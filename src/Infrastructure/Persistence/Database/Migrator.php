@@ -92,16 +92,34 @@ final class Migrator
         $this->connection->beginTransaction();
 
         try {
-            $this->connection->exec($sql);
+            foreach ($this->splitStatements($sql) as $statement) {
+                if ($statement === '') {
+                    continue;
+                }
+
+                $this->connection->exec($statement);
+            }
 
             $statement = $this->connection->prepare('INSERT INTO schema_migrations (name) VALUES (:name)');
             $statement->execute(['name' => $name]);
 
             $this->connection->commit();
         } catch (\Throwable $throwable) {
-            $this->connection->rollBack();
+            if ($this->connection->inTransaction()) {
+                $this->connection->rollBack();
+            }
 
             throw new RuntimeException(sprintf('Failed to run migration "%s": %s', $name, $throwable->getMessage()), 0, $throwable);
         }
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function splitStatements(string $sql): array
+    {
+        $statements = preg_split('/;\\s*(?=\\n|$)/', $sql) ?: [];
+
+        return array_map(static fn (string $statement): string => trim($statement), $statements);
     }
 }
