@@ -1,10 +1,10 @@
 CREATE TABLE IF NOT EXISTS materials (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id CHAR(36) NOT NULL PRIMARY KEY DEFAULT (UUID()),
     name VARCHAR(120) NOT NULL,
-    description TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
+    description TEXT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE UNIQUE INDEX IF NOT EXISTS materials_name_unique ON materials (LOWER(name));
+CREATE UNIQUE INDEX materials_name_unique ON materials (name);
 

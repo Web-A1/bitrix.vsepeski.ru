@@ -1,11 +1,11 @@
 CREATE TABLE IF NOT EXISTS trucks (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id CHAR(36) NOT NULL PRIMARY KEY DEFAULT (UUID()),
     license_plate VARCHAR(20) NOT NULL,
-    make_model VARCHAR(120),
-    notes TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
+    make_model VARCHAR(120) NULL,
+    notes TEXT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE UNIQUE INDEX IF NOT EXISTS trucks_license_plate_unique ON trucks (LOWER(license_plate));
+CREATE UNIQUE INDEX trucks_license_plate_unique ON trucks (license_plate);
 
