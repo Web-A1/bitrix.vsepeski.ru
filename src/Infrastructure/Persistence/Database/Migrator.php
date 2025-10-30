@@ -36,14 +36,16 @@ final class Migrator
 
     private function ensureSchemaMigrationsTable(): void
     {
-        $this->connection->exec(
-            <<<'SQL'
-                CREATE TABLE IF NOT EXISTS schema_migrations (
-                    name VARCHAR(255) PRIMARY KEY,
-                    executed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-                )
-            SQL
-        );
+        $driver = $this->connection->getAttribute(PDO::ATTR_DRIVER_NAME);
+
+        $timestampColumn = $driver === 'mysql'
+            ? 'TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP'
+            : 'TIMESTAMPTZ NOT NULL DEFAULT NOW()';
+
+        $this->connection->exec(sprintf(
+            'CREATE TABLE IF NOT EXISTS schema_migrations (name VARCHAR(255) PRIMARY KEY, executed_at %s)',
+            $timestampColumn
+        ));
     }
 
     /**
@@ -103,4 +105,3 @@ final class Migrator
         }
     }
 }
-
