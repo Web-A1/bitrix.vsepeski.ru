@@ -6,6 +6,7 @@ namespace B24\Center\Modules\Hauls;
 
 use B24\Center\Core\Application;
 use B24\Center\Modules\Hauls\Infrastructure\HaulRepository;
+use B24\Center\Modules\Hauls\Application\Services\HaulService;
 use B24\Center\Modules\Hauls\Infrastructure\MaterialRepository;
 use B24\Center\Modules\Hauls\Infrastructure\TruckRepository;
 use PDO;
@@ -33,6 +34,13 @@ class HaulsServiceProvider
             $connection = $container->get(PDO::class);
 
             return new TruckRepository($connection);
+        });
+
+        $app->singleton(HaulService::class, static function (Application $container): HaulService {
+            /** @var HaulRepository $repository */
+            $repository = $container->get(HaulRepository::class);
+
+            return new HaulService($repository);
         });
     }
 }
