@@ -15,10 +15,16 @@ if (file_exists($rootPath . '/.env')) {
     Dotenv::createImmutable($rootPath)->safeLoad();
 }
 
-$connection = ConnectionFactory::make();
+$migrationsPath = $rootPath . '/database/migrations';
 
-$migrator = new Migrator($connection, $rootPath . '/database/migrations');
-$migrator->migrate();
+try {
+    $connection = ConnectionFactory::make();
+    $migrator = new Migrator($connection, $migrationsPath);
+    $migrator->migrate();
+} catch (Throwable $exception) {
+    fwrite(STDERR, sprintf("Migration failed: %s\n", $exception->getMessage()));
+    exit(255);
+}
 
 fwrite(STDOUT, "Migrations executed successfully.\n");
 
