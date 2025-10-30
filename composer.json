@@ -24,7 +24,8 @@
         }
     },
     "scripts": {
-        "test": "phpunit"
+        "test": "phpunit",
+        "db:migrate": "@php bin/migrate"
     },
     "minimum-stability": "stable",
     "prefer-stable": true

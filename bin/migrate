@@ -1,0 +1,24 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+use B24\Center\Infrastructure\Persistence\Database\ConnectionFactory;
+use B24\Center\Infrastructure\Persistence\Database\Migrator;
+use Dotenv\Dotenv;
+
+$rootPath = dirname(__DIR__);
+
+require $rootPath . '/vendor/autoload.php';
+
+if (file_exists($rootPath . '/.env')) {
+    Dotenv::createImmutable($rootPath)->safeLoad();
+}
+
+$connection = ConnectionFactory::make();
+
+$migrator = new Migrator($connection, $rootPath . '/database/migrations');
+$migrator->migrate();
+
+fwrite(STDOUT, "Migrations executed successfully.\n");
+
