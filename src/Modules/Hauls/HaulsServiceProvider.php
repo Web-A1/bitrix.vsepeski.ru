@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace B24\Center\Modules\Flights;
+namespace B24\Center\Modules\Hauls;
 
 use B24\Center\Core\Application;
 
-class FlightsServiceProvider
+class HaulsServiceProvider
 {
     public function register(Application $app): void
     {
-        // Register Flights module services here.
+        // Register Hauls module specific services here.
     }
 }
 
