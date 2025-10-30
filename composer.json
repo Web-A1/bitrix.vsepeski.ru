@@ -13,7 +13,10 @@
     "autoload": {
         "psr-4": {
             "B24\\\\Center\\\\": "src/"
-        }
+        },
+        "classmap": [
+            "src/"
+        ]
     },
     "autoload-dev": {
         "psr-4": {
@@ -26,4 +29,3 @@
     "minimum-stability": "stable",
     "prefer-stable": true
 }
-
