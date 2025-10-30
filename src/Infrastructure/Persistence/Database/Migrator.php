@@ -103,7 +103,9 @@ final class Migrator
             $statement = $this->connection->prepare('INSERT INTO schema_migrations (name) VALUES (:name)');
             $statement->execute(['name' => $name]);
 
-            $this->connection->commit();
+            if ($this->connection->inTransaction()) {
+                $this->connection->commit();
+            }
         } catch (\Throwable $throwable) {
             if ($this->connection->inTransaction()) {
                 $this->connection->rollBack();
