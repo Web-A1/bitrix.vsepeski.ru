@@ -17,5 +17,5 @@ jobs:
           username: ${{ secrets.BEGET_USER }}
           key: ${{ secrets.BEGET_SSH_KEY }}
           port: ${{ secrets.BEGET_PORT || '22' }}
-          script: bash ~/www/bitrix.vsepeski.ru/deploy.sh
+          script: bash ~/bitrix.vsepeski.ru/deploy.sh
 
