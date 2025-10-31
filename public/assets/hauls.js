@@ -87,11 +87,18 @@ function setDealId(id) {
 
 async function loadReferenceData() {
   try {
-    const [trucks, materials, drivers] = await Promise.all([
+    const [trucks, materials] = await Promise.all([
       request('/api/trucks'),
       request('/api/materials'),
-      request('/api/drivers'),
     ]);
+
+    let drivers = { data: [] };
+    try {
+      drivers = await request('/api/drivers');
+    } catch (error) {
+      console.warn('Не удалось загрузить список водителей', error);
+    }
+
     state.trucks = trucks.data || [];
     state.materials = materials.data || [];
     state.drivers = drivers.data || [];
