@@ -18,6 +18,6 @@ $app = new Application();
 (new DatabaseServiceProvider())->register($app);
 
 $app->singleton(Application::class, static fn (Application $container) => $container);
-$app->singleton(Kernel::class, static fn () => new Kernel());
+$app->singleton(Kernel::class, static fn (Application $container) => new Kernel($container));
 
 return $app;

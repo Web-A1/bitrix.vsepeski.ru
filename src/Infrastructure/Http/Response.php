@@ -31,5 +31,9 @@ class Response
 
         echo $this->body;
     }
-}
 
+    public static function noContent(): self
+    {
+        return new self('', 204);
+    }
+}
