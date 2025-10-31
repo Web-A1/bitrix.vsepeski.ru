@@ -42,6 +42,7 @@ const elements = {
 };
 
 let fitTimer = null;
+let bx24Ready = null;
 
 init().catch((error) => {
   console.error('Ошибка инициализации', error);
@@ -273,21 +274,34 @@ async function detectDealId() {
     }
   }
 
-  if (state.embedded && window.BX24) {
-    await new Promise((resolve) => {
-      window.BX24.init(() => {
-        window.BX24.getPageParams((params) => {
+  if (!state.embedded) {
+    return;
+  }
+
+  const bx24 = await waitForBx24();
+  if (!bx24) {
+    console.warn('BX24 API не готова — ID сделки не определён автоматически');
+    return;
+  }
+
+  await new Promise((resolve) => {
+    try {
+      bx24.init(() => {
+        bx24.getPageParams((params) => {
           const possible = params?.deal_id || params?.ID || params?.entity_id;
           const numericId = Number(possible);
           if (Number.isFinite(numericId)) {
             setDealId(numericId);
           }
-          window.BX24?.fitWindow?.();
+          bx24.fitWindow?.();
           resolve();
         });
       });
-    });
-  }
+    } catch (error) {
+      console.warn('BX24 init/getPageParams failed', error);
+      resolve();
+    }
+  });
 }
 
 async function loadReferenceData() {
@@ -891,6 +905,36 @@ function fitWindow() {
   if (state.embedded && window.BX24 && typeof window.BX24.fitWindow === 'function') {
     window.BX24.fitWindow();
   }
+}
+
+async function waitForBx24(timeout = 5000) {
+  if (!state.embedded) {
+    return null;
+  }
+
+  if (window.BX24) {
+    return window.BX24;
+  }
+
+  if (!bx24Ready) {
+    bx24Ready = new Promise((resolve) => {
+      const started = Date.now();
+      const poll = () => {
+        if (window.BX24) {
+          resolve(window.BX24);
+          return;
+        }
+        if (Date.now() - started >= timeout) {
+          resolve(null);
+          return;
+        }
+        setTimeout(poll, 100);
+      };
+      poll();
+    });
+  }
+
+  return bx24Ready;
 }
 
 async function request(path, options = {}) {
