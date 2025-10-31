@@ -139,6 +139,7 @@ final class HaulRepository
                     unload_contact_name = :unload_contact_name,
                     unload_contact_phone = :unload_contact_phone,
                     unload_documents = :unload_documents,
+                    deleted_at = :deleted_at,
                     updated_at = NOW()
                 WHERE id = :id
             SQL
@@ -163,6 +164,7 @@ final class HaulRepository
             'unload_contact_name' => $haul->unloadContactName(),
             'unload_contact_phone' => $haul->unloadContactPhone(),
             'unload_documents' => json_encode($haul->unloadDocuments(), JSON_THROW_ON_ERROR),
+            'deleted_at' => $haul->deletedAt()?->format('Y-m-d H:i:s'),
         ]);
     }
 

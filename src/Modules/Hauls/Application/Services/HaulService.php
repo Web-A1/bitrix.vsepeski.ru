@@ -99,8 +99,7 @@ final class HaulService
             return;
         }
 
-        $existing->markDeleted(new DateTimeImmutable());
-        $this->repository->save($existing);
+        $this->repository->delete($existing->id());
     }
 
     public function restore(string $id): array
