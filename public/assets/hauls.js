@@ -274,6 +274,12 @@ async function detectDealId() {
     }
   }
 
+  const referrerId = extractDealIdFromReferrer();
+  if (referrerId) {
+    setDealId(referrerId);
+    return;
+  }
+
   if (!state.embedded) {
     return;
   }
@@ -827,11 +833,18 @@ async function deleteHaul(haulId) {
   }
 }
 
-function handleCreateRequest() {
+async function handleCreateRequest(event) {
+  event?.preventDefault?.();
+
+  if (!state.dealId) {
+    await detectDealId();
+  }
+
   if (!state.dealId) {
     alert('Сначала укажите ID сделки и загрузите список рейсов.');
     return;
   }
+
   navigateTo(views.CREATE);
 }
 
@@ -905,6 +918,26 @@ function fitWindow() {
   if (state.embedded && window.BX24 && typeof window.BX24.fitWindow === 'function') {
     window.BX24.fitWindow();
   }
+}
+
+function extractDealIdFromReferrer() {
+  const ref = document.referrer;
+  if (!ref) {
+    return null;
+  }
+
+  try {
+    const url = new URL(ref);
+    const match = url.pathname.match(/\/crm\/deal\/details\/(\d+)/);
+    if (match) {
+      const id = Number(match[1]);
+      return Number.isFinite(id) ? id : null;
+    }
+  } catch (error) {
+    console.warn('Не удалось разобрать document.referrer', error);
+  }
+
+  return null;
 }
 
 async function waitForBx24(timeout = 5000) {
