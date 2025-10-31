@@ -1,52 +1,263 @@
 const apiBase = '';
 
+const views = {
+  LIST: 'list',
+  CREATE: 'create',
+  EDIT: 'edit',
+};
+
 const state = {
   dealId: null,
+  view: views.LIST,
+  currentHaulId: null,
+  currentHaulSnapshot: null,
   trucks: [],
   materials: [],
   drivers: [],
   hauls: [],
   embedded: window !== window.top,
+  loading: false,
+  saving: false,
 };
 
 const elements = {
+  app: document.getElementById('app'),
   dealInput: document.getElementById('deal-id-input'),
   dealLabel: document.getElementById('deal-label'),
+  dealSubtitle: document.getElementById('deal-subtitle'),
   loadButton: document.getElementById('load-hauls'),
+  openCreate: document.getElementById('open-create'),
+  floatingCreate: document.getElementById('floating-create'),
+  haulsList: document.getElementById('hauls-list'),
+  editorOverlay: document.getElementById('editor-overlay'),
+  editorMode: document.getElementById('editor-mode'),
   haulForm: document.getElementById('haul-form'),
-  tableBody: document.getElementById('haul-table-body'),
+  driverSelect: document.getElementById('driver-select'),
   truckSelect: document.getElementById('truck-select'),
   materialSelect: document.getElementById('material-select'),
-  driverSelect: document.getElementById('driver-select'),
+  formError: document.getElementById('form-error'),
+  closeEditor: document.getElementById('close-editor'),
+  cancelEditor: document.getElementById('cancel-editor'),
+  submitHaul: document.getElementById('submit-haul'),
 };
 
+let fitTimer = null;
+
+init().catch((error) => {
+  console.error('Ошибка инициализации', error);
+});
+
 async function init() {
+  detectDarkMode();
   configureEmbedding();
+  attachEventHandlers();
   await loadReferenceData();
   await detectDealId();
+  updateDealMeta();
+  initRouter();
   if (state.dealId) {
     await loadHauls();
+  } else {
+    renderList();
   }
+  scheduleFitWindow();
+}
 
-  elements.loadButton.addEventListener('click', () => {
-    const dealId = Number(elements.dealInput.value);
-    if (!dealId) {
-      alert('Введите корректный ID сделки');
-      return;
-    }
-    setDealId(dealId);
-    loadHauls();
-  });
-
-  elements.haulForm.addEventListener('submit', onSubmitForm);
+function detectDarkMode() {
+  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    document.body.classList.add('dark');
+  }
 }
 
 function configureEmbedding() {
   if (state.embedded) {
-    const controls = document.querySelector('.controls');
-    if (controls) controls.style.display = 'none';
-    if (elements.loadButton) elements.loadButton.style.display = 'none';
     document.body.classList.add('embedded');
+  }
+
+  window.addEventListener('resize', () => scheduleFitWindow());
+  if (window.matchMedia) {
+    const portrait = window.matchMedia('(orientation: portrait)');
+    if (typeof portrait.addEventListener === 'function') {
+      portrait.addEventListener('change', () => scheduleFitWindow());
+    } else if (typeof portrait.addListener === 'function') {
+      portrait.addListener(() => scheduleFitWindow());
+    }
+  }
+}
+
+function attachEventHandlers() {
+  elements.loadButton?.addEventListener('click', () => {
+    const dealId = Number(elements.dealInput.value);
+    if (!Number.isFinite(dealId) || dealId <= 0) {
+      alert('Введите корректный ID сделки');
+      return;
+    }
+    setDealId(dealId);
+    navigateTo(views.LIST);
+    loadHauls();
+  });
+
+  elements.openCreate?.addEventListener('click', handleCreateRequest);
+  elements.floatingCreate?.addEventListener('click', handleCreateRequest);
+
+  elements.closeEditor?.addEventListener('click', () => navigateTo(views.LIST));
+  elements.cancelEditor?.addEventListener('click', () => navigateTo(views.LIST));
+
+  elements.editorOverlay?.addEventListener('click', (event) => {
+    if (event.target === elements.editorOverlay) {
+      navigateTo(views.LIST);
+    }
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && state.view !== views.LIST) {
+      navigateTo(views.LIST);
+    }
+  });
+
+  elements.haulForm?.addEventListener('submit', onSubmitForm);
+
+  elements.haulsList?.addEventListener('click', (event) => {
+    const editButton = event.target.closest('[data-action="edit"]');
+    if (editButton) {
+      const haulId = editButton.getAttribute('data-haul-id');
+      if (haulId) {
+        navigateTo(views.EDIT, haulId);
+      }
+      return;
+    }
+
+    const deleteButton = event.target.closest('[data-action="delete"]');
+    if (deleteButton) {
+      const haulId = deleteButton.getAttribute('data-haul-id');
+      if (haulId) {
+        deleteHaul(haulId);
+      }
+    }
+  });
+}
+
+function initRouter() {
+  window.addEventListener('hashchange', () => {
+    handleHashChange().catch((error) => console.error('Routing error', error));
+  });
+
+  if (!window.location.hash) {
+    window.location.replace(`#${views.LIST}`);
+  }
+
+  void handleHashChange();
+}
+
+async function handleHashChange() {
+  const { view, haulId } = parseHash(window.location.hash);
+  await applyView(view, haulId);
+}
+
+function parseHash(hash) {
+  const clean = (hash || '').replace(/^#/, '');
+  if (!clean) {
+    return { view: views.LIST, haulId: null };
+  }
+
+  const [view, id] = clean.split('/');
+  if (view === views.CREATE) {
+    return { view: views.CREATE, haulId: null };
+  }
+
+  if (view === views.EDIT && id) {
+    return { view: views.EDIT, haulId: id };
+  }
+
+  return { view: views.LIST, haulId: null };
+}
+
+function navigateTo(view, haulId = null) {
+  const targetHash = buildHash(view, haulId);
+  if (window.location.hash === targetHash) {
+    void applyView(view, haulId);
+  } else {
+    window.location.hash = targetHash;
+  }
+}
+
+function buildHash(view, haulId) {
+  if (view === views.CREATE) {
+    return `#${views.CREATE}`;
+  }
+  if (view === views.EDIT && haulId) {
+    return `#${views.EDIT}/${haulId}`;
+  }
+  return `#${views.LIST}`;
+}
+
+async function applyView(view, haulId) {
+  state.view = view;
+  state.currentHaulId = view === views.EDIT ? haulId : null;
+  state.currentHaulSnapshot = null;
+  elements.app?.setAttribute('data-view', view);
+
+  if (view === views.LIST) {
+    closeEditor();
+    renderList();
+    scheduleFitWindow();
+    return;
+  }
+
+  if (!state.dealId) {
+    alert('Сначала выберите сделку.');
+    navigateTo(views.LIST);
+    return;
+  }
+
+  if (view === views.CREATE) {
+    prepareCreateForm();
+    openEditor('Создание рейса');
+    return;
+  }
+
+  if (view === views.EDIT && haulId) {
+    const haul = await resolveHaul(haulId);
+    if (!haul) {
+      alert('Рейс не найден или был удалён.');
+      navigateTo(views.LIST);
+      return;
+    }
+
+    state.currentHaulSnapshot = haul;
+    prepareEditForm(haul);
+    openEditor(`Редактирование рейса №${formatSequence(haul)}`);
+  }
+}
+
+function setDealId(id) {
+  state.dealId = id;
+  if (elements.dealInput) {
+    elements.dealInput.value = id;
+  }
+  updateDealMeta();
+}
+
+function updateDealMeta() {
+  const label = state.dealId ? `#${state.dealId}` : '—';
+  if (elements.dealLabel) {
+    elements.dealLabel.textContent = label;
+  }
+
+  if (!elements.dealSubtitle) {
+    return;
+  }
+
+  if (!state.dealId) {
+    elements.dealSubtitle.textContent = 'Загрузите существующие рейсы или создайте новый.';
+    return;
+  }
+
+  const count = state.hauls.length;
+  if (count === 0) {
+    elements.dealSubtitle.textContent = 'Рейсов ещё нет — создайте первый рейс.';
+  } else {
+    elements.dealSubtitle.textContent = `Всего рейсов: ${count}`;
   }
 }
 
@@ -79,12 +290,6 @@ async function detectDealId() {
   }
 }
 
-function setDealId(id) {
-  state.dealId = id;
-  elements.dealInput.value = id;
-  elements.dealLabel.textContent = `#${id}`;
-}
-
 async function loadReferenceData() {
   try {
     const [trucks, materials] = await Promise.all([
@@ -92,214 +297,594 @@ async function loadReferenceData() {
       request('/api/materials'),
     ]);
 
-    let drivers = { data: [] };
+    let driversResponse = null;
     try {
-      drivers = await request('/api/drivers');
+      driversResponse = await request('/api/drivers');
     } catch (error) {
       console.warn('Не удалось загрузить список водителей', error);
     }
 
-    state.trucks = trucks.data || [];
-    state.materials = materials.data || [];
-    const driverList = Array.isArray(drivers?.data)
-      ? drivers.data
-      : Array.isArray(drivers) ? drivers : Object.values(drivers?.data || {});
-    state.drivers = driverList;
-    renderSelect(elements.truckSelect, state.trucks, 'license_plate');
-    renderSelect(elements.materialSelect, state.materials, 'name');
-    renderDrivers(elements.driverSelect, state.drivers);
+    state.trucks = Array.isArray(trucks?.data) ? trucks.data : [];
+    state.materials = Array.isArray(materials?.data) ? materials.data : [];
+
+    const driverData = driversResponse?.data ?? driversResponse ?? [];
+    state.drivers = Array.isArray(driverData) ? driverData : Object.values(driverData);
+    renderReferenceSelects();
   } catch (error) {
     console.error('Не удалось загрузить справочники', error);
   }
 }
 
-async function loadHauls() {
-  if (!state.dealId) return;
+function renderReferenceSelects() {
+  renderSelect(elements.driverSelect, state.drivers, {
+    placeholder: 'Выберите водителя',
+    allowEmpty: false,
+    getLabel: (driver) => {
+      const parts = [driver.name];
+      if (driver.position) {
+        parts.push(driver.position);
+      }
+      return parts.join(' · ');
+    },
+  });
 
-  try {
-    const response = await request(`/api/deals/${state.dealId}/hauls`);
-    state.hauls = response.data || [];
-    renderTable();
-  } catch (error) {
-    alert('Ошибка загрузки рейсов');
-    console.error(error);
-  }
+  renderSelect(elements.truckSelect, state.trucks, {
+    placeholder: 'Не выбрано',
+    allowEmpty: false,
+    getLabel: (truck) => truck.license_plate || truck.name || truck.id,
+  });
+
+  renderSelect(elements.materialSelect, state.materials, {
+    placeholder: 'Не выбрано',
+    allowEmpty: false,
+    getLabel: (material) => material.name || material.id,
+  });
 }
 
-function renderSelect(select, items, labelField) {
+function renderSelect(select, items, options) {
+  if (!select) return;
+
+  const { placeholder, allowEmpty, getLabel } = options;
   select.innerHTML = '';
+
   if (!items.length) {
     const option = document.createElement('option');
-    option.textContent = '--- нет данных ---';
     option.value = '';
+    option.textContent = 'данные недоступны';
+    option.disabled = true;
     select.appendChild(option);
     select.disabled = true;
     return;
   }
 
   select.disabled = false;
+  if (allowEmpty) {
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = placeholder;
+    select.appendChild(option);
+  } else {
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = placeholder;
+    option.disabled = true;
+    option.selected = true;
+    select.appendChild(option);
+  }
+
   items.forEach((item) => {
     const option = document.createElement('option');
-    option.value = item.id;
-    option.textContent = item[labelField] || item.id;
+    option.value = String(item.id);
+    option.textContent = getLabel(item);
     select.appendChild(option);
   });
 }
 
-function renderDrivers(select, drivers) {
-  select.innerHTML = '';
-
-  const placeholder = document.createElement('option');
-  placeholder.value = '';
-  placeholder.textContent = 'Выберите водителя';
-  placeholder.disabled = true;
-  placeholder.selected = true;
-  select.appendChild(placeholder);
-
-  if (!drivers.length) {
-    select.disabled = true;
+async function loadHauls() {
+  if (!state.dealId) {
     return;
   }
 
-  select.disabled = false;
-  drivers.forEach((driver) => {
-    const option = document.createElement('option');
-    option.value = driver.id;
-    const parts = [driver.name];
-    if (driver.position) {
-      parts.push(driver.position);
-    }
-    option.textContent = parts.join(' · ');
-    select.appendChild(option);
-  });
+  state.loading = true;
+  renderList();
+  try {
+    const response = await request(`/api/deals/${state.dealId}/hauls`);
+    const data = Array.isArray(response?.data) ? response.data : [];
+    state.hauls = data.slice().sort(compareHauls);
+  } catch (error) {
+    console.error('Ошибка загрузки рейсов', error);
+    alert('Не удалось загрузить список рейсов');
+  } finally {
+    state.loading = false;
+    renderList();
+    updateDealMeta();
+    scheduleFitWindow();
+  }
 }
 
-function renderTable() {
-  elements.tableBody.innerHTML = '';
+function renderList() {
+  if (!elements.haulsList) return;
+
+  const container = elements.haulsList;
+  container.classList.remove('empty', 'loading');
+  container.innerHTML = '';
+
+  if (state.loading) {
+    container.classList.add('loading');
+    return;
+  }
 
   if (!state.hauls.length) {
-    const row = document.createElement('tr');
-    const cell = document.createElement('td');
-    cell.colSpan = 7;
-    cell.textContent = 'Рейсы не найдены';
-    cell.className = 'note';
-    row.appendChild(cell);
-    elements.tableBody.appendChild(row);
+    container.classList.add('empty');
+    container.innerHTML = `
+      <div class="empty-state">
+        <p>Рейсов пока нет.</p>
+        <div class="empty-state__actions">
+          <button type="button" class="button button--primary" data-action="open-create">Создать рейс</button>
+        </div>
+      </div>
+    `;
+
+    container.querySelector('[data-action="open-create"]')?.addEventListener('click', () => {
+      handleCreateRequest();
+    });
     return;
   }
 
-  state.hauls.forEach((haul, index) => {
-    const row = document.createElement('tr');
-
-    const cells = [
-      index + 1,
-      lookupDriver(haul.responsible_id),
-      lookupLabel(state.trucks, haul.truck_id, 'license_plate'),
-      lookupLabel(state.materials, haul.material_id, 'name'),
-      haul.load.volume ?? '-',
-      haul.load.address_text,
-      haul.unload.address_text,
-    ];
-
-    cells.forEach((value) => {
-      const cell = document.createElement('td');
-      cell.textContent = value ?? '';
-      row.appendChild(cell);
-    });
-
-    const actions = document.createElement('td');
-    actions.className = 'actions';
-
-    const deleteBtn = document.createElement('button');
-    deleteBtn.type = 'button';
-    deleteBtn.textContent = 'Удалить';
-    deleteBtn.addEventListener('click', () => deleteHaul(haul.id));
-    actions.appendChild(deleteBtn);
-
-    row.appendChild(actions);
-    elements.tableBody.appendChild(row);
+  state.hauls.forEach((haul) => {
+    container.appendChild(createHaulCard(haul));
   });
-
-  fitWindow();
 }
 
-function lookupLabel(collection, id, field) {
-  const item = collection.find((entry) => entry.id === id);
-  return item ? item[field] : id ?? '-';
-}
+function createHaulCard(haul) {
+  const card = document.createElement('article');
+  card.className = 'haul-card';
+  card.dataset.haulId = haul.id;
 
-function lookupDriver(id) {
-  if (!id) {
-    return '-';
+  const header = document.createElement('div');
+  header.className = 'haul-card__header';
+
+  const headingWrapper = document.createElement('div');
+  const title = document.createElement('h3');
+  title.className = 'haul-card__title';
+  title.textContent = `Рейс №${formatSequence(haul)}`;
+
+  const meta = document.createElement('div');
+  meta.className = 'haul-card__meta';
+  const driverName = lookupDriver(haul.responsible_id) || 'Не назначен';
+  const truckLabel = lookupLabel(state.trucks, haul.truck_id, 'license_plate');
+  const materialLabel = lookupLabel(state.materials, haul.material_id, 'name');
+
+  meta.appendChild(createTag(driverName, false));
+  meta.appendChild(createTag(truckLabel, false));
+  meta.appendChild(createTag(materialLabel, true));
+
+  headingWrapper.appendChild(title);
+  headingWrapper.appendChild(meta);
+  header.appendChild(headingWrapper);
+
+  const body = document.createElement('div');
+  body.className = 'haul-card__body';
+  body.appendChild(createAddressSection('Загрузка', haul.load));
+  body.appendChild(createAddressSection('Выгрузка', haul.unload, true));
+
+  const footer = document.createElement('div');
+  footer.className = 'haul-card__actions';
+
+  const editButton = document.createElement('button');
+  editButton.type = 'button';
+  editButton.className = 'button button--ghost';
+  editButton.textContent = 'Открыть';
+  editButton.dataset.action = 'edit';
+  editButton.dataset.haulId = haul.id;
+
+  const deleteButton = document.createElement('button');
+  deleteButton.type = 'button';
+  deleteButton.className = 'button button--ghost';
+  deleteButton.textContent = 'Удалить';
+  deleteButton.dataset.action = 'delete';
+  deleteButton.dataset.haulId = haul.id;
+
+  footer.appendChild(editButton);
+  footer.appendChild(deleteButton);
+
+  if (haul.updated_at) {
+    const metaInfo = document.createElement('span');
+    metaInfo.className = 'tag tag--muted';
+    metaInfo.textContent = `Обновлено ${formatDate(haul.updated_at)}`;
+    footer.appendChild(metaInfo);
   }
-  const driver = state.drivers.find((entry) => entry.id === id);
-  return driver ? driver.name : id;
+
+  card.appendChild(header);
+  card.appendChild(body);
+  card.appendChild(footer);
+  return card;
+}
+
+function createAddressSection(title, data, isUnload = false) {
+  const section = document.createElement('div');
+  section.className = 'haul-card__section';
+
+  const heading = document.createElement('strong');
+  heading.textContent = title;
+  section.appendChild(heading);
+
+  const address = document.createElement('div');
+  address.textContent = data?.address_text || '—';
+  section.appendChild(address);
+
+  if (data?.address_url) {
+    const link = document.createElement('a');
+    link.href = data.address_url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = 'Открыть на карте';
+    section.appendChild(link);
+  }
+
+  const details = [];
+  if (data?.from_company_id) {
+    details.push(`От кого: ${data.from_company_id}`);
+  }
+  if (data?.to_company_id) {
+    details.push(`Кому: ${data.to_company_id}`);
+  }
+  if (!isUnload && Number.isFinite(Number(data?.volume))) {
+    details.push(`Объём: ${Number(data.volume).toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} м³`);
+  }
+  if (isUnload && (data?.contact_name || data?.contact_phone)) {
+    details.push(`Контакт: ${[data.contact_name, data.contact_phone].filter(Boolean).join(', ')}`);
+  }
+
+  if (details.length) {
+    const detailsEl = document.createElement('div');
+    detailsEl.className = 'haul-card__meta';
+    detailsEl.textContent = details.join(' · ');
+    section.appendChild(detailsEl);
+  }
+
+  return section;
+}
+
+function createTag(text, muted) {
+  const span = document.createElement('span');
+  span.className = muted ? 'tag tag--muted' : 'tag';
+  span.textContent = text || '—';
+  return span;
+}
+
+function compareHauls(a, b) {
+  const aSeq = typeof a.sequence === 'number' ? a.sequence : Number(a.sequence) || 0;
+  const bSeq = typeof b.sequence === 'number' ? b.sequence : Number(b.sequence) || 0;
+  return aSeq - bSeq;
+}
+
+function formatSequence(haul) {
+  const seq = typeof haul.sequence === 'number' ? haul.sequence : Number(haul.sequence);
+  if (Number.isFinite(seq) && seq > 0) {
+    return seq;
+  }
+  const index = state.hauls.findIndex((item) => item.id === haul.id);
+  return index >= 0 ? index + 1 : '-';
+}
+
+async function resolveHaul(haulId) {
+  const existing = state.hauls.find((item) => item.id === haulId);
+  if (existing) {
+    return existing;
+  }
+
+  try {
+    const response = await request(`/api/hauls/${haulId}`);
+    const haul = response?.data;
+    if (!haul) {
+      return null;
+    }
+    state.hauls.push(haul);
+    state.hauls.sort(compareHauls);
+    renderList();
+    return haul;
+  } catch (error) {
+    console.error('Не удалось получить рейс', error);
+    return null;
+  }
+}
+
+function prepareCreateForm() {
+  if (!elements.haulForm) return;
+  elements.haulForm.reset();
+  state.currentHaulSnapshot = null;
+  setSelectValue(elements.driverSelect, '');
+  setSelectValue(elements.truckSelect, '');
+  setSelectValue(elements.materialSelect, '');
+  clearFormError();
+  elements.submitHaul.textContent = 'Сохранить';
+}
+
+function prepareEditForm(haul) {
+  if (!elements.haulForm) return;
+  elements.haulForm.reset();
+  clearFormError();
+
+  setSelectValue(elements.driverSelect, haul.responsible_id);
+  setSelectValue(elements.truckSelect, haul.truck_id);
+  setSelectValue(elements.materialSelect, haul.material_id);
+
+  setFieldValue('load_volume', haul.load?.volume);
+  setFieldValue('load_address_text', haul.load?.address_text);
+  setFieldValue('load_address_url', haul.load?.address_url);
+  setFieldValue('load_from_company_id', haul.load?.from_company_id);
+  setFieldValue('load_to_company_id', haul.load?.to_company_id);
+  setFieldValue('unload_address_text', haul.unload?.address_text);
+  setFieldValue('unload_address_url', haul.unload?.address_url);
+  setFieldValue('unload_from_company_id', haul.unload?.from_company_id);
+  setFieldValue('unload_to_company_id', haul.unload?.to_company_id);
+  setFieldValue('unload_contact_name', haul.unload?.contact_name);
+  setFieldValue('unload_contact_phone', haul.unload?.contact_phone);
+
+  elements.submitHaul.textContent = 'Обновить';
+}
+
+function setFieldValue(name, value) {
+  const field = elements.haulForm?.elements?.namedItem?.(name);
+  if (!field) return;
+  if (field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement) {
+    if (value === undefined || value === null) {
+      field.value = '';
+    } else {
+      field.value = String(value);
+    }
+  }
+}
+
+function setSelectValue(select, value) {
+  if (!select) return;
+  const strValue = value === undefined || value === null ? '' : String(value);
+  select.value = strValue;
+  if (select.value !== strValue) {
+    const option = document.createElement('option');
+    option.value = strValue;
+    option.textContent = strValue;
+    select.appendChild(option);
+    select.value = strValue;
+  }
 }
 
 async function onSubmitForm(event) {
   event.preventDefault();
-  if (!state.dealId) {
-    alert('Сначала укажите ID сделки и загрузите рейсы.');
+  if (!elements.haulForm || state.saving) return;
+
+  clearFormError();
+
+  const payload = collectFormPayload();
+  const errors = validatePayload(payload);
+  if (errors.length) {
+    showFormError(errors.join(' • '));
     return;
   }
 
-  const formData = new FormData(elements.haulForm);
-  const payload = Object.fromEntries(formData.entries());
-
-  payload.responsible_id = toNumberOrNull(payload.responsible_id);
-  if (!payload.responsible_id) {
-    alert('Выберите водителя');
-    return;
+  state.saving = true;
+  const originalText = elements.submitHaul?.textContent;
+  if (elements.submitHaul) {
+    elements.submitHaul.textContent = 'Сохраняем...';
+    elements.submitHaul.disabled = true;
   }
-  payload.truck_id = payload.truck_id || null;
-  payload.material_id = payload.material_id || null;
-  payload.load_address_text = payload.load_address_text?.trim() || '';
-  payload.load_address_url = payload.load_address_url?.trim() || null;
-  payload.load_from_company_id = toNumberOrNull(payload.load_from_company_id);
-  payload.load_to_company_id = toNumberOrNull(payload.load_to_company_id);
-  payload.load_volume = toNumberOrNull(payload.load_volume);
-  payload.unload_address_text = payload.unload_address_text?.trim() || '';
-  payload.unload_address_url = payload.unload_address_url?.trim() || null;
-  payload.unload_from_company_id = toNumberOrNull(payload.unload_from_company_id);
-  payload.unload_to_company_id = toNumberOrNull(payload.unload_to_company_id);
-  payload.unload_contact_name = payload.unload_contact_name?.trim() || null;
-  payload.unload_contact_phone = payload.unload_contact_phone?.trim() || null;
-  payload.load_documents = [];
-  payload.unload_documents = [];
 
   try {
-    const response = await request(`/api/deals/${state.dealId}/hauls`, {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
+    const isEdit = state.view === views.EDIT && state.currentHaulId;
+    const url = isEdit
+      ? `/api/hauls/${state.currentHaulId}`
+      : `/api/deals/${state.dealId}/hauls`;
+    const method = isEdit ? 'PATCH' : 'POST';
 
-    state.hauls.push(response.data);
-    renderTable();
-    elements.haulForm.reset();
-    fitWindow();
+    const response = await request(url, { method, body: payload });
+    const saved = response?.data;
+
+    if (!saved) {
+      throw new Error('Ошибка обработки ответа сервера');
+    }
+
+    upsertHaul(saved);
+    updateDealMeta();
+    navigateTo(views.LIST);
   } catch (error) {
-    alert(error.message || 'Ошибка сохранения рейса');
+    console.error('Ошибка сохранения рейса', error);
+    showFormError(error.message || 'Не удалось сохранить рейс, попробуйте ещё раз');
+  } finally {
+    state.saving = false;
+    if (elements.submitHaul) {
+      elements.submitHaul.disabled = false;
+      elements.submitHaul.textContent = originalText || 'Сохранить';
+    }
   }
 }
 
+function collectFormPayload() {
+  const formData = new FormData(elements.haulForm);
+  const data = Object.fromEntries(formData.entries());
+
+  const payload = {
+    responsible_id: toNullableNumber(data.responsible_id),
+    truck_id: toNullableString(data.truck_id),
+    material_id: toNullableString(data.material_id),
+    load_volume: toNullableNumber(data.load_volume),
+    load_address_text: toNullableString(data.load_address_text, true),
+    load_address_url: toNullableString(data.load_address_url),
+    load_from_company_id: toNullableNumber(data.load_from_company_id),
+    load_to_company_id: toNullableNumber(data.load_to_company_id),
+    unload_address_text: toNullableString(data.unload_address_text, true),
+    unload_address_url: toNullableString(data.unload_address_url),
+    unload_from_company_id: toNullableNumber(data.unload_from_company_id),
+    unload_to_company_id: toNullableNumber(data.unload_to_company_id),
+    unload_contact_name: toNullableString(data.unload_contact_name),
+    unload_contact_phone: toNullableString(data.unload_contact_phone),
+    load_documents: [],
+    unload_documents: [],
+  };
+
+  if (state.currentHaulSnapshot) {
+    payload.load_documents = Array.isArray(state.currentHaulSnapshot.load?.documents)
+      ? [...state.currentHaulSnapshot.load.documents]
+      : [];
+    payload.unload_documents = Array.isArray(state.currentHaulSnapshot.unload?.documents)
+      ? [...state.currentHaulSnapshot.unload.documents]
+      : [];
+    payload.sequence = state.currentHaulSnapshot.sequence;
+  }
+
+  if (payload.responsible_id === null) {
+    delete payload.responsible_id;
+  }
+
+  return payload;
+}
+
+function validatePayload(payload) {
+  const errors = [];
+
+  if (!payload.responsible_id) {
+    errors.push('Выберите водителя');
+  }
+  if (!payload.truck_id) {
+    errors.push('Выберите самосвал');
+  }
+  if (!payload.material_id) {
+    errors.push('Выберите материал');
+  }
+  if (!payload.load_address_text) {
+    errors.push('Укажите адрес загрузки');
+  }
+  if (!payload.unload_address_text) {
+    errors.push('Укажите адрес выгрузки');
+  }
+
+  if (payload.unload_contact_phone) {
+    const phonePattern = /^[\d\s()+-]{6,}$/;
+    if (!phonePattern.test(payload.unload_contact_phone)) {
+      errors.push('Телефон введите в понятном формате (например +7 900 000-00-00)');
+    }
+  }
+
+  return errors;
+}
+
+function showFormError(message) {
+  if (elements.formError) {
+    elements.formError.textContent = message;
+  }
+}
+
+function clearFormError() {
+  if (elements.formError) {
+    elements.formError.textContent = '';
+  }
+}
+
+function upsertHaul(haul) {
+  const index = state.hauls.findIndex((item) => item.id === haul.id);
+  if (index >= 0) {
+    state.hauls.splice(index, 1, haul);
+  } else {
+    state.hauls.push(haul);
+  }
+  state.hauls.sort(compareHauls);
+  renderList();
+  scheduleFitWindow();
+}
+
 async function deleteHaul(haulId) {
-  if (!confirm('Удалить рейс?')) return;
+  if (!confirm('Удалить рейс?')) {
+    return;
+  }
 
   try {
     await request(`/api/hauls/${haulId}`, { method: 'DELETE' });
     state.hauls = state.hauls.filter((haul) => haul.id !== haulId);
-    renderTable();
+    if (state.currentHaulId === haulId) {
+      navigateTo(views.LIST);
+    } else {
+      renderList();
+      updateDealMeta();
+      scheduleFitWindow();
+    }
   } catch (error) {
-    alert('Не удалось удалить рейс');
+    console.error('Не удалось удалить рейс', error);
+    alert('Не удалось удалить рейс, попробуйте ещё раз');
   }
 }
 
-function toNumberOrNull(value) {
+function handleCreateRequest() {
+  if (!state.dealId) {
+    alert('Сначала укажите ID сделки и загрузите список рейсов.');
+    return;
+  }
+  navigateTo(views.CREATE);
+}
+
+function openEditor(modeText) {
+  elements.editorMode.textContent = modeText;
+  elements.editorOverlay.classList.add('is-open');
+  elements.editorOverlay.setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
+  scheduleFitWindow();
+}
+
+function closeEditor() {
+  elements.editorOverlay.classList.remove('is-open');
+  elements.editorOverlay.setAttribute('aria-hidden', 'true');
+  document.body.style.overflow = '';
+  state.currentHaulSnapshot = null;
+  elements.haulForm?.reset();
+  clearFormError();
+}
+
+function lookupLabel(collection, id, field) {
+  const item = collection.find((entry) => String(entry.id) === String(id));
+  return item ? item[field] || item.id : id ?? '—';
+}
+
+function lookupDriver(id) {
+  if (!id) return null;
+  const driver = state.drivers.find((entry) => String(entry.id) === String(id));
+  return driver ? driver.name : id;
+}
+
+function toNullableNumber(value) {
   if (value === undefined || value === null || value === '') {
     return null;
   }
   const num = Number(value);
   return Number.isFinite(num) ? num : null;
+}
+
+function toNullableString(value, trim = false) {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  const str = trim ? String(value).trim() : String(value);
+  return str === '' ? null : str;
+}
+
+function formatDate(input) {
+  const date = new Date(input);
+  if (Number.isNaN(date.getTime())) {
+    return input;
+  }
+  return new Intl.DateTimeFormat('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+}
+
+function scheduleFitWindow(delay = 120) {
+  if (!state.embedded) return;
+  if (fitTimer) {
+    clearTimeout(fitTimer);
+  }
+  fitTimer = setTimeout(fitWindow, delay);
 }
 
 function fitWindow() {
@@ -309,27 +894,30 @@ function fitWindow() {
 }
 
 async function request(path, options = {}) {
-  const response = await fetch(apiBase + path, {
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    ...options,
-  });
+  const { method = 'GET', body, headers = {} } = options;
 
+  const init = {
+    method,
+    headers: {
+      Accept: 'application/json',
+      ...headers,
+    },
+  };
+
+  if (body !== undefined) {
+    init.body = typeof body === 'string' ? body : JSON.stringify(body);
+    init.headers['Content-Type'] = 'application/json';
+  }
+
+  const response = await fetch(apiBase + path, init);
   const contentType = response.headers.get('content-type') || '';
-  const data = contentType.includes('application/json') ? await response.json() : {};
+  const isJson = contentType.includes('application/json');
+  const data = isJson ? await response.json() : null;
 
   if (!response.ok) {
-    const message = data.error || response.statusText;
+    const message = data?.error || response.statusText || 'Request failed';
     throw new Error(message);
   }
 
-  return data;
+  return data ?? {};
 }
-
-// auto-detect dark mode
-if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-  document.body.classList.add('dark');
-}
-
-init();

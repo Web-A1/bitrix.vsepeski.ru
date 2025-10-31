@@ -4,108 +4,142 @@
     <script src="https://api.bitrix24.com/api/v1/" async></script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Рейсы</title>
+    <title>Рейсы сделки</title>
     <link rel="stylesheet" href="../assets/hauls.css" />
   </head>
   <body>
-    <div class="app">
-      <header>
-        <h1>Рейсы сделки <span id="deal-label"></span></h1>
-        <div class="controls">
-          <label>
-            ID сделки
-            <input type="number" id="deal-id-input" />
-          </label>
-          <button id="load-hauls">Загрузить</button>
+    <div class="app" id="app" data-view="list">
+      <header class="app__header">
+        <div class="app__title">
+          <h1>Рейсы сделки <span id="deal-label"></span></h1>
+          <p class="app__subtitle" id="deal-subtitle">
+            Загрузите существующие рейсы или создайте новый.
+          </p>
+        </div>
+        <div class="app__actions">
+          <div class="deal-controls" id="deal-controls">
+            <label class="deal-controls__field">
+              <span>ID сделки</span>
+              <input type="number" id="deal-id-input" inputmode="numeric" placeholder="Например 21345" />
+            </label>
+            <button type="button" id="load-hauls" class="button button--ghost">Загрузить</button>
+          </div>
+          <button type="button" id="open-create" class="button button--primary">
+            Новый рейс
+          </button>
         </div>
       </header>
 
-      <section class="form-section">
-        <h2>Новый рейс</h2>
-        <form id="haul-form">
-          <div class="grid">
-            <label>Водитель
-              <select name="responsible_id" id="driver-select"></select>
-            </label>
-            <label>Самосвал
-              <select name="truck_id" id="truck-select"></select>
-            </label>
-            <label>Материал
-              <select name="material_id" id="material-select"></select>
-            </label>
-            <label>Объём (м³)
-              <input type="number" step="0.01" name="load_volume" />
-            </label>
+      <main class="app__main">
+        <section class="hauls-list" id="hauls-list" aria-live="polite"></section>
+      </main>
+
+      <button type="button" id="floating-create" class="fab" aria-label="Создать рейс">
+        +
+      </button>
+    </div>
+
+    <div class="editor-overlay" id="editor-overlay" aria-hidden="true">
+      <section class="editor" role="dialog" aria-modal="true" aria-labelledby="editor-title">
+        <header class="editor__header">
+          <div>
+            <p class="editor__mode" id="editor-mode"></p>
+            <h2 id="editor-title">Рейс</h2>
+          </div>
+          <div class="editor__header-actions">
+            <button type="button" class="button button--ghost" id="close-editor">Закрыть</button>
+          </div>
+        </header>
+        <form id="haul-form" novalidate>
+          <div class="form-group">
+            <h3>Основное</h3>
+            <div class="field-grid">
+              <label>
+                <span>Водитель <small>(обязательно)</small></span>
+                <select name="responsible_id" id="driver-select" required></select>
+                <span class="hint">Список из отдела «Водители» в Bitrix24</span>
+              </label>
+              <label>
+                <span>Самосвал <small>(обязательно)</small></span>
+                <select name="truck_id" id="truck-select" required></select>
+              </label>
+              <label>
+                <span>Материал <small>(обязательно)</small></span>
+                <select name="material_id" id="material-select" required></select>
+              </label>
+              <label>
+                <span>Объём, м³</span>
+                <input type="number" step="0.01" min="0" name="load_volume" placeholder="0.00" inputmode="decimal" />
+              </label>
+            </div>
           </div>
 
-          <fieldset>
-            <legend>Загрузка</legend>
-            <label>Адрес
-              <input type="text" name="load_address_text" required />
-            </label>
-            <label>Ссылка на карту
-              <input type="url" name="load_address_url" />
-            </label>
-            <div class="grid">
-              <label>Компания от кого (ID)
-                <input type="number" name="load_from_company_id" />
+          <div class="form-group">
+            <h3>Точка загрузки</h3>
+            <div class="field-grid field-grid--two">
+              <label>
+                <span>Адрес <small>(обязательно)</small></span>
+                <textarea name="load_address_text" rows="2" required placeholder="Город, улица, точка GPS"></textarea>
               </label>
-              <label>Компания кому (ID)
-                <input type="number" name="load_to_company_id" />
+              <label>
+                <span>Ссылка на карту</span>
+                <input type="url" name="load_address_url" placeholder="https://yandex.ru/maps/..." />
+              </label>
+              <label>
+                <span>ID компании-отправителя</span>
+                <input type="number" name="load_from_company_id" inputmode="numeric" placeholder="цифры или оставить пустым" />
+              </label>
+              <label>
+                <span>ID компании-получателя</span>
+                <input type="number" name="load_to_company_id" inputmode="numeric" placeholder="цифры или оставить пустым" />
               </label>
             </div>
-          </fieldset>
+          </div>
 
-          <fieldset>
-            <legend>Выгрузка</legend>
-            <label>Адрес
-              <input type="text" name="unload_address_text" required />
-            </label>
-            <label>Ссылка на карту
-              <input type="url" name="unload_address_url" />
-            </label>
-            <div class="grid">
-              <label>Компания от кого (ID)
-                <input type="number" name="unload_from_company_id" />
+          <div class="form-group">
+            <h3>Точка выгрузки</h3>
+            <div class="field-grid field-grid--two">
+              <label>
+                <span>Адрес <small>(обязательно)</small></span>
+                <textarea name="unload_address_text" rows="2" required placeholder="Город, улица, точка GPS"></textarea>
               </label>
-              <label>Компания кому (ID)
-                <input type="number" name="unload_to_company_id" />
+              <label>
+                <span>Ссылка на карту</span>
+                <input type="url" name="unload_address_url" placeholder="https://yandex.ru/maps/..." />
+              </label>
+              <label>
+                <span>ID компании-отправителя</span>
+                <input type="number" name="unload_from_company_id" inputmode="numeric" placeholder="цифры или оставить пустым" />
+              </label>
+              <label>
+                <span>ID компании-получателя</span>
+                <input type="number" name="unload_to_company_id" inputmode="numeric" placeholder="цифры или оставить пустым" />
+              </label>
+              <label>
+                <span>Контактное лицо</span>
+                <input type="text" name="unload_contact_name" placeholder="Имя или должность" maxlength="160" />
+              </label>
+              <label>
+                <span>Телефон</span>
+                <input type="tel" name="unload_contact_phone" placeholder="+7 900 000-00-00" maxlength="40" />
               </label>
             </div>
-            <div class="grid">
-              <label>Контактное имя
-                <input type="text" name="unload_contact_name" />
-              </label>
-              <label>Контактный телефон
-                <input type="tel" name="unload_contact_phone" />
-              </label>
-            </div>
-          </fieldset>
+          </div>
 
-          <button type="submit">Сохранить рейс</button>
+          <footer class="editor__footer">
+            <span class="form-error" id="form-error" role="alert"></span>
+            <div class="editor__footer-actions">
+              <button type="button" class="button button--ghost" id="cancel-editor">Отмена</button>
+              <button type="submit" class="button button--primary" id="submit-haul">Сохранить</button>
+            </div>
+          </footer>
         </form>
       </section>
-
-      <section class="list-section">
-        <h2>Список рейсов</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Водитель</th>
-              <th>Авто</th>
-              <th>Материал</th>
-              <th>Объём</th>
-              <th>Загрузка</th>
-              <th>Выгрузка</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="haul-table-body"></tbody>
-        </table>
-      </section>
     </div>
+
     <script src="../assets/hauls.js" type="module"></script>
-      <script>window.B24_HAULS_WIDGET = true;</script>
+    <script>
+      window.B24_HAULS_WIDGET = true;
+    </script>
   </body>
 </html>
