@@ -101,7 +101,10 @@ async function loadReferenceData() {
 
     state.trucks = trucks.data || [];
     state.materials = materials.data || [];
-    state.drivers = Array.isArray(drivers.data) ? drivers.data : [];
+    const driverList = Array.isArray(drivers?.data)
+      ? drivers.data
+      : Array.isArray(drivers) ? drivers : Object.values(drivers?.data || {});
+    state.drivers = driverList;
     renderSelect(elements.truckSelect, state.trucks, 'license_plate');
     renderSelect(elements.materialSelect, state.materials, 'name');
     renderDrivers(elements.driverSelect, state.drivers);
