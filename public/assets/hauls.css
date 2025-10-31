@@ -159,3 +159,5 @@ body.dark button {
   font-size: 0.85rem;
   color: #666;
 }
+
+body.embedded .controls { display: none; }

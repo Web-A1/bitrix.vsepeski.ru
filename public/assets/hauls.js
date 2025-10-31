@@ -5,6 +5,7 @@ const state = {
   trucks: [],
   materials: [],
   hauls: [],
+  embedded: window !== window.top,
 };
 
 const elements = {
@@ -17,17 +18,12 @@ const elements = {
   materialSelect: document.getElementById('material-select'),
 };
 
-function init() {
-  const searchParams = new URLSearchParams(window.location.search);
-  const dealIdParam = searchParams.get('dealId');
-
-  if (dealIdParam) {
-    state.dealId = Number(dealIdParam);
-    elements.dealInput.value = state.dealId;
-    elements.dealLabel.textContent = `#${state.dealId}`;
-    loadReferenceData().then(() => loadHauls());
-  } else {
-    loadReferenceData();
+async function init() {
+  configureEmbedding();
+  await loadReferenceData();
+  await detectDealId();
+  if (state.dealId) {
+    await loadHauls();
   }
 
   elements.loadButton.addEventListener('click', () => {
@@ -36,12 +32,55 @@ function init() {
       alert('Введите корректный ID сделки');
       return;
     }
-    state.dealId = dealId;
-    elements.dealLabel.textContent = `#${state.dealId}`;
+    setDealId(dealId);
     loadHauls();
   });
 
   elements.haulForm.addEventListener('submit', onSubmitForm);
+}
+
+function configureEmbedding() {
+  if (state.embedded) {
+    const controls = document.querySelector('.controls');
+    if (controls) controls.style.display = 'none';
+    if (elements.loadButton) elements.loadButton.style.display = 'none';
+    document.body.classList.add('embedded');
+  }
+}
+
+async function detectDealId() {
+  const searchParams = new URLSearchParams(window.location.search);
+  const candidate = searchParams.get('dealId') || searchParams.get('deal_id');
+
+  if (candidate) {
+    const numericId = Number(candidate);
+    if (Number.isFinite(numericId)) {
+      setDealId(numericId);
+      return;
+    }
+  }
+
+  if (state.embedded && window.BX24) {
+    await new Promise((resolve) => {
+      window.BX24.init(() => {
+        window.BX24.getPageParams((params) => {
+          const possible = params?.deal_id || params?.ID || params?.entity_id;
+          const numericId = Number(possible);
+          if (Number.isFinite(numericId)) {
+            setDealId(numericId);
+          }
+          window.BX24?.fitWindow?.();
+          resolve();
+        });
+      });
+    });
+  }
+}
+
+function setDealId(id) {
+  state.dealId = id;
+  elements.dealInput.value = id;
+  elements.dealLabel.textContent = `#${id}`;
 }
 
 async function loadReferenceData() {
@@ -134,6 +173,8 @@ function renderTable() {
     row.appendChild(actions);
     elements.tableBody.appendChild(row);
   });
+
+  fitWindow();
 }
 
 function lookupLabel(collection, id, field) {
@@ -177,6 +218,7 @@ async function onSubmitForm(event) {
     state.hauls.push(response.data);
     renderTable();
     elements.haulForm.reset();
+    fitWindow();
   } catch (error) {
     alert(error.message || 'Ошибка сохранения рейса');
   }
@@ -200,6 +242,12 @@ function toNumberOrNull(value) {
   }
   const num = Number(value);
   return Number.isFinite(num) ? num : null;
+}
+
+function fitWindow() {
+  if (state.embedded && window.BX24 && typeof window.BX24.fitWindow === 'function') {
+    window.BX24.fitWindow();
+  }
 }
 
 async function request(path, options = {}) {
