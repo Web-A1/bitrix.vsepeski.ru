@@ -66,6 +66,40 @@ class Kernel
             };
         }
 
+        if ($path === '/api/trucks') {
+            return match ($method) {
+                'GET' => $truckController->index(),
+                'POST' => $truckController->store($request),
+                default => $this->methodNotAllowed(['GET', 'POST']),
+            };
+        }
+
+        if (preg_match('#^/api/trucks/([A-Za-z0-9\\-]+)$#', $path, $matches)) {
+            $truckId = $matches[1];
+
+            return match ($method) {
+                'DELETE' => $truckController->destroy($truckId),
+                default => $this->methodNotAllowed(['DELETE']),
+            };
+        }
+
+        if ($path === '/api/materials') {
+            return match ($method) {
+                'GET' => $materialController->index(),
+                'POST' => $materialController->store($request),
+                default => $this->methodNotAllowed(['GET', 'POST']),
+            };
+        }
+
+        if (preg_match('#^/api/materials/([A-Za-z0-9\\-]+)$#', $path, $matches)) {
+            $materialId = $matches[1];
+
+            return match ($method) {
+                'DELETE' => $materialController->destroy($materialId),
+                default => $this->methodNotAllowed(['DELETE']),
+            };
+        }
+
         if (preg_match('#^/api/hauls/([A-Za-z0-9\\-]+)$#', $path, $matches)) {
             $haulId = $matches[1];
 
@@ -92,4 +126,3 @@ class Kernel
         );
     }
 }
-
