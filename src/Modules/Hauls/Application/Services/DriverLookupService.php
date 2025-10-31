@@ -36,19 +36,33 @@ final class DriverLookupService
             return [];
         }
 
-        return array_map(function (array $user): array {
-            $name = trim(sprintf('%s %s %s', $user['LAST_NAME'] ?? '', $user['NAME'] ?? '', $user['SECOND_NAME'] ?? ''));
+        $drivers = array_filter($users, function (array $driver): bool {
+            $positions = array_filter(array_map('trim', [
+                $driver['WORK_POSITION'] ?? '',
+                $driver['POSITION'] ?? '',
+            ]));
+            if (!$positions) {
+                return false;
+            }
+
+            return count(array_filter($positions, static function (string $value): bool {
+                return mb_strtolower($value) === mb_strtolower('Водитель');
+            })) > 0;
+        });
+
+        return array_map(function (array $driver): array {
+            $name = trim(sprintf('%s %s %s', $driver['LAST_NAME'] ?? '', $driver['NAME'] ?? '', $driver['SECOND_NAME'] ?? ''));
             if ($name === '') {
-                $name = $user['NAME'] ?? 'Без имени';
+                $name = $driver['NAME'] ?? 'Без имени';
             }
 
             return [
-                'id' => (int) ($user['ID'] ?? 0),
+                'id' => (int) ($driver['ID'] ?? 0),
                 'name' => $name,
-                'position' => $user['WORK_POSITION'] ?? null,
-                'phone' => $user['PERSONAL_MOBILE'] ?? null,
+                'position' => $driver['WORK_POSITION'] ?? null,
+                'phone' => $driver['PERSONAL_MOBILE'] ?? null,
             ];
-        }, $users);
+        }, $drivers);
     }
 
     private function resolveDepartmentId(): int
