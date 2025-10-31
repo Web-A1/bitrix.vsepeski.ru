@@ -101,7 +101,7 @@ async function loadReferenceData() {
 
     state.trucks = trucks.data || [];
     state.materials = materials.data || [];
-    state.drivers = drivers.data || [];
+    state.drivers = Array.isArray(drivers.data) ? drivers.data : [];
     renderSelect(elements.truckSelect, state.trucks, 'license_plate');
     renderSelect(elements.materialSelect, state.materials, 'name');
     renderDrivers(elements.driverSelect, state.drivers);
@@ -244,6 +244,10 @@ async function onSubmitForm(event) {
   const payload = Object.fromEntries(formData.entries());
 
   payload.responsible_id = toNumberOrNull(payload.responsible_id);
+  if (!payload.responsible_id) {
+    alert('Выберите водителя');
+    return;
+  }
   payload.truck_id = payload.truck_id || null;
   payload.material_id = payload.material_id || null;
   payload.load_address_text = payload.load_address_text?.trim() || '';
