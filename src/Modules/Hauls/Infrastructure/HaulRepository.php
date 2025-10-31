@@ -56,7 +56,6 @@ final class HaulRepository
                     :unload_address_text, :unload_address_url, :unload_from_company_id, :unload_to_company_id,
                     :unload_contact_name, :unload_contact_phone, :unload_documents
                 )
-                RETURNING *
             SQL
         );
 
@@ -82,13 +81,13 @@ final class HaulRepository
             'unload_documents' => json_encode($payload['unload_documents'] ?? [], JSON_THROW_ON_ERROR),
         ]);
 
-        $row = $statement->fetch();
+        $entity = $this->find($id);
 
-        if ($row === false) {
+        if ($entity === null) {
             throw new RuntimeException('Failed to insert haul.');
         }
 
-        return $this->hydrate($row);
+        return $entity;
     }
 
     /**
