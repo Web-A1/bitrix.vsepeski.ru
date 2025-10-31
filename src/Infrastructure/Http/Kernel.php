@@ -10,9 +10,11 @@ use B24\Center\Infrastructure\Http\Response;
 use B24\Center\Modules\Hauls\Application\Services\HaulService;
 use B24\Center\Modules\Hauls\Infrastructure\MaterialRepository;
 use B24\Center\Modules\Hauls\Infrastructure\TruckRepository;
+use B24\Center\Modules\Hauls\Application\Services\DriverLookupService;
 use B24\Center\Modules\Hauls\Ui\HaulController;
 use B24\Center\Modules\Hauls\Ui\MaterialController;
 use B24\Center\Modules\Hauls\Ui\TruckController;
+use B24\Center\Modules\Hauls\Ui\DriverController;
 use DateTimeImmutable;
 use Throwable;
 
@@ -55,6 +57,7 @@ class Kernel
         $haulController = new HaulController($this->container->get(HaulService::class));
         $truckController = new TruckController($this->container->get(TruckRepository::class));
         $materialController = new MaterialController($this->container->get(MaterialRepository::class));
+        $driverController = new DriverController($this->container->get(DriverLookupService::class));
 
         if (preg_match('#^/api/deals/(\d+)/hauls$#', $path, $matches)) {
             $dealId = (int) $matches[1];
@@ -80,6 +83,13 @@ class Kernel
             return match ($method) {
                 'DELETE' => $truckController->destroy($truckId),
                 default => $this->methodNotAllowed(['DELETE']),
+            };
+        }
+
+        if ($path === '/api/drivers') {
+            return match ($method) {
+                'GET' => $driverController->index(),
+                default => $this->methodNotAllowed(['GET']),
             };
         }
 

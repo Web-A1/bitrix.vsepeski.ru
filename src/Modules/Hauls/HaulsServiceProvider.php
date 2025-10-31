@@ -9,6 +9,8 @@ use B24\Center\Modules\Hauls\Infrastructure\HaulRepository;
 use B24\Center\Modules\Hauls\Application\Services\HaulService;
 use B24\Center\Modules\Hauls\Infrastructure\MaterialRepository;
 use B24\Center\Modules\Hauls\Infrastructure\TruckRepository;
+use B24\Center\Infrastructure\Bitrix\BitrixRestClient;
+use B24\Center\Modules\Hauls\Application\Services\DriverLookupService;
 use PDO;
 
 class HaulsServiceProvider
@@ -34,6 +36,20 @@ class HaulsServiceProvider
             $connection = $container->get(PDO::class);
 
             return new TruckRepository($connection);
+        });
+
+        $app->singleton(BitrixRestClient::class, static function (): BitrixRestClient {
+            $config = require dirname(__DIR__, 3) . '/config/bitrix.php';
+            $webhookUrl = rtrim($config['webhook_url'] ?? '', '/');
+
+            return new BitrixRestClient($webhookUrl);
+        });
+
+        $app->singleton(DriverLookupService::class, static function (Application $container): DriverLookupService {
+            $config = require dirname(__DIR__, 3) . '/config/bitrix.php';
+            $department = $config['drivers_department'] ?? 'Водители';
+
+            return new DriverLookupService($container->get(BitrixRestClient::class), $department);
         });
 
         $app->singleton(HaulService::class, static function (Application $container): HaulService {

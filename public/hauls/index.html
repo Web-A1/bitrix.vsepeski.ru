@@ -24,8 +24,8 @@
         <h2>Новый рейс</h2>
         <form id="haul-form">
           <div class="grid">
-            <label>Водитель (ID)
-              <input type="number" name="responsible_id" />
+            <label>Водитель
+              <select name="responsible_id" id="driver-select"></select>
             </label>
             <label>Самосвал
               <select name="truck_id" id="truck-select"></select>
@@ -92,6 +92,7 @@
           <thead>
             <tr>
               <th>#</th>
+              <th>Водитель</th>
               <th>Авто</th>
               <th>Материал</th>
               <th>Объём</th>

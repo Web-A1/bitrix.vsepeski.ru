@@ -4,6 +4,7 @@ const state = {
   dealId: null,
   trucks: [],
   materials: [],
+  drivers: [],
   hauls: [],
   embedded: window !== window.top,
 };
@@ -16,6 +17,7 @@ const elements = {
   tableBody: document.getElementById('haul-table-body'),
   truckSelect: document.getElementById('truck-select'),
   materialSelect: document.getElementById('material-select'),
+  driverSelect: document.getElementById('driver-select'),
 };
 
 async function init() {
@@ -85,14 +87,17 @@ function setDealId(id) {
 
 async function loadReferenceData() {
   try {
-    const [trucks, materials] = await Promise.all([
+    const [trucks, materials, drivers] = await Promise.all([
       request('/api/trucks'),
       request('/api/materials'),
+      request('/api/drivers'),
     ]);
     state.trucks = trucks.data || [];
     state.materials = materials.data || [];
+    state.drivers = drivers.data || [];
     renderSelect(elements.truckSelect, state.trucks, 'license_plate');
     renderSelect(elements.materialSelect, state.materials, 'name');
+    renderDrivers(elements.driverSelect, state.drivers);
   } catch (error) {
     console.error('Не удалось загрузить справочники', error);
   }
@@ -118,13 +123,43 @@ function renderSelect(select, items, labelField) {
     option.textContent = '--- нет данных ---';
     option.value = '';
     select.appendChild(option);
+    select.disabled = true;
     return;
   }
 
+  select.disabled = false;
   items.forEach((item) => {
     const option = document.createElement('option');
     option.value = item.id;
     option.textContent = item[labelField] || item.id;
+    select.appendChild(option);
+  });
+}
+
+function renderDrivers(select, drivers) {
+  select.innerHTML = '';
+
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = 'Выберите водителя';
+  placeholder.disabled = true;
+  placeholder.selected = true;
+  select.appendChild(placeholder);
+
+  if (!drivers.length) {
+    select.disabled = true;
+    return;
+  }
+
+  select.disabled = false;
+  drivers.forEach((driver) => {
+    const option = document.createElement('option');
+    option.value = driver.id;
+    const parts = [driver.name];
+    if (driver.position) {
+      parts.push(driver.position);
+    }
+    option.textContent = parts.join(' · ');
     select.appendChild(option);
   });
 }
@@ -148,6 +183,7 @@ function renderTable() {
 
     const cells = [
       index + 1,
+      lookupDriver(haul.responsible_id),
       lookupLabel(state.trucks, haul.truck_id, 'license_plate'),
       lookupLabel(state.materials, haul.material_id, 'name'),
       haul.load.volume ?? '-',
@@ -179,7 +215,15 @@ function renderTable() {
 
 function lookupLabel(collection, id, field) {
   const item = collection.find((entry) => entry.id === id);
-  return item ? item[field] : id;
+  return item ? item[field] : id ?? '-';
+}
+
+function lookupDriver(id) {
+  if (!id) {
+    return '-';
+  }
+  const driver = state.drivers.find((entry) => entry.id === id);
+  return driver ? driver.name : id;
 }
 
 async function onSubmitForm(event) {
