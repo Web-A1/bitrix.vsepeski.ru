@@ -11,8 +11,6 @@ declare(strict_types=1);
  * дальнейшие REST-вызовы могли выполняться от имени приложения.
  */
 
-header('Content-Type: application/json; charset=utf-8');
-
 $rawBody = file_get_contents('php://input') ?: '';
 $decoded = json_decode($rawBody, true);
 
@@ -48,8 +46,33 @@ if (isset($payload['auth']) && is_array($payload['auth'])) {
     ];
 }
 
-if (empty($auth['access_token']) || empty($auth['refresh_token'])) {
-    // Нет авторизационных данных — вероятно, страница открыта пользователем вручную.
+$hasTokens = !empty($auth['access_token']) && !empty($auth['refresh_token']);
+$isPlacementLaunch = isset($payload['PLACEMENT']);
+
+if (!$hasTokens) {
+    if ($isPlacementLaunch) {
+        // Обычный запуск размещения в CRM: отдаём фронтенд вместо JSON.
+        $projectRoot = dirname(__DIR__, 2);
+        $indexPath = $projectRoot . '/public/hauls/index.html';
+
+        if (!is_file($indexPath)) {
+            http_response_code(500);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode([
+                'result' => false,
+                'error' => 'hauls index missing',
+                'path' => $indexPath,
+            ], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+
+        header('Content-Type: text/html; charset=utf-8');
+        readfile($indexPath);
+        return;
+    }
+
+    header('Content-Type: application/json; charset=utf-8');
+    // Нет авторизационных данных — вероятно, ручной запрос или пинг.
     echo json_encode([
         'result' => true,
         'message' => 'Install endpoint ready',
@@ -93,6 +116,7 @@ $json = json_encode($storedData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JS
 
 if (file_put_contents($filePath, $json) === false) {
     http_response_code(500);
+    header('Content-Type: application/json; charset=utf-8');
     echo json_encode([
         'result' => false,
         'error' => 'failed to persist auth payload',
@@ -123,6 +147,7 @@ if (is_string($domain) && $domain !== '') {
     );
 }
 
+header('Content-Type: application/json; charset=utf-8');
 echo json_encode(['result' => true, 'bindings' => $bindings], JSON_UNESCAPED_UNICODE);
 
 /**
