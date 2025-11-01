@@ -5,6 +5,7 @@
 /storage/logs/
 /storage/cache/
 /storage/tmp/
+/storage/bitrix/
 /node_modules/
 /.idea/
 .DS_Store
