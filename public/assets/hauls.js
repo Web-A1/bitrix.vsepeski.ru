@@ -65,6 +65,11 @@ async function init() {
 }
 
 function detectDarkMode() {
+  if (state.embedded) {
+    document.body.classList.remove('dark');
+    return;
+  }
+
   if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
     document.body.classList.add('dark');
   }
@@ -293,15 +298,42 @@ async function detectDealId() {
   await new Promise((resolve) => {
     try {
       bx24.init(() => {
-        bx24.getPageParams((params) => {
-          const possible = params?.deal_id || params?.ID || params?.entity_id;
+        let resolved = false;
+
+        const applyDealId = (possible) => {
           const numericId = Number(possible);
           if (Number.isFinite(numericId)) {
             setDealId(numericId);
+            resolved = true;
+            if (state.hauls.length === 0) {
+              loadHauls();
+            }
           }
+        };
+
+        try {
+          const placementInfo = typeof bx24.placement?.info === 'function'
+            ? bx24.placement.info()
+            : null;
+          const placementId = placementInfo?.entity_id
+            ?? placementInfo?.deal_id
+            ?? placementInfo?.ID
+            ?? placementInfo?.ENTITY_ID;
+          if (placementId) {
+            applyDealId(placementId);
+          }
+        } catch (infoError) {
+          console.warn('BX24 placement info недоступна', infoError);
+        }
+
+        bx24.getPageParams((params) => {
+          const possible = params?.deal_id || params?.ID || params?.entity_id || params?.ENTITY_ID;
+          applyDealId(possible);
           bx24.fitWindow?.();
           resolve();
         });
+
+        setTimeout(() => resolve(), 500);
       });
     } catch (error) {
       console.warn('BX24 init/getPageParams failed', error);
@@ -838,6 +870,8 @@ async function handleCreateRequest(event) {
 
   if (!state.dealId) {
     await detectDealId();
+  } else if (state.hauls.length === 0) {
+    await loadHauls();
   }
 
   if (!state.dealId) {
