@@ -271,6 +271,31 @@ function updateDealMeta() {
 
 async function detectDealId() {
   const searchParams = new URLSearchParams(window.location.search);
+  const placementOptionsRaw =
+    searchParams.get('PLACEMENT_OPTIONS') ||
+    searchParams.get('placement_options');
+
+  if (placementOptionsRaw) {
+    try {
+      const options = JSON.parse(placementOptionsRaw);
+      const optionDealId =
+        options?.entityId ??
+        options?.ENTITY_ID ??
+        options?.dealId ??
+        options?.DEAL_ID ??
+        options?.ID ??
+        options?.entity_id ??
+        options?.deal?.ID;
+      const numeric = Number(optionDealId);
+      if (Number.isFinite(numeric)) {
+        setDealId(numeric);
+        return;
+      }
+    } catch (error) {
+      console.warn('Не удалось разобрать PLACEMENT_OPTIONS', error);
+    }
+  }
+
   const candidate = searchParams.get('dealId') || searchParams.get('deal_id');
 
   if (candidate) {
