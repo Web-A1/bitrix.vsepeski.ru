@@ -48,29 +48,37 @@ if (isset($payload['auth']) && is_array($payload['auth'])) {
 
 $hasTokens = !empty($auth['access_token']) && !empty($auth['refresh_token']);
 $isPlacementLaunch = isset($payload['PLACEMENT']);
+$eventName = null;
 
-if (!$hasTokens) {
-    if ($isPlacementLaunch) {
-        // Обычный запуск размещения в CRM: отдаём фронтенд вместо JSON.
-        $projectRoot = dirname(__DIR__, 2);
-        $indexPath = $projectRoot . '/public/hauls/index.html';
+if (isset($payload['event']) && is_string($payload['event'])) {
+    $eventName = $payload['event'];
+} elseif (isset($payload['EVENT']) && is_string($payload['EVENT'])) {
+    $eventName = $payload['EVENT'];
+}
 
-        if (!is_file($indexPath)) {
-            http_response_code(500);
-            header('Content-Type: application/json; charset=utf-8');
-            echo json_encode([
-                'result' => false,
-                'error' => 'hauls index missing',
-                'path' => $indexPath,
-            ], JSON_UNESCAPED_UNICODE);
-            return;
-        }
+$isInstallEvent = is_string($eventName) && stripos($eventName, 'ONAPPINSTALL') !== false;
 
-        header('Content-Type: text/html; charset=utf-8');
-        readfile($indexPath);
+if ($isPlacementLaunch && !$isInstallEvent) {
+    $projectRoot = dirname(__DIR__, 2);
+    $indexPath = $projectRoot . '/public/hauls/index.html';
+
+    if (!is_file($indexPath)) {
+        http_response_code(500);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'result' => false,
+            'error' => 'hauls index missing',
+            'path' => $indexPath,
+        ], JSON_UNESCAPED_UNICODE);
         return;
     }
 
+    header('Content-Type: text/html; charset=utf-8');
+    readfile($indexPath);
+    return;
+}
+
+if (!$hasTokens) {
     header('Content-Type: application/json; charset=utf-8');
     // Нет авторизационных данных — вероятно, ручной запрос или пинг.
     echo json_encode([
