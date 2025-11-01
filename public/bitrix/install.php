@@ -100,4 +100,59 @@ if (file_put_contents($filePath, $json) === false) {
     return;
 }
 
-echo json_encode(['result' => true], JSON_UNESCAPED_UNICODE);
+$domain = $auth['domain'] ?? $payload['DOMAIN'] ?? null;
+$bindings = [];
+
+if (is_string($domain) && $domain !== '') {
+    $primaryHandler = 'https://bitrix.vsepeski.ru/hauls/index.html?v=20241101';
+
+    $bindings['CRM_DEAL_DETAIL_TAB'] = bindPlacement(
+        $domain,
+        $auth['access_token'],
+        'CRM_DEAL_DETAIL_TAB',
+        $primaryHandler,
+        ['TITLE' => 'Рейсы']
+    );
+
+    $bindings['CRM_DEAL_LIST_MENU'] = bindPlacement(
+        $domain,
+        $auth['access_token'],
+        'CRM_DEAL_LIST_MENU',
+        $primaryHandler,
+        ['TITLE' => 'Рейсы']
+    );
+}
+
+echo json_encode(['result' => true, 'bindings' => $bindings], JSON_UNESCAPED_UNICODE);
+
+/**
+ * Выполняет REST-запрос placement.bind от имени установленного приложения.
+ *
+ * @return array{result:mixed}|array{error:string,raw?:string,url?:string}
+ */
+function bindPlacement(string $domain, string $token, string $placement, string $handler, array $extra = []): array
+{
+    $query = http_build_query(array_merge([
+        'auth' => $token,
+        'PLACEMENT' => $placement,
+        'HANDLER' => $handler,
+    ], $extra));
+
+    $url = sprintf('https://%s/rest/placement.bind.json?%s', $domain, $query);
+
+    $context = stream_context_create([
+        'http' => [
+            'method' => 'GET',
+            'timeout' => 5,
+        ],
+    ]);
+
+    $raw = @file_get_contents($url, false, $context);
+
+    if ($raw === false) {
+        return ['error' => 'request_failed', 'url' => $url];
+    }
+
+    $decoded = json_decode($raw, true);
+    return is_array($decoded) ? $decoded : ['error' => 'invalid_response', 'raw' => $raw];
+}
