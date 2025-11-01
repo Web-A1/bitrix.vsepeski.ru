@@ -42,6 +42,11 @@ body.dark {
   --shadow: none;
 }
 
+body.editor-open {
+  height: 100vh;
+  height: 100dvh;
+}
+
 .app {
   max-width: min(1080px, 100%);
   margin: 0 auto;
@@ -264,18 +269,20 @@ body.dark {
 .editor-overlay {
   position: fixed;
   inset: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
   background: rgba(10, 15, 25, 0.45);
   backdrop-filter: blur(2px);
   display: none;
-  align-items: stretch;
-  justify-content: center;
+  place-items: stretch;
   overflow: hidden;
   z-index: 50;
   padding: 0;
 }
 
 .editor-overlay.is-open {
-  display: flex;
+  display: grid;
 }
 
 .editor {
@@ -288,6 +295,7 @@ body.dark {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 100%;
   max-height: none;
   overflow: hidden;
 }
@@ -329,6 +337,7 @@ form#haul-form {
 .form-group {
   display: grid;
   gap: 12px;
+  grid-template-rows: min-content 1fr;
 }
 
 .form-group h3 {
@@ -339,6 +348,7 @@ form#haul-form {
 .field-grid {
   display: grid;
   gap: 14px;
+  align-content: start;
 }
 
 .field-grid--two {
@@ -447,6 +457,23 @@ body.embedded .fab {
 
   .deal-controls__field {
     flex: 1;
+  }
+}
+
+@media (min-width: 1024px) {
+  form#haul-form {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: stretch;
+    align-content: start;
+  }
+
+  form#haul-form > .form-group {
+    min-height: 100%;
+  }
+
+  .editor__footer {
+    grid-column: 1 / -1;
   }
 }
 

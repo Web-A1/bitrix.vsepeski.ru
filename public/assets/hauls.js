@@ -1008,6 +1008,21 @@ function openEditor(modeText) {
   elements.editorOverlay.classList.add('is-open');
   elements.editorOverlay.setAttribute('aria-hidden', 'false');
   document.body.style.overflow = 'hidden';
+  document.body.classList.add('editor-open');
+
+  if (state.embedded && window.BX24) {
+    const canResize = typeof window.BX24.resizeWindow === 'function';
+    const viewport = typeof window.BX24.getViewportSize === 'function' ? window.BX24.getViewportSize() : null;
+
+    if (canResize && viewport && typeof viewport.height === 'number') {
+      const targetWidth = typeof viewport.width === 'number' ? viewport.width : document.documentElement.clientWidth;
+      const targetHeight = viewport.height || window.innerHeight;
+      window.BX24.resizeWindow(targetWidth, targetHeight);
+    } else if (typeof window.BX24.fitWindow === 'function') {
+      window.BX24.fitWindow();
+    }
+  }
+
   scheduleFitWindow();
 }
 
@@ -1015,9 +1030,11 @@ function closeEditor() {
   elements.editorOverlay.classList.remove('is-open');
   elements.editorOverlay.setAttribute('aria-hidden', 'true');
   document.body.style.overflow = '';
+  document.body.classList.remove('editor-open');
   state.currentHaulSnapshot = null;
   elements.haulForm?.reset();
   clearFormError();
+  scheduleFitWindow();
 }
 
 function lookupLabel(collection, id, field) {
