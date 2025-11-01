@@ -267,7 +267,7 @@ body.dark {
   background: rgba(10, 15, 25, 0.45);
   backdrop-filter: blur(2px);
   display: none;
-  align-items: flex-start;
+  align-items: stretch;
   justify-content: center;
   overflow-y: auto;
   z-index: 50;
@@ -287,7 +287,9 @@ body.dark {
   border: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  max-height: none;
+  max-height: calc(100vh - 48px);
+  height: 100%;
+  overflow-y: auto;
 }
 
 .editor__header {
@@ -457,6 +459,8 @@ body.embedded .fab {
     min-height: 100vh;
     border-radius: 0;
     border: none;
+    max-height: none;
+    height: auto;
   }
 
   .editor__header {
