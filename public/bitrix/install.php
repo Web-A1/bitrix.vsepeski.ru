@@ -73,8 +73,37 @@ if ($isPlacementLaunch && !$isInstallEvent) {
         return;
     }
 
+    $html = file_get_contents($indexPath);
+    if ($html === false) {
+        http_response_code(500);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'result' => false,
+            'error' => 'failed to read hauls index',
+            'path' => $indexPath,
+        ], JSON_UNESCAPED_UNICODE);
+        return;
+    }
+
+    $bootstrapData = [
+        'payload' => $payload,
+        'get' => $_GET,
+        'post' => $_POST,
+        'request' => $_REQUEST,
+    ];
+
+    $jsonOptions = JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP;
+    $bootstrapScript = '<script>window.B24_INSTALL_PAYLOAD = ' . json_encode($bootstrapData, $jsonOptions) . ';</script>';
+
+    $moduleTag = '<script src="../assets/hauls.js" type="module"></script>';
+    if (str_contains($html, $moduleTag)) {
+        $html = str_replace($moduleTag, $bootstrapScript . "\n    " . $moduleTag, $html);
+    } else {
+        $html .= "\n" . $bootstrapScript;
+    }
+
     header('Content-Type: text/html; charset=utf-8');
-    readfile($indexPath);
+    echo $html;
     return;
 }
 

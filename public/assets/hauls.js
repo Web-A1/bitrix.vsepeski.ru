@@ -270,29 +270,60 @@ function updateDealMeta() {
 }
 
 async function detectDealId() {
+  const bootstrap = window.B24_INSTALL_PAYLOAD || null;
+  const bootstrapPayload = bootstrap?.payload || null;
+  const bootstrapQuery = bootstrap?.get || bootstrap?.query || null;
+  const bootstrapRequest = bootstrap?.request || null;
+
+  const bootstrapOptionsRaw = extractPlacementOptionsRaw(bootstrapPayload);
+  if (bootstrapOptionsRaw) {
+    const options = parsePlacementOptions(bootstrapOptionsRaw);
+    const idFromOptions = extractDealIdFromObject(options);
+    if (idFromOptions) {
+      setDealId(idFromOptions);
+      return;
+    }
+  }
+
+  const idFromPayload = extractDealIdFromObject(bootstrapPayload);
+  if (idFromPayload) {
+    setDealId(idFromPayload);
+    return;
+  }
+
+  const idFromQuery = extractDealIdFromObject(bootstrapQuery);
+  if (idFromQuery) {
+    setDealId(idFromQuery);
+    return;
+  }
+
+  const idFromRequest = extractDealIdFromObject(bootstrapRequest);
+  if (idFromRequest) {
+    setDealId(idFromRequest);
+    return;
+  }
+
+  const requestOptionsRaw = extractPlacementOptionsRaw(bootstrapRequest);
+  if (requestOptionsRaw) {
+    const requestOptions = parsePlacementOptions(requestOptionsRaw);
+    const idFromRequestOptions = extractDealIdFromObject(requestOptions);
+    if (idFromRequestOptions) {
+      setDealId(idFromRequestOptions);
+      return;
+    }
+  }
+
   const searchParams = new URLSearchParams(window.location.search);
   const placementOptionsRaw =
     searchParams.get('PLACEMENT_OPTIONS') ||
     searchParams.get('placement_options');
 
   if (placementOptionsRaw) {
-    try {
-      const options = JSON.parse(placementOptionsRaw);
-      const optionDealId =
-        options?.entityId ??
-        options?.ENTITY_ID ??
-        options?.dealId ??
-        options?.DEAL_ID ??
-        options?.ID ??
-        options?.entity_id ??
-        options?.deal?.ID;
-      const numeric = Number(optionDealId);
-      if (Number.isFinite(numeric)) {
-        setDealId(numeric);
-        return;
-      }
-    } catch (error) {
-      console.warn('Не удалось разобрать PLACEMENT_OPTIONS', error);
+    const parsedOptions = parsePlacementOptions(placementOptionsRaw);
+    const optionDealId = extractDealIdFromObject(parsedOptions);
+    if (optionDealId) {
+      setDealId(optionDealId);
+      return;
     }
   }
 
@@ -1059,6 +1090,130 @@ function extractDealIdFromReferrer() {
     }
   } catch (error) {
     console.warn('Не удалось разобрать document.referrer', error);
+  }
+
+  return null;
+}
+
+function extractPlacementOptionsRaw(payload) {
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+
+  return (
+    payload.PLACEMENT_OPTIONS ||
+    payload.placement_options ||
+    payload.PLACEMENT_PARAMS ||
+    payload.placement_params ||
+    payload.options ||
+    payload.OPTIONS ||
+    null
+  );
+}
+
+function parsePlacementOptions(raw) {
+  if (!raw) {
+    return null;
+  }
+
+  if (typeof raw === 'object') {
+    return raw;
+  }
+
+  if (typeof raw !== 'string') {
+    return null;
+  }
+
+  let candidate = raw.trim();
+  if (!candidate) {
+    return null;
+  }
+
+  try {
+    candidate = decodeURIComponent(candidate);
+  } catch (error) {
+    // Оставляем исходную строку, если декодирование не требуется
+  }
+
+  try {
+    return JSON.parse(candidate);
+  } catch (error) {
+    // Не JSON — пробуем разобрать как query string
+  }
+
+  const params = new URLSearchParams(candidate);
+  if ([...params.keys()].length === 0) {
+    return null;
+  }
+
+  const result = {};
+  params.forEach((value, key) => {
+    result[key] = value;
+  });
+  return result;
+}
+
+function extractDealIdFromObject(subject) {
+  if (!subject || typeof subject !== 'object') {
+    return null;
+  }
+
+  const candidates = [
+    subject.entityId,
+    subject.entity_id,
+    subject.ENTITY_ID,
+    subject.dealId,
+    subject.deal_id,
+    subject.DEAL_ID,
+    subject.id,
+    subject.ID,
+    subject.deal?.id,
+    subject.deal?.ID,
+    subject.params?.deal_id,
+    subject.params?.dealId,
+    subject.params?.ID,
+    subject.params?.entity_id,
+    subject.PARAMS?.deal_id,
+    subject.PARAMS?.dealId,
+    subject.PARAMS?.ID,
+    subject.PARAMS?.entity_id,
+  ];
+
+  for (const candidate of candidates) {
+    const normalized = normalizeDealId(candidate);
+    if (normalized) {
+      return normalized;
+    }
+  }
+
+  return null;
+}
+
+function normalizeDealId(value) {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value) && value > 0 ? value : null;
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return null;
+    }
+
+    const numeric = Number(trimmed);
+    if (Number.isFinite(numeric) && numeric > 0) {
+      return numeric;
+    }
+
+    const digits = trimmed.replace(/\D+/g, '');
+    const fallback = Number(digits);
+    if (Number.isFinite(fallback) && fallback > 0) {
+      return fallback;
+    }
   }
 
   return null;
