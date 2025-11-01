@@ -307,6 +307,14 @@ async function detectDealId() {
   await new Promise((resolve) => {
     try {
       bx24.init(() => {
+        let finished = false;
+        const finish = () => {
+          if (!finished) {
+            finished = true;
+            resolve();
+          }
+        };
+
         const applyDealId = (possible) => {
           const numericId = Number(possible);
           if (Number.isFinite(numericId)) {
@@ -314,6 +322,7 @@ async function detectDealId() {
             if (state.hauls.length === 0) {
               loadHauls();
             }
+            finish();
           }
         };
 
@@ -355,7 +364,7 @@ async function detectDealId() {
             const possible = params?.deal_id || params?.ID || params?.entity_id || params?.ENTITY_ID;
             applyDealId(possible);
             bx24.fitWindow?.();
-            resolve();
+            finish();
           });
         } else if (typeof bx24.callMethod === 'function') {
           const dealId = placementInfo?.entity_id
@@ -374,16 +383,16 @@ async function detectDealId() {
               if (result?.data?.ID) {
                 applyDealId(result.data.ID);
               }
-              resolve();
+              finish();
             });
           } else {
-            resolve();
+            finish();
           }
         } else {
-          resolve();
+          finish();
         }
 
-        setTimeout(() => resolve(), 500);
+        setTimeout(finish, 2000);
       });
     } catch (error) {
       console.warn('BX24 init/getPageParams failed', error);
