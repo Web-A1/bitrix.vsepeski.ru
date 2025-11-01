@@ -157,7 +157,7 @@ function initRouter() {
 
 async function handleHashChange() {
   const { view, haulId } = parseHash(window.location.hash);
-  await applyView(view, haulId);
+  await applyView(view, haulId, { updateHash: false });
 }
 
 function parseHash(hash) {
@@ -179,12 +179,7 @@ function parseHash(hash) {
 }
 
 function navigateTo(view, haulId = null) {
-  const targetHash = buildHash(view, haulId);
-  if (window.location.hash === targetHash) {
-    void applyView(view, haulId);
-  } else {
-    window.location.hash = targetHash;
-  }
+  void applyView(view, haulId, { updateHash: true });
 }
 
 function buildHash(view, haulId) {
@@ -197,7 +192,14 @@ function buildHash(view, haulId) {
   return `#${views.LIST}`;
 }
 
-async function applyView(view, haulId) {
+async function applyView(view, haulId, options = {}) {
+  if (options.updateHash !== false) {
+    const targetHash = buildHash(view, haulId);
+    if (window.location.hash !== targetHash) {
+      window.location.hash = targetHash;
+    }
+  }
+
   state.view = view;
   state.currentHaulId = view === views.EDIT ? haulId : null;
   state.currentHaulSnapshot = null;
