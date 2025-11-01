@@ -300,13 +300,10 @@ async function detectDealId() {
   await new Promise((resolve) => {
     try {
       bx24.init(() => {
-        let resolved = false;
-
         const applyDealId = (possible) => {
           const numericId = Number(possible);
           if (Number.isFinite(numericId)) {
             setDealId(numericId);
-            resolved = true;
             if (state.hauls.length === 0) {
               loadHauls();
             }
@@ -328,12 +325,23 @@ async function detectDealId() {
           console.warn('BX24 placement info недоступна', infoError);
         }
 
-        bx24.getPageParams((params) => {
-          const possible = params?.deal_id || params?.ID || params?.entity_id || params?.ENTITY_ID;
-          applyDealId(possible);
-          bx24.fitWindow?.();
+        if (typeof bx24.getPageParams === 'function') {
+          bx24.getPageParams((params) => {
+            const possible = params?.deal_id || params?.ID || params?.entity_id || params?.ENTITY_ID;
+            applyDealId(possible);
+            bx24.fitWindow?.();
+            resolve();
+          });
+        } else if (typeof bx24.callMethod === 'function') {
+          bx24.callMethod('crm.deal.get', { id: placementInfo?.entity_id ?? state.dealId }, (result) => {
+            if (result?.data?.ID) {
+              applyDealId(result.data.ID);
+            }
+            resolve();
+          });
+        } else {
           resolve();
-        });
+        }
 
         setTimeout(() => resolve(), 500);
       });
