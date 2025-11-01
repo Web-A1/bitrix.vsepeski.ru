@@ -269,9 +269,9 @@ body.dark {
   display: none;
   align-items: stretch;
   justify-content: center;
-  overflow-y: auto;
+  overflow: hidden;
   z-index: 50;
-  padding: 24px 16px;
+  padding: 0;
 }
 
 .editor-overlay.is-open {
@@ -281,15 +281,15 @@ body.dark {
 .editor {
   background: var(--surface);
   color: var(--on-surface);
-  width: min(720px, 100%);
-  border-radius: 20px;
-  box-shadow: var(--shadow);
-  border: 1px solid var(--border);
+  width: 100%;
+  border-radius: 0;
+  box-shadow: none;
+  border: none;
   display: flex;
   flex-direction: column;
-  max-height: calc(100vh - 48px);
   height: 100%;
-  overflow-y: auto;
+  max-height: none;
+  overflow: hidden;
 }
 
 .editor__header {
@@ -322,6 +322,8 @@ form#haul-form {
   display: flex;
   flex-direction: column;
   gap: 24px;
+  flex: 1;
+  overflow-y: auto;
 }
 
 .form-group {
