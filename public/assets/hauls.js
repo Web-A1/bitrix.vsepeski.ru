@@ -279,6 +279,13 @@ async function detectDealId() {
       setDealId(numericId);
       return;
     }
+
+    const digits = candidate.replace(/\D+/g, '');
+    const fallbackId = Number(digits);
+    if (Number.isFinite(fallbackId) && digits.length > 0) {
+      setDealId(fallbackId);
+      return;
+    }
   }
 
   const referrerId = extractDealIdFromReferrer();
@@ -311,6 +318,7 @@ async function detectDealId() {
         };
 
         let placementInfo = null;
+        let placementParams = null;
         try {
           placementInfo = typeof bx24.placement?.info === 'function'
             ? bx24.placement.info()
@@ -326,6 +334,22 @@ async function detectDealId() {
           console.warn('BX24 placement info недоступна', infoError);
         }
 
+        try {
+          placementParams = typeof bx24.placement?.getParams === 'function'
+            ? bx24.placement.getParams()
+            : null;
+          const paramsId = placementParams?.deal_id
+            ?? placementParams?.dealId
+            ?? placementParams?.ID
+            ?? placementParams?.entity_id
+            ?? placementParams?.ENTITY_ID;
+          if (paramsId) {
+            applyDealId(paramsId);
+          }
+        } catch (paramsError) {
+          console.warn('BX24 placement params недоступны', paramsError);
+        }
+
         if (typeof bx24.getPageParams === 'function') {
           bx24.getPageParams((params) => {
             const possible = params?.deal_id || params?.ID || params?.entity_id || params?.ENTITY_ID;
@@ -338,6 +362,11 @@ async function detectDealId() {
             ?? placementInfo?.deal_id
             ?? placementInfo?.ID
             ?? placementInfo?.ENTITY_ID
+            ?? placementParams?.deal_id
+            ?? placementParams?.dealId
+            ?? placementParams?.ID
+            ?? placementParams?.entity_id
+            ?? placementParams?.ENTITY_ID
             ?? state.dealId;
 
           if (dealId) {
@@ -891,6 +920,12 @@ async function handleCreateRequest(event) {
 
   if (!state.dealId) {
     await detectDealId();
+    if (!state.dealId) {
+      const extracted = extractDealIdFromReferrer();
+      if (extracted) {
+        setDealId(extracted);
+      }
+    }
   } else if (state.hauls.length === 0) {
     await loadHauls();
   }
