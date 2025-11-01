@@ -310,8 +310,9 @@ async function detectDealId() {
           }
         };
 
+        let placementInfo = null;
         try {
-          const placementInfo = typeof bx24.placement?.info === 'function'
+          placementInfo = typeof bx24.placement?.info === 'function'
             ? bx24.placement.info()
             : null;
           const placementId = placementInfo?.entity_id
@@ -333,12 +334,22 @@ async function detectDealId() {
             resolve();
           });
         } else if (typeof bx24.callMethod === 'function') {
-          bx24.callMethod('crm.deal.get', { id: placementInfo?.entity_id ?? state.dealId }, (result) => {
-            if (result?.data?.ID) {
-              applyDealId(result.data.ID);
-            }
+          const dealId = placementInfo?.entity_id
+            ?? placementInfo?.deal_id
+            ?? placementInfo?.ID
+            ?? placementInfo?.ENTITY_ID
+            ?? state.dealId;
+
+          if (dealId) {
+            bx24.callMethod('crm.deal.get', { id: dealId }, (result) => {
+              if (result?.data?.ID) {
+                applyDealId(result.data.ID);
+              }
+              resolve();
+            });
+          } else {
             resolve();
-          });
+          }
         } else {
           resolve();
         }
