@@ -106,7 +106,7 @@ $bindings = [];
 if (is_string($domain) && $domain !== '') {
     $primaryHandler = 'https://bitrix.vsepeski.ru/hauls/index.html?v=20241101';
 
-    $bindings['CRM_DEAL_DETAIL_TAB'] = bindPlacement(
+    $bindings['CRM_DEAL_DETAIL_TAB'] = rebindPlacement(
         $domain,
         $auth['access_token'],
         'CRM_DEAL_DETAIL_TAB',
@@ -114,7 +114,7 @@ if (is_string($domain) && $domain !== '') {
         ['TITLE' => 'Рейсы']
     );
 
-    $bindings['CRM_DEAL_LIST_MENU'] = bindPlacement(
+    $bindings['CRM_DEAL_LIST_MENU'] = rebindPlacement(
         $domain,
         $auth['access_token'],
         'CRM_DEAL_LIST_MENU',
@@ -126,33 +126,75 @@ if (is_string($domain) && $domain !== '') {
 echo json_encode(['result' => true, 'bindings' => $bindings], JSON_UNESCAPED_UNICODE);
 
 /**
- * Выполняет REST-запрос placement.bind от имени установленного приложения.
+ * Снимает старый обработчик и привязывает новый для указанного placement.
  *
- * @return array{result:mixed}|array{error:string,raw?:string,url?:string}
+ * @return array<string,mixed>
  */
-function bindPlacement(string $domain, string $token, string $placement, string $handler, array $extra = []): array
+function rebindPlacement(string $domain, string $token, string $placement, string $handler, array $extra = []): array
 {
-    $query = http_build_query(array_merge([
-        'auth' => $token,
-        'PLACEMENT' => $placement,
-        'HANDLER' => $handler,
-    ], $extra));
+    $result = [
+        'unbind' => callBitrix($domain, 'placement.unbind.json', [
+            'auth' => $token,
+            'PLACEMENT' => $placement,
+            'HANDLER' => $handler,
+        ]),
+        'bind' => callBitrix($domain, 'placement.bind.json', array_merge([
+            'auth' => $token,
+            'PLACEMENT' => $placement,
+            'HANDLER' => $handler,
+        ], $extra)),
+    ];
 
-    $url = sprintf('https://%s/rest/placement.bind.json?%s', $domain, $query);
+    return $result;
+}
 
-    $context = stream_context_create([
-        'http' => [
-            'method' => 'GET',
-            'timeout' => 5,
-        ],
-    ]);
+/**
+ * Вызывает REST-метод Bitrix24 и возвращает результат.
+ *
+ * @return array<string,mixed>
+ */
+function callBitrix(string $domain, string $method, array $params): array
+{
+    $url = sprintf('https://%s/rest/%s', $domain, $method);
+    $query = http_build_query($params);
+    $endpoint = $url . '?' . $query;
 
-    $raw = @file_get_contents($url, false, $context);
-
-    if ($raw === false) {
-        return ['error' => 'request_failed', 'url' => $url];
+    $ch = curl_init($endpoint);
+    if ($ch === false) {
+        return ['error' => 'curl_init_failed', 'url' => $endpoint];
     }
 
-    $decoded = json_decode($raw, true);
-    return is_array($decoded) ? $decoded : ['error' => 'invalid_response', 'raw' => $raw];
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 10,
+        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_SSL_VERIFYHOST => 2,
+        CURLOPT_USERAGENT => 'vsepeski-local-app-install',
+    ]);
+
+    $body = curl_exec($ch);
+    if ($body === false) {
+        $error = curl_error($ch) ?: 'curl_exec_failed';
+        curl_close($ch);
+        return ['error' => $error, 'url' => $endpoint];
+    }
+
+    $status = curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+    curl_close($ch);
+
+    $decoded = json_decode($body, true);
+
+    if (!is_array($decoded)) {
+        return [
+            'error' => 'invalid_json',
+            'http_status' => $status,
+            'raw' => $body,
+            'url' => $endpoint,
+        ];
+    }
+
+    $decoded['http_status'] = $status;
+    $decoded['url'] = $endpoint;
+
+    return $decoded;
 }
