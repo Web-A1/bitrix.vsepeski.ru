@@ -147,7 +147,7 @@ $bindings = [];
 if (is_string($domain) && $domain !== '') {
     $primaryHandler = 'https://bitrix.vsepeski.ru/hauls?v=20241115';
 
-    $options = ['TITLE' => 'Рейсы', 'OPTIONS' => ['register' => 'Y', 'support_mobile' => 'Y']];
+    $options = buildPlacementOptions();
 
     $bindings['CRM_DEAL_DETAIL_TAB'] = rebindPlacement(
         $domain,
@@ -193,6 +193,28 @@ function rebindPlacement(string $domain, string $token, string $placement, strin
 }
 
 /**
+ * Returns placement options recommended by Bitrix24 for mobile CRM tabs.
+ *
+ * @return array<string,mixed>
+ */
+function buildPlacementOptions(): array
+{
+    return [
+        'TITLE' => 'Рейсы',
+        'DESCRIPTION' => 'Вкладка с рейсами сделки',
+        'LANG_ALL' => [
+            'ru' => ['NAME' => 'Рейсы', 'DESCRIPTION' => 'Вкладка с рейсами сделки'],
+            'en' => ['NAME' => 'Hauls', 'DESCRIPTION' => 'Deal hauls tab'],
+        ],
+        'OPTIONS' => [
+            'register' => 'Y',
+            'support_mobile' => 'Y',
+            'supportMobile' => 'Y',
+        ],
+    ];
+}
+
+/**
  * Вызывает REST-метод Bitrix24 и возвращает результат.
  *
  * @return array<string,mixed>
@@ -201,20 +223,30 @@ function callBitrix(string $domain, string $method, array $params): array
 {
     $url = sprintf('https://%s/rest/%s', $domain, $method);
     $query = http_build_query($params);
-    $endpoint = $url . '?' . $query;
+    $hasComplexParams = preg_match('/%5B.+%5D=/', $query) === 1;
 
+    $endpoint = $url;
     $ch = curl_init($endpoint);
     if ($ch === false) {
         return ['error' => 'curl_init_failed', 'url' => $endpoint];
     }
 
-    curl_setopt_array($ch, [
+    $options = [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT => 10,
         CURLOPT_SSL_VERIFYPEER => true,
         CURLOPT_SSL_VERIFYHOST => 2,
         CURLOPT_USERAGENT => 'vsepeski-local-app-install',
-    ]);
+    ];
+
+    $options[CURLOPT_URL] = $hasComplexParams ? $endpoint : $endpoint . '?' . $query;
+
+    if ($hasComplexParams) {
+        $options[CURLOPT_POST] = true;
+        $options[CURLOPT_POSTFIELDS] = $query;
+    }
+
+    curl_setopt_array($ch, $options);
 
     $body = curl_exec($ch);
     if ($body === false) {
