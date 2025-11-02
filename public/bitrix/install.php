@@ -2,6 +2,11 @@
 
 declare(strict_types=1);
 
+use B24\Center\Infrastructure\Http\Response;
+use B24\Center\Modules\Hauls\Ui\HaulPlacementPageRenderer;
+
+require dirname(__DIR__, 2) . '/vendor/autoload.php';
+
 /**
  * Bitrix24 application installation handler.
  *
@@ -60,50 +65,25 @@ $isInstallEvent = is_string($eventName) && stripos($eventName, 'ONAPPINSTALL') !
 
 if ($isPlacementLaunch && !$isInstallEvent) {
     $projectRoot = dirname(__DIR__, 2);
-    $indexPath = $projectRoot . '/public/hauls/index.html';
+    $renderer = new HaulPlacementPageRenderer($projectRoot);
 
-    if (!is_file($indexPath)) {
+    try {
+        $response = $renderer->render($payload, $_GET, $_POST, $_REQUEST);
+    } catch (\RuntimeException $exception) {
         http_response_code(500);
         header('Content-Type: application/json; charset=utf-8');
         echo json_encode([
             'result' => false,
-            'error' => 'hauls index missing',
-            'path' => $indexPath,
+            'error' => 'failed to render hauls placement',
+            'message' => $exception->getMessage(),
         ], JSON_UNESCAPED_UNICODE);
         return;
     }
 
-    $html = file_get_contents($indexPath);
-    if ($html === false) {
-        http_response_code(500);
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode([
-            'result' => false,
-            'error' => 'failed to read hauls index',
-            'path' => $indexPath,
-        ], JSON_UNESCAPED_UNICODE);
-        return;
+    if ($response instanceof Response) {
+        $response->send();
     }
 
-    $bootstrapData = [
-        'payload' => $payload,
-        'get' => $_GET,
-        'post' => $_POST,
-        'request' => $_REQUEST,
-    ];
-
-    $jsonOptions = JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP;
-    $bootstrapScript = '<script>window.B24_INSTALL_PAYLOAD = ' . json_encode($bootstrapData, $jsonOptions) . ';</script>';
-
-    $moduleTag = '<script src="../assets/hauls.js" type="module"></script>';
-    if (str_contains($html, $moduleTag)) {
-        $html = str_replace($moduleTag, $bootstrapScript . "\n    " . $moduleTag, $html);
-    } else {
-        $html .= "\n" . $bootstrapScript;
-    }
-
-    header('Content-Type: text/html; charset=utf-8');
-    echo $html;
     return;
 }
 
@@ -165,14 +145,14 @@ $domain = $auth['domain'] ?? $payload['DOMAIN'] ?? null;
 $bindings = [];
 
 if (is_string($domain) && $domain !== '') {
-    $primaryHandler = 'https://bitrix.vsepeski.ru/hauls/index.html?v=20241101';
+    $primaryHandler = 'https://bitrix.vsepeski.ru/hauls?v=20241115';
 
     $bindings['CRM_DEAL_DETAIL_TAB'] = rebindPlacement(
         $domain,
         $auth['access_token'],
         'CRM_DEAL_DETAIL_TAB',
         $primaryHandler,
-        ['TITLE' => 'Рейсы']
+        ['TITLE' => 'Рейсы', 'OPTIONS' => ['supportMobile' => 'Y']]
     );
 
     $bindings['CRM_DEAL_LIST_MENU'] = rebindPlacement(
@@ -180,7 +160,7 @@ if (is_string($domain) && $domain !== '') {
         $auth['access_token'],
         'CRM_DEAL_LIST_MENU',
         $primaryHandler,
-        ['TITLE' => 'Рейсы']
+        ['TITLE' => 'Рейсы', 'OPTIONS' => ['supportMobile' => 'Y']]
     );
 }
 

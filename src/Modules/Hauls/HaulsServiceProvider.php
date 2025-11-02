@@ -11,6 +11,7 @@ use B24\Center\Modules\Hauls\Infrastructure\MaterialRepository;
 use B24\Center\Modules\Hauls\Infrastructure\TruckRepository;
 use B24\Center\Infrastructure\Bitrix\BitrixRestClient;
 use B24\Center\Modules\Hauls\Application\Services\DriverLookupService;
+use B24\Center\Modules\Hauls\Ui\HaulPlacementPageRenderer;
 use PDO;
 
 class HaulsServiceProvider
@@ -57,6 +58,12 @@ class HaulsServiceProvider
             $repository = $container->get(HaulRepository::class);
 
             return new HaulService($repository);
+        });
+
+        $app->singleton(HaulPlacementPageRenderer::class, static function (): HaulPlacementPageRenderer {
+            $projectRoot = dirname(__DIR__, 3);
+
+            return new HaulPlacementPageRenderer($projectRoot);
         });
     }
 }

@@ -15,7 +15,9 @@ use B24\Center\Modules\Hauls\Ui\HaulController;
 use B24\Center\Modules\Hauls\Ui\MaterialController;
 use B24\Center\Modules\Hauls\Ui\TruckController;
 use B24\Center\Modules\Hauls\Ui\DriverController;
+use B24\Center\Modules\Hauls\Ui\HaulPlacementPageRenderer;
 use DateTimeImmutable;
+use RuntimeException;
 use Throwable;
 
 class Kernel
@@ -52,6 +54,38 @@ class Kernel
                     'debug' => filter_var($_ENV['APP_DEBUG'] ?? true, FILTER_VALIDATE_BOOL),
                 ],
             ]);
+        }
+
+        if ($path === '/hauls') {
+            /** @var HaulPlacementPageRenderer $renderer */
+            $renderer = $this->container->get(HaulPlacementPageRenderer::class);
+
+            try {
+                $payload = $request->body();
+                if (!is_array($payload)) {
+                    $payload = [];
+                }
+
+                foreach ($_REQUEST as $key => $value) {
+                    if (!array_key_exists($key, $payload)) {
+                        $payload[$key] = $value;
+                    }
+                }
+
+                $response = $renderer->render(
+                    $payload,
+                    $_GET,
+                    $_POST,
+                    $_REQUEST
+                );
+            } catch (RuntimeException $exception) {
+                return Response::json([
+                    'error' => 'Failed to render hauls placement',
+                    'message' => $exception->getMessage(),
+                ], 500);
+            }
+
+            return $response;
         }
 
         $haulController = new HaulController($this->container->get(HaulService::class));
