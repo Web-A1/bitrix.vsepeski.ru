@@ -147,7 +147,7 @@ $bindings = [];
 if (is_string($domain) && $domain !== '') {
     $primaryHandler = 'https://bitrix.vsepeski.ru/hauls?v=20241115';
 
-    $options = ['TITLE' => 'Рейсы', 'OPTIONS' => ['register' => 'Y', 'mobile_support' => 'Y']];
+    $options = ['TITLE' => 'Рейсы', 'OPTIONS' => ['register' => 'Y', 'support_mobile' => 'Y']];
 
     $bindings['CRM_DEAL_DETAIL_TAB'] = rebindPlacement(
         $domain,
