@@ -147,12 +147,14 @@ $bindings = [];
 if (is_string($domain) && $domain !== '') {
     $primaryHandler = 'https://bitrix.vsepeski.ru/hauls?v=20241115';
 
+    $options = ['TITLE' => 'Рейсы', 'OPTIONS' => ['register' => 'Y', 'mobile_support' => 'Y']];
+
     $bindings['CRM_DEAL_DETAIL_TAB'] = rebindPlacement(
         $domain,
         $auth['access_token'],
         'CRM_DEAL_DETAIL_TAB',
         $primaryHandler,
-        ['TITLE' => 'Рейсы', 'OPTIONS' => ['supportMobile' => 'Y']]
+        $options
     );
 
     $bindings['CRM_DEAL_LIST_MENU'] = rebindPlacement(
@@ -160,7 +162,7 @@ if (is_string($domain) && $domain !== '') {
         $auth['access_token'],
         'CRM_DEAL_LIST_MENU',
         $primaryHandler,
-        ['TITLE' => 'Рейсы', 'OPTIONS' => ['supportMobile' => 'Y']]
+        $options
     );
 }
 
