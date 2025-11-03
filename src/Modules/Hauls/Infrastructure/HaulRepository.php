@@ -103,6 +103,19 @@ final class HaulRepository
         return array_map(fn (array $row): Haul => $this->hydrate($row), $statement->fetchAll());
     }
 
+    /**
+     * @return Haul[]
+     */
+    public function findByResponsible(int $responsibleId): array
+    {
+        $statement = $this->connection->prepare(
+            'SELECT * FROM hauls WHERE responsible_id = :responsible_id AND deleted_at IS NULL ORDER BY updated_at DESC, created_at DESC'
+        );
+        $statement->execute(['responsible_id' => $responsibleId]);
+
+        return array_map(fn (array $row): Haul => $this->hydrate($row), $statement->fetchAll());
+    }
+
     public function find(string $id): ?Haul
     {
         $statement = $this->connection->prepare('SELECT * FROM hauls WHERE id = :id LIMIT 1');

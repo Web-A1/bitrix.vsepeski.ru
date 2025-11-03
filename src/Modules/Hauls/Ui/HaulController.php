@@ -22,6 +22,13 @@ final class HaulController
         return Response::json(['data' => $items]);
     }
 
+    public function myHauls(int $responsibleId): Response
+    {
+        $items = $this->service->listByResponsible($responsibleId);
+
+        return Response::json(['data' => $items]);
+    }
+
     public function show(string $haulId): Response
     {
         try {

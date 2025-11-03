@@ -29,6 +29,17 @@ final class HaulService
     }
 
     /**
+     * @return array<int,array<string,mixed>>
+     */
+    public function listByResponsible(int $responsibleId): array
+    {
+        return array_map(
+            static fn (Haul $haul): array => HaulResponse::fromEntity($haul),
+            $this->repository->findByResponsible($responsibleId)
+        );
+    }
+
+    /**
      * @param array<string,mixed> $payload
      */
     public function create(int $dealId, array $payload): array

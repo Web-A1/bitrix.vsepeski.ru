@@ -7,6 +7,8 @@ namespace B24\Center\Infrastructure\Http;
 use B24\Center\Core\Application;
 use B24\Center\Infrastructure\Http\Request;
 use B24\Center\Infrastructure\Http\Response;
+use B24\Center\Infrastructure\Auth\SessionAuthManager;
+use B24\Center\Infrastructure\Bitrix\BitrixPortalAuthenticator;
 use B24\Center\Modules\Hauls\Application\Services\HaulService;
 use B24\Center\Modules\Hauls\Infrastructure\MaterialRepository;
 use B24\Center\Modules\Hauls\Infrastructure\TruckRepository;
@@ -44,6 +46,8 @@ class Kernel
     {
         $method = $request->method();
         $path = rtrim($request->path(), '/') ?: '/';
+        /** @var SessionAuthManager $authManager */
+        $authManager = $this->container->get(SessionAuthManager::class);
 
         if ($path === '/') {
             return Response::json([
@@ -88,10 +92,71 @@ class Kernel
             return $response;
         }
 
+        if ($path === '/api/auth/me') {
+            $user = $authManager->user();
+
+            if ($user === null) {
+                return Response::json(['error' => 'Unauthorized'], 401);
+            }
+
+            return Response::json(['data' => $user]);
+        }
+
+        if ($path === '/api/auth/login') {
+            if ($method !== 'POST') {
+                return $this->methodNotAllowed(['POST']);
+            }
+
+            $payload = $request->body();
+            $login = isset($payload['login']) ? trim((string) $payload['login']) : '';
+            $password = isset($payload['password']) && is_string($payload['password'])
+                ? $payload['password']
+                : '';
+
+            if ($login === '' || $password === '') {
+                return Response::json(['error' => 'Укажите логин и пароль.'], 422);
+            }
+
+            try {
+                /** @var BitrixPortalAuthenticator $authenticator */
+                $authenticator = $this->container->get(BitrixPortalAuthenticator::class);
+                $user = $authenticator->login($login, $password);
+            } catch (RuntimeException $exception) {
+                return Response::json(['error' => $exception->getMessage()], 401);
+            }
+
+            $authManager->login($user);
+
+            return Response::json(['data' => $authManager->user()]);
+        }
+
+        if ($path === '/api/auth/logout') {
+            if ($method !== 'POST') {
+                return $this->methodNotAllowed(['POST']);
+            }
+
+            $authManager->logout();
+
+            return Response::noContent();
+        }
+
         $haulController = new HaulController($this->container->get(HaulService::class));
         $truckController = new TruckController($this->container->get(TruckRepository::class));
         $materialController = new MaterialController($this->container->get(MaterialRepository::class));
         $driverController = new DriverController($this->container->get(DriverLookupService::class));
+
+        if ($path === '/api/mobile/hauls') {
+            $user = $authManager->user();
+
+            if ($user === null) {
+                return Response::json(['error' => 'Unauthorized'], 401);
+            }
+
+            return match ($method) {
+                'GET' => $haulController->myHauls((int) $user['id']),
+                default => $this->methodNotAllowed(['GET']),
+            };
+        }
 
         if (preg_match('#^/api/deals/(\d+)/hauls$#', $path, $matches)) {
             $dealId = (int) $matches[1];

@@ -8,6 +8,52 @@
     <link rel="stylesheet" href="../assets/hauls.css" />
   </head>
   <body>
+    <div class="mobile-app" id="mobile-app" hidden>
+      <section class="mobile-login" id="mobile-login">
+        <div class="mobile-login__content">
+          <h1>Вход для водителей</h1>
+          <p class="mobile-login__hint">
+            Используйте логин и пароль от портала Bitrix24.
+          </p>
+          <form id="mobile-login-form" class="mobile-login__form" novalidate>
+            <label>
+              <span>Логин</span>
+              <input type="text" name="login" autocomplete="username" required />
+            </label>
+            <label>
+              <span>Пароль</span>
+              <input type="password" name="password" autocomplete="current-password" required />
+            </label>
+            <p class="mobile-error" id="mobile-login-error" role="alert" aria-live="polite"></p>
+            <button type="submit" id="mobile-login-submit" class="button button--primary">
+              Войти
+            </button>
+          </form>
+        </div>
+      </section>
+
+      <section class="mobile-hauls" id="mobile-hauls" hidden>
+        <header class="mobile-hauls__header">
+          <div>
+            <h1>Мои рейсы</h1>
+            <p id="mobile-user-name" class="mobile-user"></p>
+          </div>
+          <div class="mobile-hauls__actions">
+            <button type="button" id="mobile-refresh" class="button button--ghost">
+              Обновить
+            </button>
+            <button type="button" id="mobile-logout" class="button button--ghost">
+              Выйти
+            </button>
+          </div>
+        </header>
+        <p class="mobile-error" id="mobile-hauls-error" role="alert" aria-live="polite" hidden></p>
+        <div id="mobile-loader" class="mobile-loader" hidden>Загрузка…</div>
+        <div id="mobile-empty" class="mobile-empty" hidden>Активных рейсов нет.</div>
+        <ul id="mobile-hauls-list" class="mobile-hauls-list"></ul>
+      </section>
+    </div>
+
     <div class="app" id="app" data-view="list">
       <header class="app__header">
         <div class="app__title">
