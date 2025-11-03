@@ -41,14 +41,42 @@ const elements = {
   submitHaul: document.getElementById('submit-haul'),
 };
 
+const mobileElements = {
+  container: document.getElementById('mobile-app'),
+  loginSection: document.getElementById('mobile-login'),
+  loginForm: document.getElementById('mobile-login-form'),
+  loginError: document.getElementById('mobile-login-error'),
+  loginButton: document.getElementById('mobile-login-submit'),
+  haulsSection: document.getElementById('mobile-hauls'),
+  refreshButton: document.getElementById('mobile-refresh'),
+  logoutButton: document.getElementById('mobile-logout'),
+  loader: document.getElementById('mobile-loader'),
+  empty: document.getElementById('mobile-empty'),
+  list: document.getElementById('mobile-hauls-list'),
+  userName: document.getElementById('mobile-user-name'),
+  errorBox: document.getElementById('mobile-hauls-error'),
+};
+
+const mobileState = {
+  user: null,
+  hauls: [],
+  loading: false,
+};
+
 let fitTimer = null;
 let bx24Ready = null;
 
-init().catch((error) => {
-  console.error('Ошибка инициализации', error);
-});
+if (state.embedded) {
+  initEmbedded().catch((error) => {
+    console.error('Ошибка инициализации', error);
+  });
+} else {
+  initMobile().catch((error) => {
+    console.error('Ошибка инициализации мобильного режима', error);
+  });
+}
 
-async function init() {
+async function initEmbedded() {
   detectDarkMode();
   configureEmbedding();
   attachEventHandlers();
@@ -62,6 +90,397 @@ async function init() {
     renderList();
   }
   scheduleFitWindow();
+}
+
+async function initMobile() {
+  document.body.classList.add('mobile-driver');
+  if (mobileElements.container) {
+    mobileElements.container.hidden = false;
+  }
+
+  attachMobileHandlers();
+  await mobileCheckAuth();
+}
+
+function attachMobileHandlers() {
+  mobileElements.loginForm?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const formData = new FormData(mobileElements.loginForm);
+    const login = String(formData.get('login') ?? '').trim();
+    const passwordValue = formData.get('password');
+    const password = typeof passwordValue === 'string' ? passwordValue : '';
+
+    if (!login || !password) {
+      setMobileLoginError('Введите логин и пароль.');
+      return;
+    }
+
+    void mobileLogin(login, password);
+  });
+
+  mobileElements.refreshButton?.addEventListener('click', () => {
+    void loadMobileHauls();
+  });
+
+  mobileElements.logoutButton?.addEventListener('click', () => {
+    void mobileLogout();
+  });
+}
+
+async function mobileCheckAuth() {
+  try {
+    const response = await fetch(apiBase + '/api/auth/me', {
+      headers: { Accept: 'application/json' },
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw new Error('Unauthorized');
+    }
+
+    const data = await readJsonResponse(response);
+    if (!data?.data) {
+      throw new Error('Unauthorized');
+    }
+
+    mobileState.user = data.data;
+    showMobileHauls();
+    await loadMobileHauls();
+  } catch (error) {
+    mobileState.user = null;
+    showMobileLogin();
+  }
+}
+
+function showMobileLogin() {
+  if (mobileElements.loginSection) {
+    mobileElements.loginSection.hidden = false;
+  }
+  if (mobileElements.haulsSection) {
+    mobileElements.haulsSection.hidden = true;
+  }
+  if (mobileElements.loginForm) {
+    mobileElements.loginForm.reset();
+  }
+  setMobileLoginError('');
+  setMobileError('');
+  mobileState.hauls = [];
+  renderMobileHauls();
+  if (mobileElements.loader) {
+    mobileElements.loader.hidden = true;
+  }
+}
+
+function showMobileHauls() {
+  if (mobileElements.loginSection) {
+    mobileElements.loginSection.hidden = true;
+  }
+  if (mobileElements.haulsSection) {
+    mobileElements.haulsSection.hidden = false;
+  }
+  if (mobileElements.userName) {
+    mobileElements.userName.textContent = mobileState.user?.name ?? '';
+  }
+  setMobileError('');
+}
+
+function setMobileLoading(isLoading) {
+  mobileState.loading = isLoading;
+  if (mobileElements.loginButton) {
+    mobileElements.loginButton.disabled = isLoading;
+  }
+}
+
+function setMobileLoginError(message) {
+  if (mobileElements.loginError) {
+    mobileElements.loginError.textContent = message ?? '';
+  }
+}
+
+function setMobileError(message) {
+  if (!mobileElements.errorBox) {
+    return;
+  }
+
+  if (message) {
+    mobileElements.errorBox.textContent = message;
+    mobileElements.errorBox.hidden = false;
+  } else {
+    mobileElements.errorBox.textContent = '';
+    mobileElements.errorBox.hidden = true;
+  }
+}
+
+async function mobileLogin(login, password) {
+  setMobileLoading(true);
+  setMobileLoginError('');
+  try {
+    const response = await fetch(apiBase + '/api/auth/login', {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({ login, password }),
+    });
+
+    const data = await readJsonResponse(response);
+    if (!response.ok) {
+      const message = data?.error || 'Не удалось авторизоваться.';
+      throw new Error(message);
+    }
+
+    if (!data?.data) {
+      throw new Error('Не удалось получить данные пользователя.');
+    }
+
+    mobileState.user = data.data;
+    showMobileHauls();
+    await loadMobileHauls();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Не удалось авторизоваться.';
+    setMobileLoginError(message);
+  } finally {
+    setMobileLoading(false);
+  }
+}
+
+async function mobileLogout() {
+  try {
+    await fetch(apiBase + '/api/auth/logout', {
+      method: 'POST',
+      credentials: 'include',
+    });
+  } catch (error) {
+    console.warn('Ошибка при выходе', error);
+  } finally {
+    mobileState.user = null;
+    showMobileLogin();
+  }
+}
+
+async function loadMobileHauls() {
+  if (!mobileState.user) {
+    await mobileCheckAuth();
+    return;
+  }
+
+  if (mobileElements.loader) {
+    mobileElements.loader.hidden = false;
+  }
+  setMobileError('');
+  if (mobileElements.empty) {
+    mobileElements.empty.hidden = true;
+  }
+
+  try {
+    const response = await fetch(apiBase + '/api/mobile/hauls', {
+      headers: { Accept: 'application/json' },
+      credentials: 'include',
+    });
+
+    if (response.status === 401) {
+      mobileState.user = null;
+      showMobileLogin();
+      return;
+    }
+
+    const data = await readJsonResponse(response);
+    if (!response.ok) {
+      const message = data?.error || 'Не удалось загрузить рейсы.';
+      throw new Error(message);
+    }
+
+    mobileState.hauls = Array.isArray(data?.data) ? data.data : [];
+    renderMobileHauls();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Не удалось загрузить рейсы.';
+    setMobileError(message);
+    mobileState.hauls = [];
+    renderMobileHauls();
+  } finally {
+    if (mobileElements.loader) {
+      mobileElements.loader.hidden = true;
+    }
+  }
+}
+
+function renderMobileHauls() {
+  const list = mobileElements.list;
+  if (!list) {
+    return;
+  }
+
+  list.innerHTML = '';
+  const items = Array.isArray(mobileState.hauls) ? mobileState.hauls : [];
+
+  if (items.length === 0) {
+    if (mobileElements.empty) {
+      mobileElements.empty.hidden = false;
+    }
+    return;
+  }
+
+  if (mobileElements.empty) {
+    mobileElements.empty.hidden = true;
+  }
+
+  for (const haul of items) {
+    const item = document.createElement('li');
+    item.className = 'mobile-haul';
+
+    const header = document.createElement('div');
+    header.className = 'mobile-haul__header';
+    const deal = document.createElement('span');
+    const dealId = Number.isFinite(haul?.deal_id) ? haul.deal_id : haul?.deal_id ?? '—';
+    deal.textContent = `Сделка #${dealId}`;
+    const seq = document.createElement('span');
+    seq.textContent = typeof haul?.sequence === 'number' && Number.isFinite(haul.sequence)
+      ? `Рейс №${haul.sequence}`
+      : 'Рейс';
+    header.append(deal, seq);
+    item.appendChild(header);
+
+    const meta = document.createElement('div');
+    meta.className = 'mobile-haul__meta';
+
+    if (haul?.truck_id) {
+      const truck = document.createElement('span');
+      truck.textContent = `Самосвал: ${haul.truck_id}`;
+      meta.appendChild(truck);
+    }
+
+    const updatedLabel = formatDateTimeLabel(haul?.updated_at || haul?.created_at);
+    if (updatedLabel) {
+      const updated = document.createElement('span');
+      updated.textContent = `Обновлено: ${updatedLabel}`;
+      meta.appendChild(updated);
+    }
+
+    if (haul?.material_id) {
+      const material = document.createElement('span');
+      material.textContent = `Материал: ${haul.material_id}`;
+      meta.appendChild(material);
+    }
+
+    if (meta.childElementCount > 0) {
+      item.appendChild(meta);
+    }
+
+    const loadSection = buildAddressSection('Погрузка', haul?.load, false);
+    if (loadSection) {
+      item.appendChild(loadSection);
+    }
+
+    const unloadSection = buildAddressSection('Выгрузка', haul?.unload, true);
+    if (unloadSection) {
+      item.appendChild(unloadSection);
+    }
+
+    list.appendChild(item);
+  }
+}
+
+function buildAddressSection(title, block, includeContact) {
+  if (!block || typeof block !== 'object') {
+    return null;
+  }
+
+  const hasContent = Boolean(
+    block.address_text ||
+      block.address_url ||
+      block.volume ||
+      (includeContact && (block.contact_name || block.contact_phone))
+  );
+
+  if (!hasContent) {
+    return null;
+  }
+
+  const section = document.createElement('div');
+  section.className = 'mobile-haul__section';
+
+  const heading = document.createElement('h3');
+  heading.textContent = title;
+  section.appendChild(heading);
+
+  if (block.address_text) {
+    const address = document.createElement('p');
+    address.className = 'mobile-haul__address';
+    address.textContent = block.address_text;
+    section.appendChild(address);
+  }
+
+  if (block.address_url) {
+    const link = document.createElement('a');
+    link.className = 'mobile-haul__link';
+    link.href = block.address_url;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    link.textContent = 'Открыть карту';
+    section.appendChild(link);
+  }
+
+  if (!includeContact && block.volume !== undefined && block.volume !== null && block.volume !== '') {
+    const volumeValue = formatVolume(block.volume);
+    if (volumeValue) {
+      const volume = document.createElement('p');
+      volume.className = 'mobile-haul__note';
+      volume.textContent = `Объём: ${volumeValue} м³`;
+      section.appendChild(volume);
+    }
+  }
+
+  if (includeContact) {
+    const contactParts = [];
+    if (block.contact_name) {
+      contactParts.push(String(block.contact_name));
+    }
+    if (block.contact_phone) {
+      contactParts.push(String(block.contact_phone));
+    }
+
+    if (contactParts.length > 0) {
+      const contact = document.createElement('p');
+      contact.className = 'mobile-haul__note';
+      contact.textContent = `Контакт: ${contactParts.join(', ')}`;
+      section.appendChild(contact);
+    }
+  }
+
+  return section;
+}
+
+function formatDateTimeLabel(value) {
+  if (!value) {
+    return '';
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  return date.toLocaleString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function formatVolume(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return '';
+  }
+
+  return numeric.toLocaleString('ru-RU', {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: numeric % 1 === 0 ? 0 : 2,
+  });
 }
 
 function detectDarkMode() {
@@ -1266,6 +1685,14 @@ async function waitForBx24(timeout = 5000) {
   return bx24Ready;
 }
 
+async function readJsonResponse(response) {
+  try {
+    return await response.json();
+  } catch (error) {
+    return null;
+  }
+}
+
 async function request(path, options = {}) {
   const { method = 'GET', body, headers = {} } = options;
 
@@ -1275,6 +1702,7 @@ async function request(path, options = {}) {
       Accept: 'application/json',
       ...headers,
     },
+    credentials: 'include',
   };
 
   if (body !== undefined) {
