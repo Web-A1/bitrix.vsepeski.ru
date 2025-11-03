@@ -34,16 +34,53 @@ final class Request
         }
 
         $raw = file_get_contents('php://input');
-        $body = [];
+        $body = self::parseBody($raw, $_POST);
 
+        return new self($method, $path, $query, $headers, $body, $server);
+    }
+
+    /**
+     * @param array<string,mixed> $fallback
+     * @return array<string,mixed>
+     */
+    private static function parseBody(string|false $raw, array $fallback): array
+    {
         if ($raw !== false && $raw !== '') {
             $decoded = json_decode($raw, true);
             if (is_array($decoded)) {
-                $body = $decoded;
+                return $decoded;
             }
         }
 
-        return new self($method, $path, $query, $headers, $body, $server);
+        if ($fallback !== []) {
+            return self::normalizeInputArray($fallback);
+        }
+
+        return [];
+    }
+
+    /**
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    private static function normalizeInputArray(array $input): array
+    {
+        $normalized = [];
+
+        foreach ($input as $key => $value) {
+            if (is_array($value)) {
+                $normalized[$key] = self::normalizeInputArray($value);
+                continue;
+            }
+
+            if (is_object($value)) {
+                continue;
+            }
+
+            $normalized[$key] = $value;
+        }
+
+        return $normalized;
     }
 
     public function method(): string
