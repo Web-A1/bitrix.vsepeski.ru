@@ -94,9 +94,9 @@ if [[ -z "$commit_summary" ]]; then
 fi
 
 if [[ -n "$extra_message" ]]; then
-  commit_message="auto: ${commit_summary} — ${extra_message}"
+  commit_message="${commit_summary} — ${extra_message}"
 else
-  commit_message="auto: ${commit_summary}"
+  commit_message="${commit_summary}"
 fi
 
 git commit -m "$commit_message"
