@@ -1,89 +1,56 @@
-# bitrix.vsepeski.ru
+# bitrix.vsepeski.ru (AI brief)
 
-Серверная платформа для кастомных интеграций Bitrix24 проекта vsepeski.ru. Код организован по модулям (`src/Modules`), сейчас реализован модуль управления перевозками.
+## Snapshot
+- Purpose: модуль «Рейсы» для Bitrix24 портала vsepeski.ru; standalone страница совпадает с iframe-плейсментом.
+- Stack: PHP 8.2 + Composer, MySQL 8.0 (UUID), Bitrix24 REST, ванильный JS/CSS.
+- Deployment: ветка `main`, автодеплой на прод через Beget hook.
 
-## Требования
+## Domain essentials
+- Haul (`hauls`): рейс сделки; включает load/unload блоки, sequence, ответственного водителя.
+- Truck (`trucks`): самосвал, уникальный `license_plate`.
+- Material (`materials`): тип груза.
+- Drivers поступают из Bitrix отдела `BITRIX_DRIVERS_DEPARTMENT`.
 
-- PHP 8.2+ с расширениями `pdo_mysql`, `openssl`, `mbstring` и `curl`
-- Composer 2.x
-- MySQL/MariaDB 8.0+ (InnoDB, поддержка функции `UUID()`)
-- Доступ к порталу Bitrix24 с правами на создание приложений/вебхуков
+## System topology
+- Container `B24\Center\Core\Application` (инициализация в `bootstrap/app.php`).
+- Providers: `DatabaseServiceProvider` (PDO), `HaulsServiceProvider` (репозитории, сервисы, Bitrix REST).
+- HTTP entry `public/index.php` → `Infrastructure\Http\Kernel` → контроллеры модуля.
+- Persistence: `Infrastructure\Persistence\Database\{ConnectionFactory,Migrator}` + SQL в `database/migrations`.
+- Module layout `src/Modules/Hauls/{Domain,Application,Infrastructure,Ui}`.
 
-## Быстрый старт
+## API surface
+- `GET/POST /api/deals/{dealId}/hauls` — список и создание рейсов.
+- `GET/PATCH/DELETE /api/hauls/{haulId}` — чтение/обновление/мягкое удаление.
+- `GET/POST /api/trucks`, `DELETE /api/trucks/{id}`.
+- `GET/POST /api/materials`, `DELETE /api/materials/{id}`.
+- `GET /api/drivers` — Bitrix REST прокси (ожидает webhook URL).
+- `GET /hauls` — отдаёт widget с вставленным `window.B24_INSTALL_PAYLOAD`.
 
-```bash
-git clone git@github.com:web-a1/bitrix-vsepeski.git
-cd bitrix-vsepeski
-composer install
-cp .env.example .env
-```
+## UI widget
+- HTML: `public/hauls/index.html`, JS: `public/assets/hauls.js`, CSS: `public/assets/hauls.css`.
+- Основные элементы: поле ввода `deal-id`, кнопка `Новый рейс`, FAB `+`, список карт рейсов, модальное редактирование.
+- При embed вызывает `BX24.fitWindow`, подстраивает тему и пытается авто-определить `dealId` из payload/query/referrer.
 
-1. Заполните `.env`, указав параметры базы данных и Bitrix24 (см. раздел «Переменные окружения»).
-2. Примените миграции: `composer run db:migrate`.
-3. Запустите встроенный сервер PHP: `php -S localhost:8000 -t public`.
-4. Откройте `http://localhost:8000/hauls` для проверки UI перевозок.
+## Bitrix install flow
+- `public/bitrix/install.php`: принимает install hook, сохраняет OAuth (`storage/bitrix/oauth.json`), при placement-запросе рендерит widget.
+- Авто ребайндинг placements `CRM_DEAL_DETAIL_TAB` и `CRM_DEAL_LIST_MENU` (см. `docs/bitrix/mobile-placement.md`).
+- TODO: реализовать проверку `BITRIX_WEBHOOK_SECRET` на входящих REST-запросах (сейчас только сохраняем значение).
 
-## Переменные окружения
+## Tooling & commands
+- `composer install`, `.env` на базе `.env.example` (dotenv 5.6).
+- Миграции: `composer run db:migrate` → `bin/migrate` → SQL в `database/migrations`.
+- Виджет локально: `php -S localhost:8000 -t public` → `http://localhost:8000/hauls`.
+- Коммит/пуш: `bin/quick-push.sh [note]` (генерирует сообщение по git diff).
+- Тесты: `composer test` (PHPUnit 10) — каталоги `tests/` пока пустые.
 
-Основные переменные, которые нужно указать в `.env`:
+## Key files map
+- `public/index.php`, `src/Infrastructure/Http/{Kernel,Request,Response}.php` — HTTP слой.
+- `src/Modules/Hauls/Application/Services/HaulService.php` — CRUD бизнес-логика.
+- `src/Modules/Hauls/Infrastructure/*Repository.php` — работа с PDO.
+- `src/Modules/Hauls/Ui/{HaulController,...}` — REST-контроллеры.
+- `src/Infrastructure/Bitrix/BitrixRestClient.php` — минимальный REST-клиент Bitrix24.
 
-- `APP_NAME`, `APP_ENV`, `APP_DEBUG`, `APP_TIMEZONE`
-- `DB_CONNECTION=mysql`, `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD`, `DB_CHARSET`
-- `BITRIX_CLIENT_ID`, `BITRIX_CLIENT_SECRET`, `BITRIX_PORTAL_URL`
-- `BITRIX_WEBHOOK_URL`, `BITRIX_WEBHOOK_SECRET`
-- `BITRIX_DRIVERS_DEPARTMENT` — название отдела в портале, куда добавляются водители
-
-## Миграции БД
-
-Для применения миграций используется консольный скрипт `bin/migrate` (обёртка на `B24\Center\Infrastructure\Persistence\Database\Migrator`):
-
-```bash
-composer run db:migrate    # с автозагрузкой из vendor/
-```
-
-Миграции создают таблицы материалов, грузовиков и перевозок. Идентификаторы генерируются функцией `UUID()` на стороне MySQL.
-
-## Локальный запуск
-
-```bash
-php -S localhost:8000 -t public
-```
-
-Сервер отдаёт публичный каталог `public/`, Bitrix-установщик доступен по адресу `/bitrix/install.php`.
-
-## Структура проекта
-
-- `public/` — HTTP-точки входа Bitrix (`bitrix/install.php`) и статические ассеты (`assets/`, `hauls/`).
-- `src/Modules/Hauls` — доменная логика и UI модуля перевозок (контроллеры, сервисы, сущности).
-- `src/Infrastructure/Persistence/Database` — фабрика подключения, мигратор и слой доступа к БД.
-- `config/*.php` — конфигурация приложения, БД и Bitrix.
-- `database/migrations` — SQL-миграции для MySQL/MariaDB.
-- `bin/migrate` — CLI-инструмент для применения миграций.
-
-## Интеграция с Bitrix24
-
-- Файл `public/bitrix/install.php` используется для установки приложения в портале Bitrix24.
-- В `.env` должны быть заданы идентификатор и секрет приложения, адрес портала и URL входящего вебхука.
-- Секрет вебхука (`BITRIX_WEBHOOK_SECRET`) проверяется в контроллерах при получении запросов от Bitrix24.
-
-## Тестирование
-
-Автотесты запускаются командой:
-
-```bash
-composer test
-```
-
-Тесты располагаются в каталоге `tests/` (фреймворк PHPUnit 10).
-
-## Разработка и деплой
-
-- Основная ветка `main` — рабочая и продакшен-ветка; коммиты делаются локально и пушатся напрямую.
-- Пуш в удалённый репозиторий — обязательный этап: CI/CD сразу выкатывает изменения на единственный сервер (production).
-- Автодеплой работает через Beget: подписанный хуком репозиторий разворачивается в каталог проекта, база — MySQL 8.0 из панели Beget.
-- Перед пушем прогоняйте ключевые проверки (миграции, UI/Bitrix-флоу). Если правка оказалась неудачной, откатите репозиторий на предыдущий коммит.
-- Для быстрой публикации изменений используйте `./bin/quick-push.sh [комментарий]` — скрипт сам сформирует сообщение коммита (по файлам и строкам) и выполнит `git push`. Дополнительный комментарий опционален.
-
-## Дополнительно
-
-- Для фронтенда модуля перевозок используются ассеты `public/assets/hauls.js` и `public/assets/hauls.css`.
+## Known gaps / reminders
+- Нет юнит/фича тестов — при изменениях полагаться на ручную проверку.
+- Проверка входящих вебхуков (`BITRIX_WEBHOOK_SECRET`) не реализована.
+- При расширении модулей регистрировать провайдеры в `config/modules.php`.
