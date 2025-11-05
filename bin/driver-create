@@ -1,0 +1,201 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+use B24\Center\Core\Application;
+use B24\Center\Infrastructure\Bitrix\BitrixRestClient;
+use B24\Center\Modules\Hauls\Infrastructure\DriverAccountRepository;
+
+$rootPath = dirname(__DIR__);
+$autoloadPath = $rootPath . '/vendor/autoload.php';
+
+if (!file_exists($autoloadPath)) {
+    fwrite(STDERR, "Composer autoload not found. Run `composer install`.\n");
+    exit(1);
+}
+
+require $autoloadPath;
+
+$options = getopt(
+    '',
+    [
+        'email:',
+        'password::',
+        'bitrix-id::',
+        'name::',
+        'phone::',
+        'help',
+    ]
+);
+
+if (isset($options['help']) || !isset($options['email'])) {
+    fwrite(
+        STDOUT,
+        <<<TXT
+Создание или обновление доступа водителя.
+
+Обязательные параметры:
+  --email         Логин (e-mail) водителя.
+
+Необязательные параметры:
+  --password      Задать пароль вручную. Если опущен — сгенерируется автоматически.
+  --bitrix-id     ID сотрудника в Bitrix24. Если не указан, попробуем найти по e-mail.
+  --name          Отображаемое имя. Если не указано — используем данные из Bitrix24.
+  --phone         Телефон для справки (необязательно).
+  --help          Показать эту подсказку.
+
+Пример:
+  php bin/driver-create --email=mkurbanov.drv@vsepeski.ru
+
+TXT
+    );
+
+    exit(0);
+}
+
+$email = strtolower(trim((string) $options['email']));
+
+if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    fwrite(STDERR, "Укажите корректный e-mail.\n");
+    exit(1);
+}
+
+$passwordPlain = isset($options['password']) && $options['password'] !== ''
+    ? (string) $options['password']
+    : null;
+
+$bitrixId = isset($options['bitrix-id']) ? (int) $options['bitrix-id'] : 0;
+$name = isset($options['name']) ? trim((string) $options['name']) : '';
+$phone = isset($options['phone']) ? trim((string) $options['phone']) : null;
+
+/** @var Application $container */
+$container = require $rootPath . '/bootstrap/app.php';
+
+/** @var BitrixRestClient $bitrix */
+$bitrix = $container->get(BitrixRestClient::class);
+
+if ($bitrixId <= 0 || $name === '' || $phone === null) {
+    try {
+        $response = $bitrix->call('user.get', [
+            'FILTER' => [
+                '=EMAIL' => $email,
+            ],
+            'SELECT' => ['ID', 'NAME', 'LAST_NAME', 'SECOND_NAME', 'EMAIL', 'PERSONAL_MOBILE', 'WORK_PHONE'],
+        ]);
+    } catch (\Throwable $exception) {
+        fwrite(STDERR, sprintf("Не удалось обратиться к Bitrix24: %s\n", $exception->getMessage()));
+        exit(1);
+    }
+
+    $users = is_array($response['result'] ?? null) ? $response['result'] : [];
+
+    if (count($users) === 0) {
+        fwrite(STDERR, "Пользователь с таким e-mail не найден в Bitrix24. Укажите --bitrix-id вручную.\n");
+        exit(1);
+    }
+
+    if (count($users) > 1 && $bitrixId <= 0) {
+        fwrite(STDERR, "Найдено несколько пользователей. Уточните параметр --bitrix-id.\n");
+        exit(1);
+    }
+
+    $data = $bitrixId > 0
+        ? array_values(array_filter($users, fn ($user) => (int) ($user['ID'] ?? 0) === $bitrixId))[0] ?? $users[0]
+        : $users[0];
+
+    if ($bitrixId <= 0) {
+        $bitrixId = (int) ($data['ID'] ?? 0);
+    }
+
+    if ($name === '') {
+        $displayName = trim(sprintf(
+            '%s %s %s',
+            $data['LAST_NAME'] ?? '',
+            $data['NAME'] ?? '',
+            $data['SECOND_NAME'] ?? ''
+        ));
+        $name = $displayName !== '' ? $displayName : ($data['NAME'] ?? $email);
+    }
+
+    if ($phone === null) {
+        $phoneCandidate = $data['PERSONAL_MOBILE'] ?? $data['WORK_PHONE'] ?? '';
+        $phone = $phoneCandidate !== '' ? $phoneCandidate : null;
+    }
+}
+
+if ($bitrixId <= 0) {
+    fwrite(STDERR, "Не удалось определить Bitrix ID. Укажите параметр --bitrix-id.\n");
+    exit(1);
+}
+
+if ($passwordPlain === null) {
+    $passwordPlain = generatePassword();
+}
+
+$passwordHash = password_hash($passwordPlain, PASSWORD_DEFAULT);
+
+/** @var DriverAccountRepository $repository */
+$repository = $container->get(DriverAccountRepository::class);
+
+try {
+    $account = $repository->upsert(
+        $bitrixId,
+        $email,
+        $passwordHash,
+        $name !== '' ? $name : $email,
+        $email,
+        $phone
+    );
+} catch (\Throwable $exception) {
+    fwrite(STDERR, sprintf("Не удалось сохранить данные: %s\n", $exception->getMessage()));
+    exit(1);
+}
+
+$message = sprintf(
+    <<<TXT
+Доступ водителя сохранён.
+- Bitrix ID: %d
+- Логин: %s
+- Имя: %s
+- Телефон: %s
+- Пароль: %s
+
+TXT,
+    $account->bitrixUserId(),
+    $account->login(),
+    $account->name(),
+    $account->phone() ?? '—',
+    $passwordPlain
+);
+
+fwrite(STDOUT, $message);
+
+$logDir = $rootPath . '/storage/logs';
+if (!is_dir($logDir)) {
+    mkdir($logDir, 0775, true);
+}
+
+$logLine = sprintf(
+    '[%s] %s (Bitrix ID: %d) — пароль: %s%s',
+    (new DateTimeImmutable())->format('Y-m-d H:i:s'),
+    $account->login(),
+    $account->bitrixUserId(),
+    $passwordPlain,
+    PHP_EOL
+);
+
+file_put_contents($logDir . '/driver_passwords.log', $logLine, FILE_APPEND | LOCK_EX);
+
+function generatePassword(int $length = 12): string
+{
+    $alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%';
+    $maxIndex = strlen($alphabet) - 1;
+    $password = '';
+
+    for ($i = 0; $i < $length; $i++) {
+        $password .= $alphabet[random_int(0, $maxIndex)];
+    }
+
+    return $password;
+}

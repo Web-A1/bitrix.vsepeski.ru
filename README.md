@@ -12,27 +12,19 @@
 - Drivers поступают из Bitrix отдела `BITRIX_DRIVERS_DEPARTMENT`.
 
 ## Driver accounts & mobile login
-- Локальные учётки водителей хранятся в таблице `driver_accounts` (см. миграцию `202511050040_create_driver_accounts_table.sql`). Для авторизации используется `bitrix_user_id` (ID сотрудника в Bitrix24), поле `login` и `password_hash`.
-- Логины приводятся к нижнему регистру при проверке — сохраняйте их в базе уже в нижнем регистре (обычно это корпоративный e-mail).
-- Базовый файл конфигурации `config/driver_accounts.php` содержит список водителей. Для каждой записи укажите `email`, `bitrix_user_id`, `name`, optional `phone`. Поле `password` можно оставить `null` — CLI сгенерирует крепкий пароль и покажет в выводе; если указан `password_hash`, он будет использован напрямую.
-- Выполните синхронизацию командой:
+- Учётки водителей хранятся в таблице `driver_accounts` (см. миграцию `202511050040_create_driver_accounts_table.sql`). Для авторизации используется Bitrix ID (`bitrix_user_id`), логин и хеш пароля.
+- Логиновый e-mail всегда приводится к нижнему регистру.
+- Для создания/обновления водителя используйте CLI:
   ```bash
-  php bin/driver-accounts-sync
+  php bin/driver-create --email=mkurbanov.drv@vsepeski.ru
   ```
-  Скрипт создаст/обновит записи в таблице `driver_accounts`, напечатает свежесгенерированные пароли и добавит их в `storage/logs/driver_passwords.log` (лог не попадает в git). Передайте пароль водителю и, при необходимости, удалите поле `password`, чтобы в конфигурации не оставалось открытого значения.
-- Локально можно подключаться к MySQL Beget через SSH-туннель. Создайте `~/.ssh/config`:
+  Скрипт подтянет пользователя из Bitrix24 (по e-mail), определит `bitrix_user_id`, сгенерирует пароль (или возьмёт из `--password=...`), запишет его в таблицу и выведет на экран. Дополнительно запись попадёт в `storage/logs/driver_passwords.log`, чтобы пароль не потерялся (лог не коммитится).
+- Если нужно задать данные вручную, доступны параметры `--bitrix-id`, `--name`, `--phone`, `--password`.
+- Запуск можно выполнять напрямую на сервере:
+  ```bash
+  ssh tdsta@tdsta.beget.tech "cd ~/bitrix.vsepeski.ru/app && php8.2 bin/driver-create --email=..."
   ```
-  Host beget-db
-      HostName tdsta.beget.tech
-      User <ssh_login>
-      LocalForward 3306 localhost:3306
-  ```
-  После `ssh beget-db` система пробросит порт 3306. Создайте `.env.local` с содержимым
-  ```
-  DB_HOST=127.0.0.1
-  DB_PORT=3306
-  ```
-  и любые локальные команды (`php bin/driver-accounts-sync`, `php bin/migrate`) будут работать, оставаясь совместимыми с продакшен- `.env`.
+  Для удобства создайте алиас в `~/.ssh/config` и используйте короткую команду.
 
 ## System topology
 - Container `B24\Center\Core\Application` (инициализация в `bootstrap/app.php`).
