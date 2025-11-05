@@ -14,18 +14,12 @@
 ## Driver accounts & mobile login
 - Локальные учётки водителей хранятся в таблице `driver_accounts` (см. миграцию `202511050040_create_driver_accounts_table.sql`). Для авторизации используется `bitrix_user_id` (ID сотрудника в Bitrix24), поле `login` и `password_hash`.
 - Логины приводятся к нижнему регистру при проверке — сохраняйте их в базе уже в нижнем регистре (обычно это корпоративный e-mail).
-- Сгенерировать хеш можно командой `php -r "echo password_hash('НовыйПароль', PASSWORD_DEFAULT), PHP_EOL;"`.
-- Пример вставки:
-  ```sql
-  INSERT INTO driver_accounts (bitrix_user_id, login, password_hash, name, email, phone)
-  VALUES (1234, 'driver@example.com', '$2y$...', 'Иван Иванов', 'driver@example.com', '+7 999 000 00 00');
-  ```
-- После добавления записи водитель может авторизоваться на `https://bitrix.vsepeski.ru/hauls/`; выдавайте логин/пароль индивидуально. Удаление/смена пароля выполняется через обновление соответствующей записи.
-- Для автоматизации создан CLI-хелпер `php bin/driver-account`. Достаточно указать e-mail:
+- Базовый файл конфигурации `config/driver_accounts.php` содержит список водителей. Для каждой записи укажите `email`, `bitrix_user_id`, `name`, optional `phone`. Поле `password` можно оставить `null` — CLI сгенерирует крепкий пароль и покажет в выводе; если указан `password_hash`, он будет использован напрямую.
+- Выполните синхронизацию командой:
   ```bash
-  php bin/driver-account --email=mkurbanov.drv@vsepeski.ru
+  php bin/driver-accounts-sync
   ```
-  Скрипт подтягивает пользователя из Bitrix24 (по e-mail), назначает ID, генерирует пароль и выводит его в консоль. Параметры `--password`, `--bitrix-id`, `--name`, `--phone` позволяют задать значения вручную.
+  Скрипт создаст/обновит записи в таблице `driver_accounts` и напечатает свежесгенерированные пароли. Передайте их водителям и, при необходимости, удалите поле `password`, чтобы не хранить текстовый пароль в репозитории.
 - Локально можно подключаться к MySQL Beget через SSH-туннель. Создайте `~/.ssh/config`:
   ```
   Host beget-db
@@ -38,7 +32,7 @@
   DB_HOST=127.0.0.1
   DB_PORT=3306
   ```
-  и любые локальные команды (`php bin/driver-account`, `php bin/migrate`) будут работать, оставаясь совместимыми с продакшен- `.env`.
+  и любые локальные команды (`php bin/driver-accounts-sync`, `php bin/migrate`) будут работать, оставаясь совместимыми с продакшен- `.env`.
 
 ## System topology
 - Container `B24\Center\Core\Application` (инициализация в `bootstrap/app.php`).
