@@ -5,6 +5,7 @@ declare(strict_types=1);
 
 use B24\Center\Core\Application;
 use B24\Center\Modules\Hauls\Infrastructure\DriverAccountRepository;
+use DateTimeImmutable;
 
 $rootPath = dirname(__DIR__);
 $autoloadPath = $rootPath . '/vendor/autoload.php';
@@ -39,6 +40,7 @@ $repository = $container->get(DriverAccountRepository::class);
 $results = [];
 $errors = [];
 $synced = 0;
+$logEntries = [];
 
 foreach ($accountsConfig as $index => $accountData) {
     if (!is_array($accountData)) {
@@ -98,6 +100,16 @@ foreach ($accountsConfig as $index => $accountData) {
         'phone' => $entity->phone(),
         'plain_password' => $plainPassword,
     ];
+
+    if ($plainPassword !== null) {
+        $logEntries[] = sprintf(
+            '[%s] %s (Bitrix ID: %d) — пароль: %s',
+            (new DateTimeImmutable())->format('Y-m-d H:i:s'),
+            $entity->login(),
+            $entity->bitrixUserId(),
+            $plainPassword
+        );
+    }
 }
 
 if ($synced === 0 && $errors) {
@@ -133,6 +145,15 @@ if ($errors) {
         fwrite(STDERR, ' - ' . $error . PHP_EOL);
     }
     exit(1);
+}
+
+if ($logEntries) {
+    $logDirectory = $rootPath . '/storage/logs';
+    if (!is_dir($logDirectory)) {
+        mkdir($logDirectory, 0775, true);
+    }
+    $logPath = $logDirectory . '/driver_passwords.log';
+    file_put_contents($logPath, implode(PHP_EOL, $logEntries) . PHP_EOL, FILE_APPEND | LOCK_EX);
 }
 
 function generatePassword(int $length = 12): string
