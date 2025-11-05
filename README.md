@@ -26,6 +26,19 @@
   php bin/driver-account --email=mkurbanov.drv@vsepeski.ru
   ```
   Скрипт подтягивает пользователя из Bitrix24 (по e-mail), назначает ID, генерирует пароль и выводит его в консоль. Параметры `--password`, `--bitrix-id`, `--name`, `--phone` позволяют задать значения вручную.
+- Локально можно подключаться к MySQL Beget через SSH-туннель. Создайте `~/.ssh/config`:
+  ```
+  Host beget-db
+      HostName tdsta.beget.tech
+      User <ssh_login>
+      LocalForward 3306 localhost:3306
+  ```
+  После `ssh beget-db` система пробросит порт 3306. Создайте `.env.local` с содержимым
+  ```
+  DB_HOST=127.0.0.1
+  DB_PORT=3306
+  ```
+  и любые локальные команды (`php bin/driver-account`, `php bin/migrate`) будут работать, оставаясь совместимыми с продакшен- `.env`.
 
 ## System topology
 - Container `B24\Center\Core\Application` (инициализация в `bootstrap/app.php`).

@@ -17,6 +17,10 @@ if (file_exists($rootPath . '/.env')) {
     Dotenv::createImmutable($rootPath)->safeLoad();
 }
 
+if (file_exists($rootPath . '/.env.local')) {
+    Dotenv::createImmutable($rootPath, ['.env.local'])->safeLoad();
+}
+
 $app = new Application();
 
 (new DatabaseServiceProvider())->register($app);

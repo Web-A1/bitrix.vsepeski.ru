@@ -15,6 +15,10 @@ if (file_exists($rootPath . '/.env')) {
     Dotenv::createImmutable($rootPath)->safeLoad();
 }
 
+if (file_exists($rootPath . '/.env.local')) {
+    Dotenv::createImmutable($rootPath, ['.env.local'])->safeLoad();
+}
+
 $migrationsPath = $rootPath . '/database/migrations';
 
 try {
@@ -27,4 +31,3 @@ try {
 }
 
 fwrite(STDOUT, "Migrations executed successfully.\n");
-
