@@ -8,7 +8,7 @@ use B24\Center\Core\Application;
 use B24\Center\Infrastructure\Http\Request;
 use B24\Center\Infrastructure\Http\Response;
 use B24\Center\Infrastructure\Auth\SessionAuthManager;
-use B24\Center\Infrastructure\Bitrix\BitrixPortalAuthenticator;
+use B24\Center\Infrastructure\Auth\LocalDriverAuthenticator;
 use B24\Center\Modules\Hauls\Application\Services\HaulService;
 use B24\Center\Modules\Hauls\Infrastructure\MaterialRepository;
 use B24\Center\Modules\Hauls\Infrastructure\TruckRepository;
@@ -118,8 +118,8 @@ class Kernel
             }
 
             try {
-                /** @var BitrixPortalAuthenticator $authenticator */
-                $authenticator = $this->container->get(BitrixPortalAuthenticator::class);
+                /** @var LocalDriverAuthenticator $authenticator */
+                $authenticator = $this->container->get(LocalDriverAuthenticator::class);
                 $user = $authenticator->login($login, $password);
             } catch (RuntimeException $exception) {
                 return Response::json(['error' => $exception->getMessage()], 401);

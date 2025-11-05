@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace B24\Center\Modules\Hauls;
 
 use B24\Center\Core\Application;
+use B24\Center\Modules\Hauls\Infrastructure\DriverAccountRepository;
 use B24\Center\Modules\Hauls\Infrastructure\HaulRepository;
 use B24\Center\Modules\Hauls\Application\Services\HaulService;
 use B24\Center\Modules\Hauls\Infrastructure\MaterialRepository;
@@ -23,6 +24,13 @@ class HaulsServiceProvider
             $connection = $container->get(PDO::class);
 
             return new HaulRepository($connection);
+        });
+
+        $app->singleton(DriverAccountRepository::class, static function (Application $container): DriverAccountRepository {
+            /** @var PDO $connection */
+            $connection = $container->get(PDO::class);
+
+            return new DriverAccountRepository($connection);
         });
 
         $app->singleton(MaterialRepository::class, static function (Application $container): MaterialRepository {

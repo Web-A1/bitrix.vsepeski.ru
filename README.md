@@ -11,6 +11,17 @@
 - Material (`materials`): тип груза.
 - Drivers поступают из Bitrix отдела `BITRIX_DRIVERS_DEPARTMENT`.
 
+## Driver accounts & mobile login
+- Локальные учётки водителей хранятся в таблице `driver_accounts` (см. миграцию `202511050040_create_driver_accounts_table.sql`). Для авторизации используется `bitrix_user_id` (ID сотрудника в Bitrix24), поле `login` и `password_hash`.
+- Логины приводятся к нижнему регистру при проверке — сохраняйте их в базе уже в нижнем регистре (обычно это корпоративный e-mail).
+- Сгенерировать хеш можно командой `php -r "echo password_hash('НовыйПароль', PASSWORD_DEFAULT), PHP_EOL;"`.
+- Пример вставки:
+  ```sql
+  INSERT INTO driver_accounts (bitrix_user_id, login, password_hash, name, email, phone)
+  VALUES (1234, 'driver@example.com', '$2y$...', 'Иван Иванов', 'driver@example.com', '+7 999 000 00 00');
+  ```
+- После добавления записи водитель может авторизоваться на `https://bitrix.vsepeski.ru/hauls/`; выдавайте логин/пароль индивидуально. Удаление/смена пароля выполняется через обновление соответствующей записи.
+
 ## System topology
 - Container `B24\Center\Core\Application` (инициализация в `bootstrap/app.php`).
 - Providers: `DatabaseServiceProvider` (PDO), `HaulsServiceProvider` (репозитории, сервисы, Bitrix REST).
