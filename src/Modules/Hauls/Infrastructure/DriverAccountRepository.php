@@ -6,6 +6,7 @@ namespace B24\Center\Modules\Hauls\Infrastructure;
 
 use B24\Center\Modules\Hauls\Domain\DriverAccount;
 use PDO;
+use RuntimeException;
 
 final class DriverAccountRepository
 {
@@ -53,6 +54,47 @@ final class DriverAccountRepository
         }
 
         return $this->hydrate($row);
+    }
+
+    public function upsert(
+        int $bitrixUserId,
+        string $login,
+        string $passwordHash,
+        string $name,
+        ?string $email,
+        ?string $phone
+    ): DriverAccount {
+        $normalizedLogin = mb_strtolower(trim($login));
+
+        $statement = $this->connection->prepare(
+            <<<SQL
+                INSERT INTO driver_accounts (bitrix_user_id, login, password_hash, name, email, phone)
+                VALUES (:bitrix_user_id, :login, :password_hash, :name, :email, :phone)
+                ON DUPLICATE KEY UPDATE
+                    password_hash = VALUES(password_hash),
+                    name = VALUES(name),
+                    email = VALUES(email),
+                    phone = VALUES(phone),
+                    updated_at = CURRENT_TIMESTAMP
+            SQL
+        );
+
+        $statement->execute([
+            'bitrix_user_id' => $bitrixUserId,
+            'login' => $normalizedLogin,
+            'password_hash' => $passwordHash,
+            'name' => $name,
+            'email' => $email,
+            'phone' => $phone,
+        ]);
+
+        $account = $this->findByLogin($normalizedLogin);
+
+        if ($account === null) {
+            throw new RuntimeException('Не удалось сохранить данные водителя.');
+        }
+
+        return $account;
     }
 
     /**

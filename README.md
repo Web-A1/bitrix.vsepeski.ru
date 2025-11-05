@@ -21,6 +21,11 @@
   VALUES (1234, 'driver@example.com', '$2y$...', 'Иван Иванов', 'driver@example.com', '+7 999 000 00 00');
   ```
 - После добавления записи водитель может авторизоваться на `https://bitrix.vsepeski.ru/hauls/`; выдавайте логин/пароль индивидуально. Удаление/смена пароля выполняется через обновление соответствующей записи.
+- Для автоматизации создан CLI-хелпер `php bin/driver-account`. Достаточно указать e-mail:
+  ```bash
+  php bin/driver-account --email=mkurbanov.drv@vsepeski.ru
+  ```
+  Скрипт подтягивает пользователя из Bitrix24 (по e-mail), назначает ID, генерирует пароль и выводит его в консоль. Параметры `--password`, `--bitrix-id`, `--name`, `--phone` позволяют задать значения вручную.
 
 ## System topology
 - Container `B24\Center\Core\Application` (инициализация в `bootstrap/app.php`).
