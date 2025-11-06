@@ -52,7 +52,7 @@ if (isset($payload['auth']) && is_array($payload['auth'])) {
 }
 
 $hasTokens = !empty($auth['access_token']) && !empty($auth['refresh_token']);
-$isPlacementLaunch = isset($payload['PLACEMENT']);
+$isPlacementLaunch = isset($payload['PLACEMENT']) || isset($payload['placement']);
 $eventName = null;
 
 if (isset($payload['event']) && is_string($payload['event'])) {
@@ -145,7 +145,7 @@ $domain = $auth['domain'] ?? $payload['DOMAIN'] ?? null;
 $bindings = [];
 
 if (is_string($domain) && $domain !== '') {
-    $primaryHandler = 'https://bitrix.vsepeski.ru/hauls?v=20241115';
+    $primaryHandler = 'https://bitrix.vsepeski.ru/bitrix/install.php?placement=hauls&v=20241118';
 
     $options = buildPlacementOptions();
 
