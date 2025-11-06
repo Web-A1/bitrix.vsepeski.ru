@@ -19,11 +19,14 @@ final class Haul
         private readonly string $truckId,
         private readonly string $materialId,
         private int $sequence,
+        private int $status,
+        private ?string $generalNotes,
         private string $loadAddressText,
         private ?string $loadAddressUrl,
         private ?int $loadFromCompanyId,
         private ?int $loadToCompanyId,
         private ?float $loadVolume,
+        private ?float $loadActualVolume,
         private array $loadDocuments,
         private string $unloadAddressText,
         private ?string $unloadAddressUrl,
@@ -31,6 +34,7 @@ final class Haul
         private ?int $unloadToCompanyId,
         private ?string $unloadContactName,
         private ?string $unloadContactPhone,
+        private ?string $unloadAcceptanceTime,
         private array $unloadDocuments,
         private DateTimeImmutable $createdAt,
         private DateTimeImmutable $updatedAt,
@@ -78,6 +82,26 @@ final class Haul
         $this->sequence = $sequence;
     }
 
+    public function status(): int
+    {
+        return $this->status;
+    }
+
+    public function updateStatus(int $status): void
+    {
+        $this->status = $status;
+    }
+
+    public function generalNotes(): ?string
+    {
+        return $this->generalNotes;
+    }
+
+    public function updateGeneralNotes(?string $notes): void
+    {
+        $this->generalNotes = $notes;
+    }
+
     public function loadAddressText(): string
     {
         return $this->loadAddressText;
@@ -118,6 +142,16 @@ final class Haul
     public function updateLoadVolume(?float $volume): void
     {
         $this->loadVolume = $volume;
+    }
+
+    public function loadActualVolume(): ?float
+    {
+        return $this->loadActualVolume;
+    }
+
+    public function updateLoadActualVolume(?float $volume): void
+    {
+        $this->loadActualVolume = $volume;
     }
 
     /**
@@ -182,6 +216,16 @@ final class Haul
     {
         $this->unloadContactName = $name;
         $this->unloadContactPhone = $phone;
+    }
+
+    public function unloadAcceptanceTime(): ?string
+    {
+        return $this->unloadAcceptanceTime;
+    }
+
+    public function updateUnloadAcceptanceTime(?string $value): void
+    {
+        $this->unloadAcceptanceTime = $value;
     }
 
     /**

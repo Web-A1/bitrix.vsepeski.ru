@@ -72,6 +72,28 @@ final class HaulController
         return Response::json(['data' => $updated]);
     }
 
+    public function transitionStatus(string $haulId, Request $request, ?int $actorId, string $actorRole): Response
+    {
+        $payload = $request->body();
+        if (!isset($payload['status'])) {
+            return Response::json(['error' => 'Поле status обязательно.'], 422);
+        }
+
+        try {
+            $updated = $this->service->transitionStatus(
+                $haulId,
+                (int) $payload['status'],
+                $actorId,
+                $actorRole,
+                $payload
+            );
+        } catch (RuntimeException $exception) {
+            return Response::json(['error' => $exception->getMessage()], 422);
+        }
+
+        return Response::json(['data' => $updated]);
+    }
+
     public function destroy(string $haulId): Response
     {
         $this->service->delete($haulId);
@@ -98,4 +120,3 @@ final class HaulController
         return null;
     }
 }
-

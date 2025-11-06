@@ -7,6 +7,7 @@ namespace B24\Center\Modules\Hauls;
 use B24\Center\Core\Application;
 use B24\Center\Modules\Hauls\Infrastructure\DriverAccountRepository;
 use B24\Center\Modules\Hauls\Infrastructure\HaulRepository;
+use B24\Center\Modules\Hauls\Infrastructure\HaulStatusHistoryRepository;
 use B24\Center\Modules\Hauls\Application\Services\HaulService;
 use B24\Center\Modules\Hauls\Infrastructure\MaterialRepository;
 use B24\Center\Modules\Hauls\Infrastructure\TruckRepository;
@@ -24,6 +25,13 @@ class HaulsServiceProvider
             $connection = $container->get(PDO::class);
 
             return new HaulRepository($connection);
+        });
+
+        $app->singleton(HaulStatusHistoryRepository::class, static function (Application $container): HaulStatusHistoryRepository {
+            /** @var PDO $connection */
+            $connection = $container->get(PDO::class);
+
+            return new HaulStatusHistoryRepository($connection);
         });
 
         $app->singleton(DriverAccountRepository::class, static function (Application $container): DriverAccountRepository {
@@ -64,8 +72,10 @@ class HaulsServiceProvider
         $app->singleton(HaulService::class, static function (Application $container): HaulService {
             /** @var HaulRepository $repository */
             $repository = $container->get(HaulRepository::class);
+            /** @var HaulStatusHistoryRepository $history */
+            $history = $container->get(HaulStatusHistoryRepository::class);
 
-            return new HaulService($repository);
+            return new HaulService($repository, $history);
         });
 
         $app->singleton(HaulPlacementPageRenderer::class, static function (): HaulPlacementPageRenderer {

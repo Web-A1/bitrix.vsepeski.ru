@@ -67,6 +67,7 @@
           </div>
           <button type="button" class="button button--ghost" id="mobile-haul-dialog-close">Закрыть</button>
         </header>
+        <p id="mobile-haul-dialog-error" class="mobile-error mobile-haul-dialog__error" aria-live="polite" hidden></p>
         <div id="mobile-haul-dialog-body" class="mobile-haul-dialog__body"></div>
       </section>
     </div>
@@ -134,7 +135,21 @@
                 <span>Объём, м³</span>
                 <input type="number" step="0.01" min="0" name="load_volume" placeholder="0.00" inputmode="decimal" />
               </label>
+              <label>
+                <span>Статус</span>
+                <select name="status" id="status-select">
+                  <option value="0">Подготовка рейса</option>
+                  <option value="1">Рейс в работе</option>
+                  <option value="2">Загрузился</option>
+                  <option value="3">Выгрузился</option>
+                  <option value="4">Проверено</option>
+                </select>
+              </label>
             </div>
+            <label>
+              <span>Заметки по рейсу</span>
+              <textarea name="general_notes" rows="3" placeholder="Дополнительная информация для водителя"></textarea>
+            </label>
           </div>
 
           <div class="form-group">
@@ -185,6 +200,10 @@
               <label>
                 <span>Телефон</span>
                 <input type="tel" name="unload_contact_phone" placeholder="+7 900 000-00-00" maxlength="40" />
+              </label>
+              <label>
+                <span>Время приёмки</span>
+                <input type="text" name="unload_acceptance_time" placeholder="Например, с 11:00 до 19:00" />
               </label>
             </div>
           </div>

@@ -158,6 +158,20 @@ class Kernel
             };
         }
 
+        if (preg_match('#^/api/mobile/hauls/([A-Za-z0-9\\-]+)/status$#', $path, $matches)) {
+            $user = $authManager->user();
+
+            if ($user === null) {
+                return Response::json(['error' => 'Unauthorized'], 401);
+            }
+
+            if ($method !== 'POST') {
+                return $this->methodNotAllowed(['POST']);
+            }
+
+            return $haulController->transitionStatus($matches[1], $request, (int) $user['id'], 'driver');
+        }
+
         if (preg_match('#^/api/deals/(\d+)/hauls$#', $path, $matches)) {
             $dealId = (int) $matches[1];
 
@@ -206,6 +220,15 @@ class Kernel
             return match ($method) {
                 'DELETE' => $materialController->destroy($materialId),
                 default => $this->methodNotAllowed(['DELETE']),
+            };
+        }
+
+        if (preg_match('#^/api/hauls/([A-Za-z0-9\\-]+)/status$#', $path, $matches)) {
+            $haulId = $matches[1];
+
+            return match ($method) {
+                'POST', 'PUT', 'PATCH' => $haulController->transitionStatus($haulId, $request, null, 'manager'),
+                default => $this->methodNotAllowed(['POST', 'PUT', 'PATCH']),
             };
         }
 

@@ -61,6 +61,8 @@ const mobileElements = {
   dialogMeta: document.getElementById('mobile-haul-dialog-meta'),
   dialogClose: document.getElementById('mobile-haul-dialog-close'),
   dialogBackdrop: document.querySelector('[data-mobile-dialog-dismiss]'),
+  dialogError: document.getElementById('mobile-haul-dialog-error'),
+  dialogVolumeInput: null,
 };
 
 const mobileState = {
@@ -97,6 +99,16 @@ const mobileStorage = {
     }
   },
 };
+
+const mobileStatusLabels = {
+  0: 'Подготовка рейса',
+  1: 'Рейс в работе',
+  2: 'Загрузился',
+  3: 'Выгрузился',
+  4: 'Проверено',
+};
+
+const driverVisibleStatuses = new Set([1, 2, 3]);
 
 let fitTimer = null;
 let bx24Ready = null;
@@ -211,6 +223,8 @@ function showMobileLogin() {
   prefillSavedMobileLogin();
   setMobileLoginError('');
   setMobileError('');
+  mobileState.selectedHaulId = null;
+  closeMobileHaulDetails();
   mobileState.hauls = [];
   renderMobileHauls();
   if (mobileElements.loader) {
@@ -421,25 +435,28 @@ function buildMobileHaulCard(haul) {
   item.tabIndex = 0;
   item.setAttribute('role', 'button');
 
-  const title = document.createElement('p');
-  title.className = 'mobile-haul__title';
-  title.textContent = formatMobileHaulTitle(haul);
-  item.appendChild(title);
-
-  const subtitle = document.createElement('p');
-  subtitle.className = 'mobile-haul__subtitle';
-  subtitle.textContent = formatMobileHaulSubtitle(haul);
-  item.appendChild(subtitle);
+  const route = document.createElement('div');
+  route.className = 'mobile-haul__route';
+  route.append(
+    buildRoutePoint('Погрузка', haul?.load?.address_text),
+    buildRoutePoint(
+      'Выгрузка',
+      haul?.unload?.address_text,
+      haul?.unload?.acceptance_time ? `Время приёмки: ${haul.unload.acceptance_time}` : null
+    )
+  );
+  item.appendChild(route);
 
   const meta = document.createElement('div');
   meta.className = 'mobile-haul__meta';
 
-  if (haul?.truck_id) {
-    meta.appendChild(createMetaBadge(`Самосвал: ${haul.truck_id}`));
-  }
-
   if (haul?.material_id) {
     meta.appendChild(createMetaBadge(`Материал: ${haul.material_id}`));
+  }
+
+  const statusBadge = buildStatusBadge(haul.status);
+  if (statusBadge) {
+    meta.appendChild(statusBadge);
   }
 
   const updatedLabel = formatDateTimeLabel(haul?.updated_at || haul?.created_at);
@@ -471,6 +488,39 @@ function createMetaBadge(text) {
   span.textContent = text;
   return span;
 }
+
+function buildRoutePoint(label, address, extra = null) {
+  const paragraph = document.createElement('p');
+  paragraph.className = 'mobile-haul__point';
+
+  const caption = document.createElement('span');
+  caption.textContent = label;
+  paragraph.appendChild(caption);
+
+  const addressLine = document.createElement('strong');
+  addressLine.textContent = address || '—';
+  paragraph.appendChild(addressLine);
+
+  if (extra) {
+    const extraLine = document.createElement('small');
+    extraLine.textContent = extra;
+    paragraph.appendChild(extraLine);
+  }
+
+  return paragraph;
+}
+
+function buildStatusBadge(status) {
+  if (!isDriverStatusVisible(status)) {
+    return null;
+  }
+
+  const badge = document.createElement('span');
+  badge.className = 'mobile-haul__status-badge';
+  badge.textContent = getStatusLabel(status);
+  return badge;
+}
+
 
 function formatMobileHaulTitle(haul) {
   const sequence = formatSequence(haul);
@@ -504,6 +554,8 @@ function openMobileHaulDetails(haulOrId) {
   }
 
   mobileState.selectedHaulId = haul.id ?? null;
+  setMobileDialogError('');
+  setMobileDialogLoading(false);
   renderMobileHaulDetails(haul);
   mobileElements.dialog.hidden = false;
   mobileElements.dialog.setAttribute('aria-hidden', 'false');
@@ -518,6 +570,13 @@ function closeMobileHaulDetails() {
   mobileElements.dialog.hidden = true;
   mobileElements.dialog.setAttribute('aria-hidden', 'true');
   document.body.classList.remove('mobile-dialog-open');
+  if (mobileElements.dialogBody) {
+    mobileElements.dialogBody.innerHTML = '';
+  }
+  mobileElements.dialogVolumeInput = null;
+  setMobileDialogError('');
+  setMobileDialogLoading(false);
+  mobileState.selectedHaulId = null;
 }
 
 function handleMobileDialogKeydown(event) {
@@ -536,46 +595,66 @@ function renderMobileHaulDetails(haul) {
     return;
   }
 
+  const latest = mobileState.hauls.find((item) => item.id === haul?.id);
+  const data = latest ?? haul;
+  mobileElements.dialogBody.innerHTML = '';
+  mobileElements.dialogVolumeInput = null;
+  setMobileDialogError('');
+
   if (mobileElements.dialogTitle) {
-    mobileElements.dialogTitle.textContent = formatMobileHaulTitle(haul);
+    mobileElements.dialogTitle.textContent = formatMobileHaulTitle(data);
   }
 
   if (mobileElements.dialogMeta) {
-    mobileElements.dialogMeta.textContent = buildMobileHaulMetaLine(haul);
+    mobileElements.dialogMeta.textContent = buildMobileHaulMetaLine(data);
   }
 
-  mobileElements.dialogBody.innerHTML = '';
-
-  const infoSection = buildMobileSummarySection(haul);
+  const infoSection = buildMobileSummarySection(data);
   if (infoSection) {
     mobileElements.dialogBody.appendChild(infoSection);
   }
 
-  const loadSection = buildAddressSection('Погрузка', haul?.load, {
+  const loadActions = buildLoadActionSection(data);
+  if (loadActions) {
+    mobileElements.dialogBody.appendChild(loadActions);
+  }
+
+  const loadSection = buildAddressSection('Адрес погрузки', data?.load, {
     showMapLink: true,
     includeContact: false,
     sectionClass: 'mobile-haul-dialog__section',
+    photoPlaceholderText: 'Фото документов с погрузки появятся здесь.',
   });
   if (loadSection) {
     mobileElements.dialogBody.appendChild(loadSection);
   }
 
-  const unloadSection = buildAddressSection('Выгрузка', haul?.unload, {
+  const unloadActions = buildUnloadActionSection(data);
+  if (unloadActions) {
+    mobileElements.dialogBody.appendChild(unloadActions);
+  }
+
+  const unloadSection = buildAddressSection('Адрес выгрузки', data?.unload, {
     includeContact: true,
     sectionClass: 'mobile-haul-dialog__section',
+    photoPlaceholderText: 'Фото документов с выгрузки появятся здесь.',
   });
   if (unloadSection) {
     mobileElements.dialogBody.appendChild(unloadSection);
   }
 
-  const actions = buildMobileHaulActionsPlaceholder();
-  if (actions) {
-    mobileElements.dialogBody.appendChild(actions);
+  const historySection = buildMobileStatusHistorySection(data);
+  if (historySection) {
+    mobileElements.dialogBody.appendChild(historySection);
   }
 }
 
 function buildMobileHaulMetaLine(haul) {
   const parts = [];
+  if (isDriverStatusVisible(haul?.status)) {
+    const statusLabel = getStatusLabel(haul?.status);
+    parts.push(statusLabel);
+  }
   if (haul?.deal_id) {
     parts.push(`Сделка #${haul.deal_id}`);
   }
@@ -601,14 +680,28 @@ function buildMobileSummarySection(haul) {
   const list = document.createElement('ul');
   list.className = 'mobile-haul-dialog__list';
 
+  if (isDriverStatusVisible(haul?.status)) {
+    list.appendChild(createSummaryRow('Статус', getStatusLabel(haul.status)));
+  }
   list.appendChild(createSummaryRow('Сделка', haul.deal_id ? `#${haul.deal_id}` : '—'));
   list.appendChild(createSummaryRow('Самосвал', haul.truck_id || '—'));
   list.appendChild(createSummaryRow('Материал', haul.material_id || '—'));
 
   const volume = formatVolume(haul?.load?.volume);
-  list.appendChild(createSummaryRow('Объём, м³', volume || '—'));
+  list.appendChild(createSummaryRow('План, м³', volume || '—'));
+
+  const actualVolume = formatVolume(haul?.load?.actual_volume);
+  list.appendChild(createSummaryRow('Факт, м³', actualVolume || '—'));
 
   section.appendChild(list);
+
+  if (haul?.general_notes) {
+    const notes = document.createElement('p');
+    notes.className = 'mobile-status-note';
+    notes.textContent = haul.general_notes;
+    section.appendChild(notes);
+  }
+
   return section;
 }
 
@@ -627,22 +720,6 @@ function createSummaryRow(label, value) {
   return item;
 }
 
-function buildMobileHaulActionsPlaceholder() {
-  const section = document.createElement('div');
-  section.className = 'mobile-haul-dialog__section mobile-haul-dialog__actions';
-
-  const title = document.createElement('h3');
-  title.textContent = 'Действия';
-  section.appendChild(title);
-
-  const note = document.createElement('p');
-  note.className = 'mobile-haul__note';
-  note.textContent = 'Загрузка фото и отметка фактического материала появятся в следующем обновлении.';
-  section.appendChild(note);
-
-  return section;
-}
-
 function buildAddressSection(title, block, options = {}) {
   if (!block || typeof block !== 'object') {
     return null;
@@ -653,6 +730,7 @@ function buildAddressSection(title, block, options = {}) {
     showVolume = true,
     showMapLink = true,
     sectionClass = 'mobile-haul__section',
+    photoPlaceholderText = '',
   } = options;
 
   const hasContent = Boolean(
@@ -717,7 +795,276 @@ function buildAddressSection(title, block, options = {}) {
     }
   }
 
+  if (photoPlaceholderText) {
+    section.appendChild(createPhotoPlaceholder(photoPlaceholderText));
+  }
+
   return section;
+}
+
+function buildLoadActionSection(haul) {
+  if (!haul) {
+    return null;
+  }
+
+  const section = document.createElement('div');
+  section.className = 'mobile-haul-dialog__section mobile-status-controls';
+
+  const heading = document.createElement('h3');
+  heading.textContent = 'Загрузка';
+  section.appendChild(heading);
+
+  const note = document.createElement('p');
+  note.className = 'mobile-status-note';
+  note.textContent = 'Введите фактический объём после взвешивания и подтвердите загрузку.';
+  section.appendChild(note);
+
+  const volumeInput = document.createElement('input');
+  volumeInput.type = 'number';
+  volumeInput.step = '0.01';
+  volumeInput.min = '0';
+  volumeInput.placeholder = 'Фактический объём, м³';
+  if (haul?.load?.actual_volume !== undefined && haul?.load?.actual_volume !== null) {
+    volumeInput.value = String(haul.load.actual_volume);
+  }
+  section.appendChild(volumeInput);
+  mobileElements.dialogVolumeInput = volumeInput;
+
+  section.appendChild(createPhotoPlaceholder('Фото документов с погрузки появятся здесь.'));
+
+  const buttons = document.createElement('div');
+  buttons.className = 'mobile-status-buttons';
+  const button = buildLoadStatusButton(haul);
+  if (button) {
+    buttons.appendChild(button);
+  }
+  section.appendChild(buttons);
+
+  return section;
+}
+
+function buildUnloadActionSection(haul) {
+  if (!haul) {
+    return null;
+  }
+
+  const section = document.createElement('div');
+  section.className = 'mobile-haul-dialog__section mobile-status-controls';
+
+  const heading = document.createElement('h3');
+  heading.textContent = 'Выгрузка';
+  section.appendChild(heading);
+
+  const note = document.createElement('p');
+  note.className = 'mobile-status-note';
+  note.textContent = 'После сдачи груза подтвердите выгрузку.';
+  section.appendChild(note);
+
+  section.appendChild(createPhotoPlaceholder('Фото документов с выгрузки появятся здесь.'));
+
+  const buttons = document.createElement('div');
+  buttons.className = 'mobile-status-buttons';
+  const button = buildUnloadStatusButton(haul);
+  if (button) {
+    buttons.appendChild(button);
+  }
+  section.appendChild(buttons);
+
+  return section;
+}
+
+function buildMobileStatusHistorySection(haul) {
+  const history = Array.isArray(haul?.status_history) ? haul.status_history : [];
+  if (history.length === 0) {
+    return null;
+  }
+
+  const section = document.createElement('div');
+  section.className = 'mobile-haul-dialog__section';
+
+  const heading = document.createElement('h3');
+  heading.textContent = 'История статусов';
+  section.appendChild(heading);
+
+  const list = document.createElement('ul');
+  list.className = 'mobile-haul-dialog__list';
+
+  for (const event of history) {
+    const label = getStatusLabel(event.status);
+    const dateLabel = formatDateTimeLabel(event.changed_at) || '—';
+    list.appendChild(createSummaryRow(label, dateLabel));
+  }
+
+  section.appendChild(list);
+  return section;
+}
+
+function buildLoadStatusButton(haul) {
+  const value = getStatusValue(haul?.status);
+  if (value === null) {
+    return null;
+  }
+
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'mobile-status-button';
+  button.textContent = 'Загрузился';
+
+  const isLoaded = value >= 2;
+  const isLocked = value >= 3;
+
+  button.classList.add(isLoaded ? 'mobile-status-button--active' : 'mobile-status-button--ghost');
+  button.dataset.permanentDisabled = isLocked ? 'true' : 'false';
+  button.disabled = isLocked;
+
+  if (!isLocked) {
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      const nextStatus = value === 2 ? 1 : 2;
+      void handleLoadStatusClick(haul.id, nextStatus);
+    });
+  }
+
+  return button;
+}
+
+function buildUnloadStatusButton(haul) {
+  const value = getStatusValue(haul?.status);
+  if (value === null) {
+    return null;
+  }
+
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'mobile-status-button';
+  button.textContent = 'Выгрузился';
+
+  const isUnloaded = value >= 3;
+  const unavailable = value < 2 || isUnloaded;
+
+  button.classList.add(isUnloaded ? 'mobile-status-button--active' : 'mobile-status-button--ghost');
+  button.dataset.permanentDisabled = unavailable ? 'true' : 'false';
+  button.disabled = unavailable;
+
+  if (!unavailable) {
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      void handleUnloadStatusClick(haul.id);
+    });
+  }
+
+  return button;
+}
+
+function createPhotoPlaceholder(text) {
+  const box = document.createElement('div');
+  box.className = 'mobile-photo-placeholder';
+  box.textContent = text;
+  return box;
+}
+
+function getCurrentActualVolumeValue() {
+  const input = mobileElements.dialogVolumeInput;
+  if (!(input instanceof HTMLInputElement)) {
+    return null;
+  }
+  const raw = input.value.trim();
+  return raw === '' ? null : raw;
+}
+
+async function handleLoadStatusClick(haulId, nextStatus) {
+  if (!haulId) {
+    return;
+  }
+
+  const requiresVolume = nextStatus === 2;
+  const actualVolume = getCurrentActualVolumeValue();
+
+  if (requiresVolume && (actualVolume === null || actualVolume === '')) {
+    setMobileDialogError('Укажите фактический объём после взвешивания.');
+    return;
+  }
+
+  setMobileDialogError('');
+  await mobileUpdateStatus(haulId, nextStatus, { load_actual_volume: actualVolume });
+}
+
+async function handleUnloadStatusClick(haulId) {
+  if (!haulId) {
+    return;
+  }
+  setMobileDialogError('');
+  await mobileUpdateStatus(haulId, 3);
+}
+
+async function mobileUpdateStatus(haulId, status, extra = {}) {
+  try {
+    setMobileDialogLoading(true);
+    const response = await fetch(apiBase + `/api/mobile/hauls/${haulId}/status`, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({ status, ...extra }),
+    });
+
+    const data = await readJsonResponse(response);
+    if (!response.ok) {
+      const message = data?.error || 'Не удалось обновить статус.';
+      throw new Error(message);
+    }
+
+    if (data?.data) {
+      applyMobileHaulUpdate(data.data);
+      renderMobileHauls();
+      if (mobileState.selectedHaulId === data.data.id) {
+        renderMobileHaulDetails(data.data);
+      }
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Не удалось обновить статус.';
+    setMobileDialogError(message);
+  } finally {
+    setMobileDialogLoading(false);
+  }
+}
+
+function applyMobileHaulUpdate(updated) {
+  if (!updated || typeof updated !== 'object') {
+    return;
+  }
+
+  const index = mobileState.hauls.findIndex((item) => item.id === updated.id);
+  if (index >= 0) {
+    mobileState.hauls[index] = updated;
+  } else {
+    mobileState.hauls.unshift(updated);
+  }
+}
+
+function setMobileDialogError(message) {
+  if (!mobileElements.dialogError) {
+    return;
+  }
+  mobileElements.dialogError.textContent = message || '';
+  mobileElements.dialogError.hidden = !message;
+}
+
+function setMobileDialogLoading(isLoading) {
+  const buttons = mobileElements.dialogBody?.querySelectorAll('.mobile-status-button');
+  if (!buttons) {
+    return;
+  }
+  buttons.forEach((button) => {
+    const permanent = button.dataset.permanentDisabled === 'true';
+    if (isLoading) {
+      button.disabled = true;
+    } else {
+      button.disabled = permanent;
+    }
+  });
 }
 
 function formatDateTimeLabel(value) {
@@ -749,6 +1096,37 @@ function formatVolume(value) {
     maximumFractionDigits: 2,
     minimumFractionDigits: numeric % 1 === 0 ? 0 : 2,
   });
+}
+
+function getStatusValue(status) {
+  if (status && typeof status === 'object' && 'value' in status) {
+    const numeric = Number(status.value);
+    return Number.isFinite(numeric) ? numeric : null;
+  }
+  if (status === undefined || status === null) {
+    return null;
+  }
+  const numeric = Number(status);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function getStatusLabel(status) {
+  if (status && typeof status === 'object' && typeof status.label === 'string') {
+    return status.label;
+  }
+  const value = getStatusValue(status);
+  if (value === null) {
+    return 'Неизвестно';
+  }
+  return mobileStatusLabels[value] ?? 'Неизвестно';
+}
+
+function isDriverStatusVisible(status) {
+  const value = getStatusValue(status);
+  if (value === null) {
+    return false;
+  }
+  return driverVisibleStatuses.has(value);
 }
 
 function detectDarkMode() {
@@ -1464,6 +1842,8 @@ function prepareEditForm(haul) {
   setSelectValue(elements.driverSelect, haul.responsible_id);
   setSelectValue(elements.truckSelect, haul.truck_id);
   setSelectValue(elements.materialSelect, haul.material_id);
+  setFieldValue('status', haul.status?.value ?? haul.status);
+  setFieldValue('general_notes', haul.general_notes);
 
   setFieldValue('load_volume', haul.load?.volume);
   setFieldValue('load_address_text', haul.load?.address_text);
@@ -1476,6 +1856,7 @@ function prepareEditForm(haul) {
   setFieldValue('unload_to_company_id', haul.unload?.to_company_id);
   setFieldValue('unload_contact_name', haul.unload?.contact_name);
   setFieldValue('unload_contact_phone', haul.unload?.contact_phone);
+  setFieldValue('unload_acceptance_time', haul.unload?.acceptance_time);
 
   elements.submitHaul.textContent = 'Обновить';
 }
@@ -1562,6 +1943,8 @@ function collectFormPayload() {
     responsible_id: toNullableNumber(data.responsible_id),
     truck_id: toNullableString(data.truck_id),
     material_id: toNullableString(data.material_id),
+    status: toNullableNumber(data.status) ?? 0,
+    general_notes: toNullableString(data.general_notes),
     load_volume: toNullableNumber(data.load_volume),
     load_address_text: toNullableString(data.load_address_text, true),
     load_address_url: toNullableString(data.load_address_url),
@@ -1573,6 +1956,7 @@ function collectFormPayload() {
     unload_to_company_id: toNullableNumber(data.unload_to_company_id),
     unload_contact_name: toNullableString(data.unload_contact_name),
     unload_contact_phone: toNullableString(data.unload_contact_phone),
+    unload_acceptance_time: toNullableString(data.unload_acceptance_time),
     load_documents: [],
     unload_documents: [],
   };
