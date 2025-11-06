@@ -63,6 +63,11 @@ const mobileState = {
   loading: false,
 };
 
+const mobileViewStates = {
+  LOGIN: 'login',
+  HAULS: 'hauls',
+};
+
 let fitTimer = null;
 let bx24Ready = null;
 
@@ -153,6 +158,7 @@ async function mobileCheckAuth() {
 }
 
 function showMobileLogin() {
+  setMobileViewState(mobileViewStates.LOGIN);
   if (mobileElements.loginSection) {
     mobileElements.loginSection.hidden = false;
   }
@@ -172,6 +178,7 @@ function showMobileLogin() {
 }
 
 function showMobileHauls() {
+  setMobileViewState(mobileViewStates.HAULS);
   if (mobileElements.loginSection) {
     mobileElements.loginSection.hidden = true;
   }
@@ -208,6 +215,18 @@ function setMobileError(message) {
   } else {
     mobileElements.errorBox.textContent = '';
     mobileElements.errorBox.hidden = true;
+  }
+}
+
+function setMobileViewState(nextState) {
+  if (!mobileElements.container) {
+    return;
+  }
+
+  if (nextState) {
+    mobileElements.container.dataset.state = nextState;
+  } else {
+    delete mobileElements.container.dataset.state;
   }
 }
 
@@ -329,6 +348,9 @@ function renderMobileHauls() {
   for (const haul of items) {
     const item = document.createElement('li');
     item.className = 'mobile-haul';
+    if (haul?.id) {
+      item.dataset.haulId = String(haul.id);
+    }
 
     const header = document.createElement('div');
     header.className = 'mobile-haul__header';
@@ -368,18 +390,75 @@ function renderMobileHauls() {
       item.appendChild(meta);
     }
 
+    const details = document.createElement('div');
+    details.className = 'mobile-haul__details';
+
     const loadSection = buildAddressSection('Погрузка', haul?.load, false);
     if (loadSection) {
-      item.appendChild(loadSection);
+      details.appendChild(loadSection);
     }
 
     const unloadSection = buildAddressSection('Выгрузка', haul?.unload, true);
     if (unloadSection) {
-      item.appendChild(unloadSection);
+      details.appendChild(unloadSection);
     }
 
+    const hasDetails = details.childElementCount > 0;
+    if (hasDetails) {
+      item.appendChild(details);
+    }
+
+    setupMobileHaulInteractions(item, hasDetails);
     list.appendChild(item);
   }
+}
+
+function setupMobileHaulInteractions(item, expandable) {
+  if (!expandable) {
+    item.classList.remove('mobile-haul--interactive', 'mobile-haul--expanded');
+    item.removeAttribute('role');
+    item.removeAttribute('aria-expanded');
+    item.removeAttribute('tabindex');
+    return;
+  }
+
+  item.classList.add('mobile-haul--interactive');
+  item.classList.remove('mobile-haul--expanded');
+  item.setAttribute('role', 'button');
+  item.setAttribute('aria-expanded', 'false');
+  item.tabIndex = 0;
+
+  const toggle = () => {
+    const expanded = item.classList.toggle('mobile-haul--expanded');
+    item.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+  };
+
+  item.addEventListener('click', (event) => {
+    if (!shouldToggleMobileHaul(event)) {
+      return;
+    }
+    toggle();
+  });
+
+  item.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      toggle();
+    }
+  });
+}
+
+function shouldToggleMobileHaul(event) {
+  const target = event.target;
+  if (!(target instanceof Element)) {
+    return true;
+  }
+
+  if (target.closest('a, button, input, textarea, select, label')) {
+    return false;
+  }
+
+  return true;
 }
 
 function buildAddressSection(title, block, includeContact) {
