@@ -55,17 +55,47 @@ const mobileElements = {
   list: document.getElementById('mobile-hauls-list'),
   userName: document.getElementById('mobile-user-name'),
   errorBox: document.getElementById('mobile-hauls-error'),
+  dialog: document.getElementById('mobile-haul-dialog'),
+  dialogBody: document.getElementById('mobile-haul-dialog-body'),
+  dialogTitle: document.getElementById('mobile-haul-dialog-title'),
+  dialogMeta: document.getElementById('mobile-haul-dialog-meta'),
+  dialogClose: document.getElementById('mobile-haul-dialog-close'),
+  dialogBackdrop: document.querySelector('[data-mobile-dialog-dismiss]'),
 };
 
 const mobileState = {
   user: null,
   hauls: [],
   loading: false,
+  selectedHaulId: null,
 };
 
 const mobileViewStates = {
   LOGIN: 'login',
   HAULS: 'hauls',
+};
+
+const mobileStorageKey = 'b24-mobile-hauls-login';
+
+const mobileStorage = {
+  getLogin() {
+    try {
+      return localStorage.getItem(mobileStorageKey) || '';
+    } catch (error) {
+      console.warn('Не удалось прочитать сохранённый логин', error);
+      return '';
+    }
+  },
+  saveLogin(login) {
+    if (!login) {
+      return;
+    }
+    try {
+      localStorage.setItem(mobileStorageKey, login);
+    } catch (error) {
+      console.warn('Не удалось сохранить логин', error);
+    }
+  },
 };
 
 let fitTimer = null;
@@ -130,6 +160,16 @@ function attachMobileHandlers() {
   mobileElements.logoutButton?.addEventListener('click', () => {
     void mobileLogout();
   });
+
+  mobileElements.dialogClose?.addEventListener('click', () => {
+    closeMobileHaulDetails();
+  });
+
+  mobileElements.dialogBackdrop?.addEventListener('click', () => {
+    closeMobileHaulDetails();
+  });
+
+  document.addEventListener('keydown', handleMobileDialogKeydown);
 }
 
 async function mobileCheckAuth() {
@@ -168,6 +208,7 @@ function showMobileLogin() {
   if (mobileElements.loginForm) {
     mobileElements.loginForm.reset();
   }
+  prefillSavedMobileLogin();
   setMobileLoginError('');
   setMobileError('');
   mobileState.hauls = [];
@@ -201,6 +242,20 @@ function setMobileLoading(isLoading) {
 function setMobileLoginError(message) {
   if (mobileElements.loginError) {
     mobileElements.loginError.textContent = message ?? '';
+  }
+}
+
+function prefillSavedMobileLogin() {
+  if (!mobileElements.loginForm) {
+    return;
+  }
+  const savedLogin = mobileStorage.getLogin();
+  if (!savedLogin) {
+    return;
+  }
+  const loginInput = mobileElements.loginForm.querySelector('input[name="login"]');
+  if (loginInput instanceof HTMLInputElement) {
+    loginInput.value = savedLogin;
   }
 }
 
@@ -255,6 +310,7 @@ async function mobileLogin(login, password) {
     }
 
     mobileState.user = data.data;
+    mobileStorage.saveLogin(login);
     showMobileHauls();
     await loadMobileHauls();
   } catch (error) {
@@ -275,6 +331,8 @@ async function mobileLogout() {
     console.warn('Ошибка при выходе', error);
   } finally {
     mobileState.user = null;
+    mobileState.selectedHaulId = null;
+    closeMobileHaulDetails();
     showMobileLogin();
   }
 }
@@ -346,130 +404,261 @@ function renderMobileHauls() {
   }
 
   for (const haul of items) {
-    const item = document.createElement('li');
-    item.className = 'mobile-haul';
-    if (haul?.id) {
-      item.dataset.haulId = String(haul.id);
+    const card = buildMobileHaulCard(haul);
+    if (card) {
+      list.appendChild(card);
     }
-
-    const header = document.createElement('div');
-    header.className = 'mobile-haul__header';
-    const deal = document.createElement('span');
-    const dealId = Number.isFinite(haul?.deal_id) ? haul.deal_id : haul?.deal_id ?? '—';
-    deal.textContent = `Сделка #${dealId}`;
-    const seq = document.createElement('span');
-    seq.textContent = typeof haul?.sequence === 'number' && Number.isFinite(haul.sequence)
-      ? `Рейс №${haul.sequence}`
-      : 'Рейс';
-    header.append(deal, seq);
-    item.appendChild(header);
-
-    const meta = document.createElement('div');
-    meta.className = 'mobile-haul__meta';
-
-    if (haul?.truck_id) {
-      const truck = document.createElement('span');
-      truck.textContent = `Самосвал: ${haul.truck_id}`;
-      meta.appendChild(truck);
-    }
-
-    const updatedLabel = formatDateTimeLabel(haul?.updated_at || haul?.created_at);
-    if (updatedLabel) {
-      const updated = document.createElement('span');
-      updated.textContent = `Обновлено: ${updatedLabel}`;
-      meta.appendChild(updated);
-    }
-
-    if (haul?.material_id) {
-      const material = document.createElement('span');
-      material.textContent = `Материал: ${haul.material_id}`;
-      meta.appendChild(material);
-    }
-
-    if (meta.childElementCount > 0) {
-      item.appendChild(meta);
-    }
-
-    const details = document.createElement('div');
-    details.className = 'mobile-haul__details';
-
-    const loadSection = buildAddressSection('Погрузка', haul?.load, false);
-    if (loadSection) {
-      details.appendChild(loadSection);
-    }
-
-    const unloadSection = buildAddressSection('Выгрузка', haul?.unload, true);
-    if (unloadSection) {
-      details.appendChild(unloadSection);
-    }
-
-    const hasDetails = details.childElementCount > 0;
-    if (hasDetails) {
-      item.appendChild(details);
-    }
-
-    setupMobileHaulInteractions(item, hasDetails);
-    list.appendChild(item);
   }
 }
 
-function setupMobileHaulInteractions(item, expandable) {
-  if (!expandable) {
-    item.classList.remove('mobile-haul--interactive', 'mobile-haul--expanded');
-    item.removeAttribute('role');
-    item.removeAttribute('aria-expanded');
-    item.removeAttribute('tabindex');
-    return;
+function buildMobileHaulCard(haul) {
+  if (!haul || typeof haul !== 'object') {
+    return null;
   }
 
-  item.classList.add('mobile-haul--interactive');
-  item.classList.remove('mobile-haul--expanded');
-  item.setAttribute('role', 'button');
-  item.setAttribute('aria-expanded', 'false');
+  const item = document.createElement('li');
+  item.className = 'mobile-haul';
   item.tabIndex = 0;
+  item.setAttribute('role', 'button');
 
-  const toggle = () => {
-    const expanded = item.classList.toggle('mobile-haul--expanded');
-    item.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+  const title = document.createElement('p');
+  title.className = 'mobile-haul__title';
+  title.textContent = formatMobileHaulTitle(haul);
+  item.appendChild(title);
+
+  const subtitle = document.createElement('p');
+  subtitle.className = 'mobile-haul__subtitle';
+  subtitle.textContent = formatMobileHaulSubtitle(haul);
+  item.appendChild(subtitle);
+
+  const meta = document.createElement('div');
+  meta.className = 'mobile-haul__meta';
+
+  if (haul?.truck_id) {
+    meta.appendChild(createMetaBadge(`Самосвал: ${haul.truck_id}`));
+  }
+
+  if (haul?.material_id) {
+    meta.appendChild(createMetaBadge(`Материал: ${haul.material_id}`));
+  }
+
+  const updatedLabel = formatDateTimeLabel(haul?.updated_at || haul?.created_at);
+  if (updatedLabel) {
+    meta.appendChild(createMetaBadge(`Обновлено: ${updatedLabel}`));
+  }
+
+  if (meta.childElementCount > 0) {
+    item.appendChild(meta);
+  }
+
+  const openDetails = () => {
+    openMobileHaulDetails(haul);
   };
 
-  item.addEventListener('click', (event) => {
-    if (!shouldToggleMobileHaul(event)) {
-      return;
-    }
-    toggle();
-  });
-
+  item.addEventListener('click', openDetails);
   item.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
-      toggle();
+      openDetails();
     }
   });
+
+  return item;
 }
 
-function shouldToggleMobileHaul(event) {
-  const target = event.target;
-  if (!(target instanceof Element)) {
-    return true;
-  }
-
-  if (target.closest('a, button, input, textarea, select, label')) {
-    return false;
-  }
-
-  return true;
+function createMetaBadge(text) {
+  const span = document.createElement('span');
+  span.textContent = text;
+  return span;
 }
 
-function buildAddressSection(title, block, includeContact) {
+function formatMobileHaulTitle(haul) {
+  const sequence = formatSequence(haul);
+  if (sequence && sequence !== '-') {
+    return `Рейс №${sequence}`;
+  }
+  return 'Рейс';
+}
+
+function formatMobileHaulSubtitle(haul) {
+  const dealId = Number.isFinite(haul?.deal_id) ? Number(haul.deal_id) : null;
+  const loadPoint = haul?.load?.address_text ? String(haul.load.address_text) : 'Без адреса';
+  const unloadPoint = haul?.unload?.address_text ? String(haul.unload.address_text) : null;
+
+  const route = unloadPoint ? `${loadPoint} → ${unloadPoint}` : loadPoint;
+  return dealId ? `Сделка #${dealId} · ${route}` : route;
+}
+
+function openMobileHaulDetails(haulOrId) {
+  if (!mobileElements.dialog) {
+    return;
+  }
+
+  const haul = typeof haulOrId === 'object' && haulOrId !== null
+    ? haulOrId
+    : mobileState.hauls.find((item) => item.id === haulOrId);
+
+  if (!haul) {
+    console.warn('Рейс не найден для детального просмотра');
+    return;
+  }
+
+  mobileState.selectedHaulId = haul.id ?? null;
+  renderMobileHaulDetails(haul);
+  mobileElements.dialog.hidden = false;
+  mobileElements.dialog.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('mobile-dialog-open');
+}
+
+function closeMobileHaulDetails() {
+  if (!mobileElements.dialog || mobileElements.dialog.hidden) {
+    return;
+  }
+
+  mobileElements.dialog.hidden = true;
+  mobileElements.dialog.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('mobile-dialog-open');
+}
+
+function handleMobileDialogKeydown(event) {
+  if (event.key !== 'Escape') {
+    return;
+  }
+
+  if (mobileElements.dialog && mobileElements.dialog.getAttribute('aria-hidden') === 'false') {
+    event.preventDefault();
+    closeMobileHaulDetails();
+  }
+}
+
+function renderMobileHaulDetails(haul) {
+  if (!mobileElements.dialogBody) {
+    return;
+  }
+
+  if (mobileElements.dialogTitle) {
+    mobileElements.dialogTitle.textContent = formatMobileHaulTitle(haul);
+  }
+
+  if (mobileElements.dialogMeta) {
+    mobileElements.dialogMeta.textContent = buildMobileHaulMetaLine(haul);
+  }
+
+  mobileElements.dialogBody.innerHTML = '';
+
+  const infoSection = buildMobileSummarySection(haul);
+  if (infoSection) {
+    mobileElements.dialogBody.appendChild(infoSection);
+  }
+
+  const loadSection = buildAddressSection('Погрузка', haul?.load, {
+    showMapLink: true,
+    includeContact: false,
+    sectionClass: 'mobile-haul-dialog__section',
+  });
+  if (loadSection) {
+    mobileElements.dialogBody.appendChild(loadSection);
+  }
+
+  const unloadSection = buildAddressSection('Выгрузка', haul?.unload, {
+    includeContact: true,
+    sectionClass: 'mobile-haul-dialog__section',
+  });
+  if (unloadSection) {
+    mobileElements.dialogBody.appendChild(unloadSection);
+  }
+
+  const actions = buildMobileHaulActionsPlaceholder();
+  if (actions) {
+    mobileElements.dialogBody.appendChild(actions);
+  }
+}
+
+function buildMobileHaulMetaLine(haul) {
+  const parts = [];
+  if (haul?.deal_id) {
+    parts.push(`Сделка #${haul.deal_id}`);
+  }
+  const updatedLabel = formatDateTimeLabel(haul?.updated_at || haul?.created_at);
+  if (updatedLabel) {
+    parts.push(`Обновлено: ${updatedLabel}`);
+  }
+  return parts.join(' · ');
+}
+
+function buildMobileSummarySection(haul) {
+  if (!haul) {
+    return null;
+  }
+
+  const section = document.createElement('div');
+  section.className = 'mobile-haul-dialog__section';
+
+  const heading = document.createElement('h3');
+  heading.textContent = 'Информация';
+  section.appendChild(heading);
+
+  const list = document.createElement('ul');
+  list.className = 'mobile-haul-dialog__list';
+
+  list.appendChild(createSummaryRow('Сделка', haul.deal_id ? `#${haul.deal_id}` : '—'));
+  list.appendChild(createSummaryRow('Самосвал', haul.truck_id || '—'));
+  list.appendChild(createSummaryRow('Материал', haul.material_id || '—'));
+
+  const volume = formatVolume(haul?.load?.volume);
+  list.appendChild(createSummaryRow('Объём, м³', volume || '—'));
+
+  section.appendChild(list);
+  return section;
+}
+
+function createSummaryRow(label, value) {
+  const item = document.createElement('li');
+  item.className = 'mobile-haul-dialog__list-item';
+
+  const name = document.createElement('span');
+  name.className = 'mobile-haul-dialog__list-label';
+  name.textContent = label;
+
+  const val = document.createElement('span');
+  val.textContent = value ?? '—';
+
+  item.append(name, val);
+  return item;
+}
+
+function buildMobileHaulActionsPlaceholder() {
+  const section = document.createElement('div');
+  section.className = 'mobile-haul-dialog__section mobile-haul-dialog__actions';
+
+  const title = document.createElement('h3');
+  title.textContent = 'Действия';
+  section.appendChild(title);
+
+  const note = document.createElement('p');
+  note.className = 'mobile-haul__note';
+  note.textContent = 'Загрузка фото и отметка фактического материала появятся в следующем обновлении.';
+  section.appendChild(note);
+
+  return section;
+}
+
+function buildAddressSection(title, block, options = {}) {
   if (!block || typeof block !== 'object') {
     return null;
   }
 
+  const {
+    includeContact = false,
+    showVolume = true,
+    showMapLink = true,
+    sectionClass = 'mobile-haul__section',
+  } = options;
+
   const hasContent = Boolean(
     block.address_text ||
       block.address_url ||
-      block.volume ||
+      (showVolume && block.volume !== undefined && block.volume !== null && block.volume !== '') ||
       (includeContact && (block.contact_name || block.contact_phone))
   );
 
@@ -478,7 +667,7 @@ function buildAddressSection(title, block, includeContact) {
   }
 
   const section = document.createElement('div');
-  section.className = 'mobile-haul__section';
+  section.className = sectionClass;
 
   const heading = document.createElement('h3');
   heading.textContent = title;
@@ -491,7 +680,7 @@ function buildAddressSection(title, block, includeContact) {
     section.appendChild(address);
   }
 
-  if (block.address_url) {
+  if (showMapLink && block.address_url) {
     const link = document.createElement('a');
     link.className = 'mobile-haul__link';
     link.href = block.address_url;
@@ -501,7 +690,7 @@ function buildAddressSection(title, block, includeContact) {
     section.appendChild(link);
   }
 
-  if (!includeContact && block.volume !== undefined && block.volume !== null && block.volume !== '') {
+  if (showVolume && block.volume !== undefined && block.volume !== null && block.volume !== '') {
     const volumeValue = formatVolume(block.volume);
     if (volumeValue) {
       const volume = document.createElement('p');
@@ -1229,7 +1418,8 @@ function formatSequence(haul) {
   if (Number.isFinite(seq) && seq > 0) {
     return seq;
   }
-  const index = state.hauls.findIndex((item) => item.id === haul.id);
+  const allHauls = state.hauls.length ? state.hauls : mobileState.hauls;
+  const index = allHauls.findIndex((item) => item.id === haul.id);
   return index >= 0 ? index + 1 : '-';
 }
 

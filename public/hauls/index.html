@@ -34,16 +34,10 @@
 
       <section class="mobile-hauls" id="mobile-hauls" hidden>
         <header class="mobile-hauls__header">
-          <div>
-            <h1>Мои рейсы</h1>
-            <p id="mobile-user-name" class="mobile-user"></p>
-          </div>
+          <p id="mobile-user-name" class="mobile-user"></p>
           <div class="mobile-hauls__actions">
             <button type="button" id="mobile-refresh" class="button button--ghost">
               Обновить
-            </button>
-            <button type="button" id="mobile-logout" class="button button--ghost">
-              Выйти
             </button>
           </div>
         </header>
@@ -51,6 +45,29 @@
         <div id="mobile-loader" class="mobile-loader" hidden>Загрузка…</div>
         <div id="mobile-empty" class="mobile-empty" hidden>Активных рейсов нет.</div>
         <ul id="mobile-hauls-list" class="mobile-hauls-list"></ul>
+        <footer class="mobile-hauls__footer">
+          <button type="button" id="mobile-logout" class="mobile-logout-link">Выйти</button>
+        </footer>
+      </section>
+    </div>
+
+    <div class="mobile-haul-dialog" id="mobile-haul-dialog" hidden aria-hidden="true">
+      <div class="mobile-haul-dialog__backdrop" data-mobile-dialog-dismiss></div>
+      <section
+        class="mobile-haul-dialog__panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="mobile-haul-dialog-title"
+        aria-describedby="mobile-haul-dialog-body"
+      >
+        <header class="mobile-haul-dialog__header">
+          <div>
+            <p id="mobile-haul-dialog-title" class="mobile-haul-dialog__title"></p>
+            <p id="mobile-haul-dialog-meta" class="mobile-haul-dialog__meta"></p>
+          </div>
+          <button type="button" class="button button--ghost" id="mobile-haul-dialog-close">Закрыть</button>
+        </header>
+        <div id="mobile-haul-dialog-body" class="mobile-haul-dialog__body"></div>
       </section>
     </div>
 
