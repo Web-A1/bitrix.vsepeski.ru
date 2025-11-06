@@ -6,6 +6,8 @@ const views = {
   EDIT: 'edit',
 };
 
+const knownPlacements = new Set(['CRM_DEAL_DETAIL_TAB', 'CRM_DEAL_LIST_MENU']);
+
 const state = {
   dealId: null,
   view: views.LIST,
@@ -15,7 +17,7 @@ const state = {
   materials: [],
   drivers: [],
   hauls: [],
-  embedded: window !== window.top,
+  embedded: detectEmbeddedMode(),
   loading: false,
   saving: false,
 };
@@ -78,6 +80,162 @@ const mobileViewStates = {
 };
 
 const mobileStorageKey = 'b24-mobile-hauls-login';
+
+function detectEmbeddedMode() {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  if (window !== window.top) {
+    return true;
+  }
+
+  const bootstrap = window.B24_INSTALL_PAYLOAD || null;
+  const candidates = [
+    bootstrap?.payload,
+    bootstrap?.request,
+    bootstrap?.get,
+    bootstrap?.query,
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate && hasKnownPlacement(candidate)) {
+      return true;
+    }
+  }
+
+  try {
+    const searchParams = new URLSearchParams(window.location.search || '');
+    const directPlacement =
+      searchParams.get('PLACEMENT') || searchParams.get('placement');
+    if (hasKnownPlacement(directPlacement)) {
+      return true;
+    }
+
+    const optionsRaw =
+      searchParams.get('PLACEMENT_OPTIONS') ||
+      searchParams.get('placement_options');
+    if (optionsRaw && hasKnownPlacement(optionsRaw)) {
+      return true;
+    }
+  } catch (error) {
+    console.warn('Не удалось разобрать параметры адресной строки', error);
+  }
+
+  return false;
+}
+
+function hasKnownPlacement(candidate) {
+  if (!candidate) {
+    return false;
+  }
+
+  if (candidate instanceof URLSearchParams) {
+    const direct = candidate.get('PLACEMENT') || candidate.get('placement');
+    if (hasKnownPlacement(direct)) {
+      return true;
+    }
+
+    const options =
+      candidate.get('PLACEMENT_OPTIONS') || candidate.get('placement_options');
+    return hasKnownPlacement(options);
+  }
+
+  if (typeof candidate === 'string') {
+    const normalized = candidate.trim();
+    if (!normalized) {
+      return false;
+    }
+
+    if (isKnownPlacementValue(normalized)) {
+      return true;
+    }
+
+    const parsed = parsePlacementOptions(normalized);
+    if (parsed && parsed !== candidate) {
+      return hasKnownPlacement(parsed);
+    }
+
+    return false;
+  }
+
+  if (typeof candidate !== 'object') {
+    return false;
+  }
+
+  if (typeof candidate.get === 'function') {
+    try {
+      const value = candidate.get('PLACEMENT') || candidate.get('placement');
+      if (hasKnownPlacement(value)) {
+        return true;
+      }
+
+      const options =
+        candidate.get('PLACEMENT_OPTIONS') ||
+        candidate.get('placement_options');
+      if (options && hasKnownPlacement(options)) {
+        return true;
+      }
+    } catch (error) {
+      console.warn('Не удалось прочитать placement из объекта', error);
+    }
+  }
+
+  const placement = readPlacementFromObject(candidate);
+  if (isKnownPlacementValue(placement)) {
+    return true;
+  }
+
+  const optionsRaw = extractPlacementOptionsRaw(candidate);
+  if (optionsRaw && hasKnownPlacement(optionsRaw)) {
+    return true;
+  }
+
+  return false;
+}
+
+function readPlacementFromObject(subject) {
+  if (!subject || typeof subject !== 'object') {
+    return null;
+  }
+
+  const candidates = [
+    subject.PLACEMENT,
+    subject.placement,
+    subject.PLACEMENT_NAME,
+    subject.placement_name,
+    subject.placementName,
+    subject.PLACEMENT_CODE,
+    subject.placement_code,
+    subject.context?.PLACEMENT,
+    subject.context?.placement,
+    subject.params?.PLACEMENT,
+    subject.params?.placement,
+    subject.PARAMS?.PLACEMENT,
+    subject.PARAMS?.placement,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.trim() !== '') {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+function isKnownPlacementValue(value) {
+  if (typeof value !== 'string') {
+    return false;
+  }
+
+  const normalized = value.trim();
+  if (!normalized) {
+    return false;
+  }
+
+  return knownPlacements.has(normalized.toUpperCase());
+}
 
 const mobileStorage = {
   getLogin() {
