@@ -844,17 +844,17 @@ body.mobile-driver .mobile-app {
 }
 
 .editor__header {
-  padding: 20px 24px 16px;
+  padding: 24px 24px 20px;
   border-bottom: 1px solid var(--border-strong);
   display: flex;
   justify-content: space-between;
   gap: 16px;
   align-items: center;
-  margin-bottom: 18px;
+  margin-bottom: 24px;
   background: var(--surface);
   position: sticky;
   top: 0;
-  z-index: 5;
+  z-index: 15;
   box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
 }
 
@@ -902,6 +902,7 @@ form#haul-form {
   margin-bottom: 18px;
   width: 100%;
   box-sizing: border-box;
+  overflow: hidden;
 }
 
 .form-group h3 {
@@ -951,6 +952,7 @@ textarea {
   color: inherit;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
   resize: vertical;
+  box-sizing: border-box;
 }
 
 textarea {
