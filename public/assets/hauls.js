@@ -14,6 +14,7 @@ const embeddedMode = detectEmbeddedMode();
 
 const driverKeyword = 'водител';
 let referenceDataPromise = null;
+let bx24DealLookupPromise = null;
 
 const state = {
   dealId: initialDealContext.id,
@@ -1689,6 +1690,7 @@ async function detectDealId() {
     const idFromOptions = extractDealIdFromObject(options);
     if (idFromOptions) {
       setDealId(idFromOptions);
+      scheduleBx24DealLookup();
       return true;
     }
   }
@@ -1701,6 +1703,7 @@ async function detectDealId() {
     if (payloadTitle) {
       applyDealTitle(payloadTitle, { force: true });
     }
+    scheduleBx24DealLookup();
     return true;
   }
 
@@ -1712,6 +1715,7 @@ async function detectDealId() {
     if (queryTitle) {
       applyDealTitle(queryTitle, { force: true });
     }
+    scheduleBx24DealLookup();
     return true;
   }
 
@@ -1719,6 +1723,7 @@ async function detectDealId() {
   if (idFromRequest) {
     setDealId(idFromRequest);
     applyDealTitle(extractDealTitleFromObject(bootstrapRequest));
+    scheduleBx24DealLookup();
     return true;
   }
 
@@ -1729,6 +1734,7 @@ async function detectDealId() {
     const idFromRequestOptions = extractDealIdFromObject(requestOptions);
     if (idFromRequestOptions) {
       setDealId(idFromRequestOptions);
+      scheduleBx24DealLookup();
       return true;
     }
   }
@@ -1764,6 +1770,7 @@ async function detectDealId() {
       if (titleParam) {
         applyDealTitle(titleParam, { force: true });
       }
+      scheduleBx24DealLookup();
       return true;
     }
 
@@ -1774,6 +1781,7 @@ async function detectDealId() {
       if (titleParam) {
         applyDealTitle(titleParam, { force: true });
       }
+      scheduleBx24DealLookup();
       return true;
     }
   }
@@ -1781,6 +1789,7 @@ async function detectDealId() {
   const referrerId = extractDealIdFromReferrer();
   if (referrerId) {
     setDealId(referrerId);
+    scheduleBx24DealLookup();
     return true;
   }
 
@@ -1788,113 +1797,10 @@ async function detectDealId() {
     return Boolean(state.dealId);
   }
 
-  const bx24 = await waitForBx24();
-  if (!bx24) {
-    console.warn('BX24 API не готова — ID сделки не определён автоматически');
-    return Boolean(state.dealId);
+  scheduleBx24DealLookup();
+  if (bx24DealLookupPromise) {
+    await bx24DealLookupPromise;
   }
-
-  await new Promise((resolve) => {
-    try {
-      bx24.init(() => {
-        let finished = false;
-        const finish = () => {
-          if (!finished) {
-            finished = true;
-            resolve();
-          }
-        };
-
-        const applyDealId = (possible) => {
-          const numericId = Number(possible);
-          if (Number.isFinite(numericId)) {
-            setDealId(numericId);
-            if (state.hauls.length === 0) {
-              loadHauls();
-            }
-            finish();
-          }
-        };
-
-        let placementInfo = null;
-        let placementParams = null;
-        try {
-          placementInfo = typeof bx24.placement?.info === 'function'
-            ? bx24.placement.info()
-            : null;
-          applyDealTitle(extractDealTitleFromObject(placementInfo));
-          const placementId = placementInfo?.entity_id
-            ?? placementInfo?.deal_id
-            ?? placementInfo?.ID
-            ?? placementInfo?.ENTITY_ID;
-          if (placementId) {
-            applyDealId(placementId);
-          }
-        } catch (infoError) {
-          console.warn('BX24 placement info недоступна', infoError);
-        }
-
-        try {
-          placementParams = typeof bx24.placement?.getParams === 'function'
-            ? bx24.placement.getParams()
-            : null;
-          applyDealTitle(extractDealTitleFromObject(placementParams));
-          const paramsId = placementParams?.deal_id
-            ?? placementParams?.dealId
-            ?? placementParams?.ID
-            ?? placementParams?.entity_id
-            ?? placementParams?.ENTITY_ID;
-          if (paramsId) {
-            applyDealId(paramsId);
-          }
-        } catch (paramsError) {
-          console.warn('BX24 placement params недоступны', paramsError);
-        }
-
-        if (typeof bx24.getPageParams === 'function') {
-          bx24.getPageParams((params) => {
-            const possible = params?.deal_id || params?.ID || params?.entity_id || params?.ENTITY_ID;
-            applyDealTitle(extractDealTitleFromObject(params));
-            applyDealId(possible);
-            bx24.fitWindow?.();
-            finish();
-          });
-        } else if (typeof bx24.callMethod === 'function') {
-          const dealId = placementInfo?.entity_id
-            ?? placementInfo?.deal_id
-            ?? placementInfo?.ID
-            ?? placementInfo?.ENTITY_ID
-            ?? placementParams?.deal_id
-            ?? placementParams?.dealId
-            ?? placementParams?.ID
-            ?? placementParams?.entity_id
-            ?? placementParams?.ENTITY_ID
-            ?? state.dealId;
-
-          if (dealId) {
-            bx24.callMethod('crm.deal.get', { id: dealId }, (result) => {
-              if (result?.data?.ID) {
-                applyDealId(result.data.ID);
-                if (typeof result.data.TITLE === 'string') {
-                  applyDealTitle(result.data.TITLE);
-                }
-              }
-              finish();
-            });
-          } else {
-            finish();
-          }
-        } else {
-          finish();
-        }
-
-        setTimeout(finish, 2000);
-      });
-    } catch (error) {
-      console.warn('BX24 init/getPageParams failed', error);
-      resolve();
-    }
-  });
 
   return Boolean(state.dealId);
 }
@@ -1939,6 +1845,125 @@ async function ensureReferenceDataLoaded() {
   } catch (error) {
     console.warn('Справочники недоступны, продолжим без них', error);
   }
+}
+
+function scheduleBx24DealLookup() {
+  if (!state.embedded || typeof window === 'undefined') {
+    return;
+  }
+  if (bx24DealLookupPromise) {
+    return;
+  }
+  bx24DealLookupPromise = fetchDealFromBx24().finally(() => {
+    bx24DealLookupPromise = null;
+  });
+}
+
+async function fetchDealFromBx24() {
+  const bx24 = await waitForBx24();
+  if (!bx24) {
+    console.warn('BX24 API не готова — ID сделки не определён автоматически');
+    return;
+  }
+
+  await new Promise((resolve) => {
+    try {
+      bx24.init(() => {
+        let finished = false;
+        const finish = () => {
+          if (!finished) {
+            finished = true;
+            resolve();
+          }
+        };
+
+        const tryApplyDealId = (possible) => {
+          const numericId = Number(possible);
+          if (Number.isFinite(numericId)) {
+            setDealId(numericId);
+            finish();
+          }
+        };
+
+        let placementInfo = null;
+        let placementParams = null;
+        try {
+          placementInfo = typeof bx24.placement?.info === 'function'
+            ? bx24.placement.info()
+            : null;
+          applyDealTitle(extractDealTitleFromObject(placementInfo));
+          const placementId = placementInfo?.entity_id
+            ?? placementInfo?.deal_id
+            ?? placementInfo?.ID
+            ?? placementInfo?.ENTITY_ID;
+          if (placementId) {
+            tryApplyDealId(placementId);
+          }
+        } catch (infoError) {
+          console.warn('BX24 placement info недоступна', infoError);
+        }
+
+        try {
+          placementParams = typeof bx24.placement?.getParams === 'function'
+            ? bx24.placement.getParams()
+            : null;
+          applyDealTitle(extractDealTitleFromObject(placementParams));
+          const paramsId = placementParams?.deal_id
+            ?? placementParams?.dealId
+            ?? placementParams?.ID
+            ?? placementParams?.entity_id
+            ?? placementParams?.ENTITY_ID;
+          if (paramsId) {
+            tryApplyDealId(paramsId);
+          }
+        } catch (paramsError) {
+          console.warn('BX24 placement params недоступны', paramsError);
+        }
+
+        if (typeof bx24.getPageParams === 'function') {
+          bx24.getPageParams((params) => {
+            const possible = params?.deal_id || params?.ID || params?.entity_id || params?.ENTITY_ID;
+            applyDealTitle(extractDealTitleFromObject(params));
+            tryApplyDealId(possible);
+            bx24.fitWindow?.();
+            finish();
+          });
+        } else if (typeof bx24.callMethod === 'function') {
+          const dealId = placementInfo?.entity_id
+            ?? placementInfo?.deal_id
+            ?? placementInfo?.ID
+            ?? placementInfo?.ENTITY_ID
+            ?? placementParams?.deal_id
+            ?? placementParams?.dealId
+            ?? placementParams?.ID
+            ?? placementParams?.entity_id
+            ?? placementParams?.ENTITY_ID
+            ?? state.dealId;
+
+          if (dealId) {
+            bx24.callMethod('crm.deal.get', { id: dealId }, (result) => {
+              if (result?.data?.ID) {
+                tryApplyDealId(result.data.ID);
+                if (typeof result.data.TITLE === 'string') {
+                  applyDealTitle(result.data.TITLE);
+                }
+              }
+              finish();
+            });
+          } else {
+            finish();
+          }
+        } else {
+          finish();
+        }
+
+        setTimeout(finish, 2000);
+      });
+    } catch (error) {
+      console.warn('BX24 init/getPageParams failed', error);
+      resolve();
+    }
+  });
 }
 
 async function loadCompanyDirectory(type) {
