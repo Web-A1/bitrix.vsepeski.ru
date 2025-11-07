@@ -305,10 +305,11 @@ async function initEmbedded() {
   attachEventHandlers();
   await resolveActorFromBitrix();
   await loadReferenceData();
-  await detectDealId();
+  const hasDeal = await detectDealId();
   updateDealMeta();
   initRouter();
-  if (state.dealId) {
+  setAppReady(true);
+  if (hasDeal) {
     await loadHauls();
   } else {
     renderList();
@@ -1583,7 +1584,6 @@ async function refreshDealMeta() {
     state.dealMeta = response?.data ?? null;
   } catch (error) {
     console.warn('Не удалось получить данные сделки', error);
-    state.dealMeta = null;
   }
 
   updateDealMeta();
@@ -1599,38 +1599,43 @@ async function detectDealId() {
   const bootstrapOptionsRaw = extractPlacementOptionsRaw(bootstrapPayload);
   if (bootstrapOptionsRaw) {
     const options = parsePlacementOptions(bootstrapOptionsRaw);
+    applyDealTitle(extractDealTitleFromObject(options));
     const idFromOptions = extractDealIdFromObject(options);
     if (idFromOptions) {
       setDealId(idFromOptions);
-      return;
+      return true;
     }
   }
 
   const idFromPayload = extractDealIdFromObject(bootstrapPayload);
   if (idFromPayload) {
     setDealId(idFromPayload);
-    return;
+    applyDealTitle(extractDealTitleFromObject(bootstrapPayload));
+    return true;
   }
 
   const idFromQuery = extractDealIdFromObject(bootstrapQuery);
   if (idFromQuery) {
     setDealId(idFromQuery);
-    return;
+    applyDealTitle(extractDealTitleFromObject(bootstrapQuery));
+    return true;
   }
 
   const idFromRequest = extractDealIdFromObject(bootstrapRequest);
   if (idFromRequest) {
     setDealId(idFromRequest);
-    return;
+    applyDealTitle(extractDealTitleFromObject(bootstrapRequest));
+    return true;
   }
 
   const requestOptionsRaw = extractPlacementOptionsRaw(bootstrapRequest);
   if (requestOptionsRaw) {
     const requestOptions = parsePlacementOptions(requestOptionsRaw);
+    applyDealTitle(extractDealTitleFromObject(requestOptions));
     const idFromRequestOptions = extractDealIdFromObject(requestOptions);
     if (idFromRequestOptions) {
       setDealId(idFromRequestOptions);
-      return;
+      return true;
     }
   }
 
@@ -1641,44 +1646,52 @@ async function detectDealId() {
 
   if (placementOptionsRaw) {
     const parsedOptions = parsePlacementOptions(placementOptionsRaw);
+    applyDealTitle(extractDealTitleFromObject(parsedOptions));
     const optionDealId = extractDealIdFromObject(parsedOptions);
     if (optionDealId) {
       setDealId(optionDealId);
-      return;
+      return true;
     }
   }
 
   const candidate = searchParams.get('dealId') || searchParams.get('deal_id');
+  const titleParam =
+    searchParams.get('dealTitle') ||
+    searchParams.get('deal_title') ||
+    searchParams.get('DEAL_TITLE');
+  if (titleParam) {
+    applyDealTitle(titleParam);
+  }
 
   if (candidate) {
     const numericId = Number(candidate);
     if (Number.isFinite(numericId)) {
       setDealId(numericId);
-      return;
+      return true;
     }
 
     const digits = candidate.replace(/\D+/g, '');
     const fallbackId = Number(digits);
     if (Number.isFinite(fallbackId) && digits.length > 0) {
       setDealId(fallbackId);
-      return;
+      return true;
     }
   }
 
   const referrerId = extractDealIdFromReferrer();
   if (referrerId) {
     setDealId(referrerId);
-    return;
+    return true;
   }
 
   if (!state.embedded) {
-    return;
+    return false;
   }
 
   const bx24 = await waitForBx24();
   if (!bx24) {
     console.warn('BX24 API не готова — ID сделки не определён автоматически');
-    return;
+    return false;
   }
 
   await new Promise((resolve) => {
@@ -1709,6 +1722,7 @@ async function detectDealId() {
           placementInfo = typeof bx24.placement?.info === 'function'
             ? bx24.placement.info()
             : null;
+          applyDealTitle(extractDealTitleFromObject(placementInfo));
           const placementId = placementInfo?.entity_id
             ?? placementInfo?.deal_id
             ?? placementInfo?.ID
@@ -1724,6 +1738,7 @@ async function detectDealId() {
           placementParams = typeof bx24.placement?.getParams === 'function'
             ? bx24.placement.getParams()
             : null;
+          applyDealTitle(extractDealTitleFromObject(placementParams));
           const paramsId = placementParams?.deal_id
             ?? placementParams?.dealId
             ?? placementParams?.ID
@@ -1739,6 +1754,7 @@ async function detectDealId() {
         if (typeof bx24.getPageParams === 'function') {
           bx24.getPageParams((params) => {
             const possible = params?.deal_id || params?.ID || params?.entity_id || params?.ENTITY_ID;
+            applyDealTitle(extractDealTitleFromObject(params));
             applyDealId(possible);
             bx24.fitWindow?.();
             finish();
@@ -1759,6 +1775,9 @@ async function detectDealId() {
             bx24.callMethod('crm.deal.get', { id: dealId }, (result) => {
               if (result?.data?.ID) {
                 applyDealId(result.data.ID);
+                if (typeof result.data.TITLE === 'string') {
+                  applyDealTitle(result.data.TITLE);
+                }
               }
               finish();
             });
@@ -1776,6 +1795,8 @@ async function detectDealId() {
       resolve();
     }
   });
+
+  return Boolean(state.dealId);
 }
 
 async function loadReferenceData() {
@@ -2773,6 +2794,87 @@ function extractDealIdFromObject(subject) {
   return null;
 }
 
+function applyDealTitle(title, options = {}) {
+  if (!title || typeof title !== 'string') {
+    return;
+  }
+
+  const normalized = title.trim();
+  if (!normalized) {
+    return;
+  }
+
+  const force = Boolean(options.force);
+
+  if (!state.dealMeta) {
+    state.dealMeta = { title: normalized };
+    updateDealMeta();
+    return;
+  }
+
+  if (state.dealMeta.title && !force) {
+    return;
+  }
+
+  state.dealMeta = { ...state.dealMeta, title: normalized };
+  updateDealMeta();
+}
+
+function extractDealTitleFromObject(subject) {
+  if (!subject) {
+    return null;
+  }
+
+  if (typeof subject === 'string') {
+    const trimmed = subject.trim();
+    return trimmed || null;
+  }
+
+  if (typeof subject.get === 'function') {
+    const keys = ['dealTitle', 'deal_title', 'TITLE', 'title', 'name', 'DEAL_NAME', 'dealName'];
+    for (const key of keys) {
+      const value = subject.get(key);
+      if (typeof value === 'string' && value.trim() !== '') {
+        return value.trim();
+      }
+    }
+    return null;
+  }
+
+  if (typeof subject !== 'object') {
+    return null;
+  }
+
+  const candidates = [
+    subject.dealTitle,
+    subject.DEAL_TITLE,
+    subject.deal_name,
+    subject.dealName,
+    subject.TITLE,
+    subject.title,
+    subject.NAME,
+    subject.name,
+    subject.deal?.TITLE,
+    subject.deal?.title,
+    subject.params?.deal_title,
+    subject.params?.dealTitle,
+    subject.params?.TITLE,
+    subject.params?.title,
+    subject.PARAMS?.deal_title,
+    subject.PARAMS?.dealTitle,
+    subject.PARAMS?.TITLE,
+    subject.PARAMS?.title,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.trim() !== '') {
+      return candidate.trim();
+    }
+  }
+
+  return null;
+}
+
 function normalizeDealId(value) {
   if (value === undefined || value === null) {
     return null;
@@ -2801,6 +2903,18 @@ function normalizeDealId(value) {
   }
 
   return null;
+}
+
+function setAppReady(ready) {
+  if (!elements.app) {
+    return;
+  }
+
+  if (ready) {
+    elements.app.dataset.initialized = 'true';
+  } else {
+    elements.app.dataset.initialized = 'false';
+  }
 }
 
 async function waitForBx24(timeout = 5000) {

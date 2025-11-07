@@ -508,6 +508,10 @@ body.mobile-driver .mobile-app {
   gap: 24px;
 }
 
+.app[data-initialized='false'] {
+  opacity: 0;
+}
+
 .app__header {
   display: flex;
   flex-wrap: wrap;
