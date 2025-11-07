@@ -6,7 +6,7 @@ const views = {
   EDIT: 'edit',
 };
 
-const knownPlacements = new Set(['CRM_DEAL_DETAIL_TAB', 'CRM_DEAL_LIST_MENU']);
+const knownPlacements = new Set(['CRM_DEAL_DETAIL_TAB', 'CRM_DEAL_LIST_MENU', 'HAULS']);
 
 const embeddedMode = detectEmbeddedMode();
 
