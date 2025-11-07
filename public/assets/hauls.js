@@ -377,7 +377,9 @@ async function initEmbedded() {
   const hasDeal = await detectDealId();
   updateDealMeta();
   initRouter();
-  await Promise.allSettled([actorPromise]);
+  actorPromise.catch((error) => {
+    console.warn('Не удалось определить пользователя Bitrix24', error);
+  });
   if (hasDeal) {
     void loadHauls();
   } else {
