@@ -843,9 +843,27 @@ body.mobile-driver .mobile-app {
   padding: 20px 24px 12px;
   border-bottom: 1px solid var(--border);
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 16px;
   align-items: center;
+}
+
+.editor__header-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.editor__deal-title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.editor__deal-meta {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--muted);
 }
 
 .editor__header-actions {

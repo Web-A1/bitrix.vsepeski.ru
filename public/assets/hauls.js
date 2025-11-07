@@ -12,6 +12,8 @@ const initialDealContext = readInitialDealContext();
 
 const embeddedMode = detectEmbeddedMode();
 
+const driverKeyword = 'водител';
+
 const state = {
   dealId: initialDealContext.id,
   view: views.LIST,
@@ -26,14 +28,72 @@ const state = {
   dealMeta: initialDealContext.meta,
   formTemplate: null,
   embedded: embeddedMode,
+  role: detectDefaultRole(embeddedMode),
   actor: {
     id: null,
     name: null,
-    role: embeddedMode ? 'manager' : 'system',
+    role: detectDefaultRole(embeddedMode),
   },
   loading: false,
   saving: false,
 };
+
+function detectDefaultRole(isEmbedded) {
+  return isEmbedded ? 'manager' : 'driver';
+}
+
+function deriveRoleFromBitrixUser(user) {
+  if (!user || typeof user !== 'object') {
+    return 'manager';
+  }
+
+  const candidates = [
+    user.WORK_POSITION,
+    user.POSITION,
+    user.work_position,
+    user.position,
+  ];
+
+  const hasDriverPosition = candidates.some((value) => isDriverPosition(value));
+
+  return hasDriverPosition ? 'driver' : 'manager';
+}
+
+function isDriverPosition(value) {
+  if (typeof value !== 'string') {
+    return false;
+  }
+  return value.toLowerCase().includes(driverKeyword);
+}
+
+function applyRole(role, context = {}) {
+  state.role = role;
+  if (typeof context.id !== 'undefined') {
+    const numeric = typeof context.id === 'string' ? Number(context.id) : context.id;
+    state.actor.id = Number.isFinite(numeric) ? Number(numeric) : context.id;
+  }
+  if (typeof context.name === 'string') {
+    state.actor.name = context.name;
+  }
+  state.actor.role = role;
+}
+
+function applyDriverRoleFromMobileUser(user) {
+  if (!user || typeof user !== 'object') {
+    applyRole('driver');
+    return;
+  }
+
+  const context = {
+    id: user.id ?? user.bitrix_user_id ?? null,
+    name: user.name ?? user.email ?? null,
+  };
+  applyRole('driver', context);
+}
+
+function resetRoleToDefault() {
+  applyRole(detectDefaultRole(state.embedded));
+}
 
 const elements = {
   app: document.getElementById('app'),
@@ -58,6 +118,8 @@ const elements = {
   unloadFromInput: document.getElementById('unload-from-input'),
   unloadToDisplay: document.getElementById('unload-to-display'),
   unloadToInput: document.getElementById('unload-to-input'),
+  editorDealTitle: document.getElementById('editor-deal-title'),
+  editorDealMeta: document.getElementById('editor-deal-meta'),
   formError: document.getElementById('form-error'),
   closeEditor: document.getElementById('close-editor'),
   cancelEditor: document.getElementById('cancel-editor'),
@@ -384,11 +446,13 @@ async function mobileCheckAuth() {
     }
 
     mobileState.user = data.data;
+    applyDriverRoleFromMobileUser(data.data);
     showMobileHauls();
     await loadMobileHauls();
   } catch (error) {
     mobileState.user = null;
     showMobileLogin();
+    resetRoleToDefault();
   }
 }
 
@@ -507,6 +571,7 @@ async function mobileLogin(login, password) {
     }
 
     mobileState.user = data.data;
+    applyDriverRoleFromMobileUser(data.data);
     mobileStorage.saveLogin(login);
     showMobileHauls();
     await loadMobileHauls();
@@ -531,6 +596,7 @@ async function mobileLogout() {
     mobileState.selectedHaulId = null;
     closeMobileHaulDetails();
     showMobileLogin();
+    resetRoleToDefault();
   }
 }
 
@@ -1505,7 +1571,11 @@ async function applyView(view, haulId, options = {}) {
       applyTemplateToForm(state.formTemplate, { includeStatus: false });
       state.formTemplate = null;
     }
-    openEditor('Создание рейса');
+    const meta = buildEditorMeta({
+      mode: 'create',
+      sequence: estimateNextSequence(),
+    });
+    openEditor(meta);
     return;
   }
 
@@ -1519,7 +1589,11 @@ async function applyView(view, haulId, options = {}) {
 
     state.currentHaulSnapshot = haul;
     prepareEditForm(haul);
-    openEditor(`Редактирование рейса №${formatSequence(haul)}`);
+    const meta = buildEditorMeta({
+      mode: 'edit',
+      sequence: formatSequence(haul),
+    });
+    openEditor(meta);
   }
 }
 
@@ -1888,9 +1962,12 @@ async function resolveActorFromBitrix() {
     const secondName = typeof data.SECOND_NAME === 'string' ? data.SECOND_NAME.trim() : '';
     const nameParts = [lastName, firstName, secondName].filter(Boolean);
 
-    state.actor.id = userId ? Number(userId) : null;
-    state.actor.name = nameParts.length ? nameParts.join(' ') : (data.EMAIL ?? null);
-    state.actor.role = 'manager';
+    const context = {
+      id: userId ? Number(userId) : null,
+      name: nameParts.length ? nameParts.join(' ') : (data.EMAIL ?? null),
+    };
+    const role = deriveRoleFromBitrixUser(data);
+    applyRole(role, context);
   } catch (error) {
     console.warn('Не удалось определить пользователя Bitrix24', error);
   }
@@ -2602,10 +2679,8 @@ async function handleCreateRequest(event) {
   navigateTo(views.CREATE);
 }
 
-function openEditor(modeText = '') {
-  if (elements.editorMode) {
-    elements.editorMode.textContent = modeText;
-  }
+function openEditor(metaText = '') {
+  updateEditorHeader(metaText);
   elements.editorOverlay.classList.add('is-open');
   elements.editorOverlay.setAttribute('aria-hidden', 'false');
   document.body.style.overflow = 'hidden';
@@ -2707,7 +2782,54 @@ function scheduleFitWindow(delay = 120) {
 function fitWindow() {
   if (state.embedded && window.BX24 && typeof window.BX24.fitWindow === 'function') {
     window.BX24.fitWindow();
+}
+
+function updateEditorHeader(metaText) {
+  if (elements.editorDealTitle) {
+    const title = state.dealMeta?.title
+      ?? (state.dealId ? `Сделка #${state.dealId}` : 'Сделка');
+    elements.editorDealTitle.textContent = title;
   }
+
+  if (elements.editorDealMeta) {
+    elements.editorDealMeta.textContent = metaText ?? '';
+  }
+}
+
+function buildEditorMeta(options) {
+  const sequenceLabel = options.sequence && options.sequence !== '-' ? `Рейс №${options.sequence}` : null;
+
+  if (options.mode === 'edit') {
+    if (sequenceLabel) {
+      return `${sequenceLabel} · редактирование`;
+    }
+    return 'Редактирование рейса';
+  }
+
+  if (sequenceLabel) {
+    return `${sequenceLabel} · новый`;
+  }
+  return 'Новый рейс';
+}
+
+function estimateNextSequence() {
+  if (state.formTemplate?.sequence) {
+    return state.formTemplate.sequence;
+  }
+
+  const numericSequences = state.hauls
+    .map((haul) => {
+      const value = typeof haul.sequence === 'number' ? haul.sequence : Number(haul.sequence);
+      return Number.isFinite(value) ? value : null;
+    })
+    .filter((value) => value !== null);
+
+  if (numericSequences.length) {
+    const max = Math.max(...numericSequences);
+    return max + 1;
+  }
+
+  return state.hauls.length + 1;
 }
 
 function extractDealIdFromReferrer() {
