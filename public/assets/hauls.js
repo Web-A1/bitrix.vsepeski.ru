@@ -36,10 +36,10 @@ const state = {
 const elements = {
   app: document.getElementById('app'),
   dealInput: document.getElementById('deal-id-input'),
-  dealLabel: document.getElementById('deal-label'),
+  dealTitle: document.getElementById('deal-title'),
+  dealIdLabel: document.getElementById('deal-id-label'),
   dealSubtitle: document.getElementById('deal-subtitle'),
   loadButton: document.getElementById('load-hauls'),
-  openCreate: document.getElementById('open-create'),
   floatingCreate: document.getElementById('floating-create'),
   haulsList: document.getElementById('hauls-list'),
   editorOverlay: document.getElementById('editor-overlay'),
@@ -1357,7 +1357,6 @@ function attachEventHandlers() {
     loadHauls();
   });
 
-  elements.openCreate?.addEventListener('click', handleCreateRequest);
   elements.floatingCreate?.addEventListener('click', handleCreateRequest);
 
   elements.closeEditor?.addEventListener('click', () => navigateTo(views.LIST));
@@ -1522,10 +1521,28 @@ function setDealId(id) {
 }
 
 function updateDealMeta() {
-  const label = state.dealId ? `#${state.dealId}` : '—';
-  if (elements.dealLabel) {
-    const dealTitle = state.dealMeta?.title ? `${state.dealMeta.title} · ${label}` : label;
-    elements.dealLabel.textContent = dealTitle;
+  const dealName = typeof state.dealMeta?.title === 'string' && state.dealMeta.title.trim() !== ''
+    ? state.dealMeta.title.trim()
+    : null;
+
+  if (elements.dealTitle) {
+    if (dealName) {
+      elements.dealTitle.textContent = dealName;
+    } else if (state.dealId) {
+      elements.dealTitle.textContent = `Сделка #${state.dealId}`;
+    } else {
+      elements.dealTitle.textContent = 'Сделка не выбрана';
+    }
+  }
+
+  if (elements.dealIdLabel) {
+    if (state.dealId) {
+      elements.dealIdLabel.textContent = `ID: ${state.dealId}`;
+      elements.dealIdLabel.hidden = false;
+    } else {
+      elements.dealIdLabel.textContent = '';
+      elements.dealIdLabel.hidden = true;
+    }
   }
 
   if (!elements.dealSubtitle) {

@@ -520,8 +520,14 @@ body.mobile-driver .mobile-app {
   font-size: clamp(1.3rem, 2vw, 1.7rem);
 }
 
-.app__subtitle {
+.deal-meta {
   margin: 4px 0 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.app__subtitle {
+  margin: 6px 0 0;
   color: var(--muted);
   font-size: 0.95rem;
 }

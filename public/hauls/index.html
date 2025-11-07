@@ -75,7 +75,8 @@
     <div class="app" id="app" data-view="list">
       <header class="app__header">
         <div class="app__title">
-          <h1>Рейсы сделки <span id="deal-label"></span></h1>
+          <h1 id="deal-title">Сделка не выбрана</h1>
+          <p class="deal-meta" id="deal-id-label"></p>
           <p class="app__subtitle" id="deal-subtitle">
             Загрузите существующие рейсы или создайте новый.
           </p>
@@ -88,9 +89,6 @@
             </label>
             <button type="button" id="load-hauls" class="button button--ghost">Загрузить</button>
           </div>
-          <button type="button" id="open-create" class="button button--primary">
-            Новый рейс
-          </button>
         </div>
       </header>
 
