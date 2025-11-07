@@ -35,6 +35,7 @@ const state = {
 
 const elements = {
   app: document.getElementById('app'),
+  loadingMessage: document.getElementById('app-loading'),
   dealInput: document.getElementById('deal-id-input'),
   dealTitle: document.getElementById('deal-title'),
   dealIdLabel: document.getElementById('deal-id-label'),
@@ -1582,6 +1583,9 @@ async function refreshDealMeta() {
   try {
     const response = await request(`/api/deals/${state.dealId}`);
     state.dealMeta = response?.data ?? null;
+    if (state.dealMeta?.title) {
+      applyDealTitle(state.dealMeta.title, { force: true });
+    }
   } catch (error) {
     console.warn('Не удалось получить данные сделки', error);
   }
@@ -1607,17 +1611,25 @@ async function detectDealId() {
     }
   }
 
+  const payloadTitle = extractDealTitleFromObject(bootstrapPayload);
+  applyDealTitle(payloadTitle);
   const idFromPayload = extractDealIdFromObject(bootstrapPayload);
   if (idFromPayload) {
     setDealId(idFromPayload);
-    applyDealTitle(extractDealTitleFromObject(bootstrapPayload));
+    if (payloadTitle) {
+      applyDealTitle(payloadTitle, { force: true });
+    }
     return true;
   }
 
+  const queryTitle = extractDealTitleFromObject(bootstrapQuery);
+  applyDealTitle(queryTitle);
   const idFromQuery = extractDealIdFromObject(bootstrapQuery);
   if (idFromQuery) {
     setDealId(idFromQuery);
-    applyDealTitle(extractDealTitleFromObject(bootstrapQuery));
+    if (queryTitle) {
+      applyDealTitle(queryTitle, { force: true });
+    }
     return true;
   }
 
@@ -2912,8 +2924,10 @@ function setAppReady(ready) {
 
   if (ready) {
     elements.app.dataset.initialized = 'true';
+    elements.loadingMessage?.classList.add('hidden');
   } else {
     elements.app.dataset.initialized = 'false';
+    elements.loadingMessage?.classList.remove('hidden');
   }
 }
 

@@ -508,6 +508,22 @@ body.mobile-driver .mobile-app {
   gap: 24px;
 }
 
+.app-loading {
+  max-width: min(1080px, 100%);
+  margin: 48px auto 0;
+  padding: 32px 20px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 1rem;
+  border-radius: 24px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.app-loading.hidden {
+  display: none;
+}
+
 .app[data-initialized='false'] {
   opacity: 0;
 }
