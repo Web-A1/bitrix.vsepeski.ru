@@ -2782,6 +2782,7 @@ function scheduleFitWindow(delay = 120) {
 function fitWindow() {
   if (state.embedded && window.BX24 && typeof window.BX24.fitWindow === 'function') {
     window.BX24.fitWindow();
+  }
 }
 
 function updateEditorHeader(metaText) {
