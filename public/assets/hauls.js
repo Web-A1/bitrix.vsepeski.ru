@@ -13,6 +13,7 @@ const initialDealContext = readInitialDealContext();
 const embeddedMode = detectEmbeddedMode();
 
 const driverKeyword = 'водител';
+let referenceDataPromise = null;
 
 const state = {
   dealId: initialDealContext.id,
@@ -369,11 +370,13 @@ async function initEmbedded() {
   configureEmbedding();
   attachEventHandlers();
   const actorPromise = resolveActorFromBitrix();
-  const referencePromise = loadReferenceData();
+  referenceDataPromise = loadReferenceData().catch((error) => {
+    console.error('Не удалось загрузить справочники', error);
+  });
   const hasDeal = await detectDealId();
   updateDealMeta();
   initRouter();
-  await Promise.allSettled([actorPromise, referencePromise]);
+  await Promise.allSettled([actorPromise]);
   if (hasDeal) {
     void loadHauls();
   } else {
@@ -1559,6 +1562,7 @@ async function applyView(view, haulId, options = {}) {
   }
 
   if (view === views.CREATE) {
+    await ensureReferenceDataLoaded();
     prepareCreateForm();
     if (state.formTemplate) {
       applyTemplateToForm(state.formTemplate, { includeStatus: false });
@@ -1580,6 +1584,7 @@ async function applyView(view, haulId, options = {}) {
       return;
     }
 
+    await ensureReferenceDataLoaded();
     state.currentHaulSnapshot = haul;
     prepareEditForm(haul);
     const meta = buildEditorMeta({
@@ -1921,6 +1926,18 @@ async function loadReferenceData() {
     syncUnloadFromCompany();
   } catch (error) {
     console.error('Не удалось загрузить справочники', error);
+    throw error;
+  }
+}
+
+async function ensureReferenceDataLoaded() {
+  if (!referenceDataPromise) {
+    referenceDataPromise = Promise.resolve();
+  }
+  try {
+    await referenceDataPromise;
+  } catch (error) {
+    console.warn('Справочники недоступны, продолжим без них', error);
   }
 }
 
