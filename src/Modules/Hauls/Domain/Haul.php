@@ -27,6 +27,7 @@ final class Haul
         private ?int $loadToCompanyId,
         private ?float $loadVolume,
         private ?float $loadActualVolume,
+        private ?float $legDistanceKm,
         private array $loadDocuments,
         private string $unloadAddressText,
         private ?string $unloadAddressUrl,
@@ -152,6 +153,16 @@ final class Haul
     public function updateLoadActualVolume(?float $volume): void
     {
         $this->loadActualVolume = $volume;
+    }
+
+    public function legDistanceKm(): ?float
+    {
+        return $this->legDistanceKm;
+    }
+
+    public function updateLegDistance(?float $distance): void
+    {
+        $this->legDistanceKm = $distance;
     }
 
     /**

@@ -702,6 +702,33 @@ body.mobile-driver .mobile-app {
   gap: 12px;
 }
 
+.haul-card__metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px 12px;
+}
+
+.haul-card__metric {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.haul-card__metric-label {
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-weight: 500;
+  font-size: 0.75rem;
+}
+
+.haul-card__metric-value {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--on-surface);
+}
+
 .haul-card__section {
   display: grid;
   gap: 6px;
@@ -711,11 +738,44 @@ body.mobile-driver .mobile-app {
   font-weight: 600;
 }
 
+.haul-card__address {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.haul-card__address-link {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.haul-card__address-link:hover {
+  text-decoration: underline;
+}
+
 .haul-card__actions {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
   justify-content: flex-end;
+}
+
+.haul-card__contact,
+.haul-card__contact-link {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.9rem;
+  align-items: center;
+}
+
+.haul-card__contact-link {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.haul-card__contact-link:hover {
+  text-decoration: underline;
 }
 
 .editor-overlay {
@@ -816,6 +876,16 @@ label {
 label span small {
   color: var(--muted);
   font-weight: 400;
+}
+
+.linked-field input[disabled] {
+  background: var(--surface-elevated);
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.linked-field .hint {
+  margin-top: -2px;
 }
 
 input,

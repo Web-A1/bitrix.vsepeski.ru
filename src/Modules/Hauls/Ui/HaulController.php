@@ -6,6 +6,7 @@ namespace B24\Center\Modules\Hauls\Ui;
 
 use B24\Center\Infrastructure\Http\Request;
 use B24\Center\Infrastructure\Http\Response;
+use B24\Center\Modules\Hauls\Application\DTO\ActorContext;
 use B24\Center\Modules\Hauls\Application\Services\HaulService;
 use RuntimeException;
 
@@ -49,7 +50,8 @@ final class HaulController
             return Response::json(['error' => $validation], 422);
         }
 
-        $created = $this->service->create($dealId, $payload);
+        $actor = $this->resolveActor($request);
+        $created = $this->service->create($dealId, $payload, $actor);
 
         return Response::json(['data' => $created], 201);
     }
@@ -63,8 +65,10 @@ final class HaulController
             return Response::json(['error' => $validation], 422);
         }
 
+        $actor = $this->resolveActor($request);
+
         try {
-            $updated = $this->service->update($haulId, $payload);
+            $updated = $this->service->update($haulId, $payload, $actor);
         } catch (RuntimeException $exception) {
             return Response::json(['error' => $exception->getMessage()], 404);
         }
@@ -72,19 +76,19 @@ final class HaulController
         return Response::json(['data' => $updated]);
     }
 
-    public function transitionStatus(string $haulId, Request $request, ?int $actorId, string $actorRole): Response
+    public function transitionStatus(string $haulId, Request $request, ?ActorContext $actor = null): Response
     {
         $payload = $request->body();
         if (!isset($payload['status'])) {
             return Response::json(['error' => 'Поле status обязательно.'], 422);
         }
+        $contextActor = $actor ?? $this->resolveActor($request);
 
         try {
             $updated = $this->service->transitionStatus(
                 $haulId,
                 (int) $payload['status'],
-                $actorId,
-                $actorRole,
+                $contextActor,
                 $payload
             );
         } catch (RuntimeException $exception) {
@@ -118,5 +122,25 @@ final class HaulController
         }
 
         return null;
+    }
+
+    private function resolveActor(Request $request, string $defaultRole = 'manager'): ActorContext
+    {
+        $idHeader = $request->header('x-actor-id');
+        $nameHeader = $request->header('x-actor-name');
+        $roleHeader = $request->header('x-actor-role') ?? $defaultRole;
+
+        $id = null;
+        if ($idHeader !== null && $idHeader !== '') {
+            $numeric = filter_var($idHeader, FILTER_VALIDATE_INT);
+            if ($numeric !== false) {
+                $id = (int) $numeric;
+            }
+        }
+
+        $name = $nameHeader !== null && $nameHeader !== '' ? $nameHeader : null;
+        $role = $roleHeader !== '' ? $roleHeader : $defaultRole;
+
+        return new ActorContext($id, $name, $role);
     }
 }

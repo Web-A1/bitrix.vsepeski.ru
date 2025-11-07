@@ -26,6 +26,7 @@ final class HaulResponse
                 'value' => $haul->status(),
                 'label' => HaulStatus::label($haul->status()),
             ],
+            'leg_distance_km' => $haul->legDistanceKm(),
             'general_notes' => $haul->generalNotes(),
             'load' => [
                 'address_text' => $haul->loadAddressText(),

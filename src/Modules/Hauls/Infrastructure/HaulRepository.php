@@ -31,6 +31,7 @@ final class HaulRepository
      *     load_volume?:float|null,
      *     load_actual_volume?:float|null,
      *     load_documents?:array,
+     *     leg_distance_km?:float|null,
      *     general_notes?:string|null,
      *     unload_address_text:string,
      *     unload_address_url?:string|null,
@@ -51,12 +52,12 @@ final class HaulRepository
             <<<SQL
                 INSERT INTO hauls (
                     id, deal_id, responsible_id, truck_id, material_id, sequence, status, general_notes,
-                    load_address_text, load_address_url, load_from_company_id, load_to_company_id, load_volume, load_actual_volume, load_documents,
+                    load_address_text, load_address_url, load_from_company_id, load_to_company_id, load_volume, load_actual_volume, leg_distance_km, load_documents,
                     unload_address_text, unload_address_url, unload_from_company_id, unload_to_company_id,
                     unload_contact_name, unload_contact_phone, unload_acceptance_time, unload_documents
                 ) VALUES (
                     :id, :deal_id, :responsible_id, :truck_id, :material_id, :sequence, :status, :general_notes,
-                    :load_address_text, :load_address_url, :load_from_company_id, :load_to_company_id, :load_volume, :load_actual_volume, :load_documents,
+                    :load_address_text, :load_address_url, :load_from_company_id, :load_to_company_id, :load_volume, :load_actual_volume, :leg_distance_km, :load_documents,
                     :unload_address_text, :unload_address_url, :unload_from_company_id, :unload_to_company_id,
                     :unload_contact_name, :unload_contact_phone, :unload_acceptance_time, :unload_documents
                 )
@@ -78,6 +79,7 @@ final class HaulRepository
             'load_to_company_id' => $payload['load_to_company_id'] ?? null,
             'load_volume' => $payload['load_volume'] ?? null,
             'load_actual_volume' => $payload['load_actual_volume'] ?? null,
+            'leg_distance_km' => $payload['leg_distance_km'] ?? null,
             'load_documents' => json_encode($payload['load_documents'] ?? [], JSON_THROW_ON_ERROR),
             'unload_address_text' => $payload['unload_address_text'],
             'unload_address_url' => $payload['unload_address_url'] ?? null,
@@ -155,6 +157,7 @@ final class HaulRepository
                     load_to_company_id = :load_to_company_id,
                     load_volume = :load_volume,
                     load_actual_volume = :load_actual_volume,
+                    leg_distance_km = :leg_distance_km,
                     load_documents = :load_documents,
                     unload_address_text = :unload_address_text,
                     unload_address_url = :unload_address_url,
@@ -184,6 +187,7 @@ final class HaulRepository
             'load_to_company_id' => $haul->loadToCompanyId(),
             'load_volume' => $haul->loadVolume(),
             'load_actual_volume' => $haul->loadActualVolume(),
+            'leg_distance_km' => $haul->legDistanceKm(),
             'load_documents' => json_encode($haul->loadDocuments(), JSON_THROW_ON_ERROR),
             'unload_address_text' => $haul->unloadAddressText(),
             'unload_address_url' => $haul->unloadAddressUrl(),
@@ -237,6 +241,7 @@ final class HaulRepository
             $row['load_to_company_id'] !== null ? (int) $row['load_to_company_id'] : null,
             $row['load_volume'] !== null ? (float) $row['load_volume'] : null,
             $row['load_actual_volume'] !== null ? (float) $row['load_actual_volume'] : null,
+            $row['leg_distance_km'] !== null ? (float) $row['leg_distance_km'] : null,
             $this->decodeJsonColumn($row['load_documents']),
             $row['unload_address_text'],
             $row['unload_address_url'],

@@ -136,6 +136,18 @@
                 <input type="number" step="0.01" min="0" name="load_volume" placeholder="0.00" inputmode="decimal" />
               </label>
               <label>
+                <span>Плечо, км</span>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  name="leg_distance_km"
+                  id="leg-distance-input"
+                  placeholder="0.0"
+                  inputmode="decimal"
+                />
+              </label>
+              <label>
                 <span>Статус</span>
                 <select name="status" id="status-select">
                   <option value="0">Подготовка рейса</option>
@@ -164,12 +176,12 @@
                 <input type="url" name="load_address_url" placeholder="https://yandex.ru/maps/..." />
               </label>
               <label>
-                <span>ID компании-отправителя</span>
-                <input type="number" name="load_from_company_id" inputmode="numeric" placeholder="цифры или оставить пустым" />
+                <span>От кого (поставщик)</span>
+                <select name="load_from_company_id" id="supplier-select"></select>
               </label>
               <label>
-                <span>ID компании-получателя</span>
-                <input type="number" name="load_to_company_id" inputmode="numeric" placeholder="цифры или оставить пустым" />
+                <span>Кому (перевозчик)</span>
+                <select name="load_to_company_id" id="carrier-select"></select>
               </label>
             </div>
           </div>
@@ -185,13 +197,17 @@
                 <span>Ссылка на карту</span>
                 <input type="url" name="unload_address_url" placeholder="https://yandex.ru/maps/..." />
               </label>
-              <label>
-                <span>ID компании-отправителя</span>
-                <input type="number" name="unload_from_company_id" inputmode="numeric" placeholder="цифры или оставить пустым" />
+              <label class="linked-field">
+                <span>От кого</span>
+                <input type="text" id="unload-from-display" placeholder="Автозаполняется" disabled />
+                <input type="hidden" name="unload_from_company_id" id="unload-from-input" />
+                <span class="hint">Синхронизируется с выбранным перевозчиком в блоке погрузки.</span>
               </label>
-              <label>
-                <span>ID компании-получателя</span>
-                <input type="number" name="unload_to_company_id" inputmode="numeric" placeholder="цифры или оставить пустым" />
+              <label class="linked-field">
+                <span>Кому</span>
+                <input type="text" id="unload-to-display" placeholder="Клиент сделки" disabled />
+                <input type="hidden" name="unload_to_company_id" id="unload-to-input" />
+                <span class="hint">Подтягиваем клиента из сделки автоматически.</span>
               </label>
               <label>
                 <span>Контактное лицо</span>

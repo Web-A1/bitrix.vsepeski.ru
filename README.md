@@ -7,9 +7,11 @@
 
 ## Domain essentials
 - Haul (`hauls`): рейс сделки; включает load/unload блоки, sequence, ответственного водителя.
+- `hauls.leg_distance_km` хранит плечо (км) между точками, используется в предпросмотре и копировании рейса.
 - Truck (`trucks`): самосвал, уникальный `license_plate`.
 - Material (`materials`): тип груза.
 - Drivers поступают из Bitrix отдела `BITRIX_DRIVERS_DEPARTMENT`.
+- Каждое изменение полей фиксируется в таблице `haul_change_events` (кто/что/когда), статусные переходы дополнительно пишутся в `haul_status_events`.
 
 ## Driver accounts & mobile login
 - Учётки водителей хранятся в таблице `driver_accounts` (см. миграцию `202511050040_create_driver_accounts_table.sql`). Для авторизации используется Bitrix ID (`bitrix_user_id`), логин и хеш пароля.
@@ -39,6 +41,8 @@
 - `GET/POST /api/trucks`, `DELETE /api/trucks/{id}`.
 - `GET/POST /api/materials`, `DELETE /api/materials/{id}`.
 - `GET /api/drivers` — Bitrix REST прокси (ожидает webhook URL).
+- `GET /api/crm/companies?type=supplier|carrier` — справочники компаний Bitrix24 по типам.
+- `GET /api/deals/{dealId}` — заголовок сделки + данные клиента/контакта для автозаполнения формы.
 - `GET /hauls` — отдаёт widget с вставленным `window.B24_INSTALL_PAYLOAD`.
 
 ## UI widget
@@ -53,6 +57,7 @@
 
 ## Tooling & commands
 - `composer install`, `.env` на базе `.env.example` (dotenv 5.6).
+- Для автозаполнения выпадающих списков нужны `BITRIX_COMPANY_SUPPLIER_TYPE` и `BITRIX_COMPANY_CARRIER_TYPE` (значения соответствуют `TYPE_ID` в CRM).
 - Миграции: `composer run db:migrate` → `bin/migrate` → SQL в `database/migrations`.
 - Виджет локально: `php -S localhost:8000 -t public` → `http://localhost:8000/hauls`.
 - Коммит/пуш: `bin/quick-push.sh [note]` (генерирует сообщение по git diff).

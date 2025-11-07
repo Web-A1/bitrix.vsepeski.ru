@@ -8,6 +8,8 @@ const views = {
 
 const knownPlacements = new Set(['CRM_DEAL_DETAIL_TAB', 'CRM_DEAL_LIST_MENU']);
 
+const embeddedMode = detectEmbeddedMode();
+
 const state = {
   dealId: null,
   view: views.LIST,
@@ -17,7 +19,16 @@ const state = {
   materials: [],
   drivers: [],
   hauls: [],
-  embedded: detectEmbeddedMode(),
+  suppliers: [],
+  carriers: [],
+  dealMeta: null,
+  formTemplate: null,
+  embedded: embeddedMode,
+  actor: {
+    id: null,
+    name: null,
+    role: embeddedMode ? 'manager' : 'system',
+  },
   loading: false,
   saving: false,
 };
@@ -37,6 +48,13 @@ const elements = {
   driverSelect: document.getElementById('driver-select'),
   truckSelect: document.getElementById('truck-select'),
   materialSelect: document.getElementById('material-select'),
+  supplierSelect: document.getElementById('supplier-select'),
+  carrierSelect: document.getElementById('carrier-select'),
+  legDistanceInput: document.getElementById('leg-distance-input'),
+  unloadFromDisplay: document.getElementById('unload-from-display'),
+  unloadFromInput: document.getElementById('unload-from-input'),
+  unloadToDisplay: document.getElementById('unload-to-display'),
+  unloadToInput: document.getElementById('unload-to-input'),
   formError: document.getElementById('form-error'),
   closeEditor: document.getElementById('close-editor'),
   cancelEditor: document.getElementById('cancel-editor'),
@@ -285,6 +303,7 @@ async function initEmbedded() {
   detectDarkMode();
   configureEmbedding();
   attachEventHandlers();
+  await resolveActorFromBitrix();
   await loadReferenceData();
   await detectDealId();
   updateDealMeta();
@@ -1256,6 +1275,18 @@ function formatVolume(value) {
   });
 }
 
+function formatDistance(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return '';
+  }
+
+  return numeric.toLocaleString('ru-RU', {
+    maximumFractionDigits: 1,
+    minimumFractionDigits: numeric % 1 === 0 ? 0 : 1,
+  });
+}
+
 function getStatusValue(status) {
   if (status && typeof status === 'object' && 'value' in status) {
     const numeric = Number(status.value);
@@ -1347,6 +1378,15 @@ function attachEventHandlers() {
   elements.haulForm?.addEventListener('submit', onSubmitForm);
 
   elements.haulsList?.addEventListener('click', (event) => {
+    const copyButton = event.target.closest('[data-action="copy"]');
+    if (copyButton) {
+      const haulId = copyButton.getAttribute('data-haul-id');
+      if (haulId) {
+        void handleCopyRequest(haulId);
+      }
+      return;
+    }
+
     const editButton = event.target.closest('[data-action="edit"]');
     if (editButton) {
       const haulId = editButton.getAttribute('data-haul-id');
@@ -1363,6 +1403,10 @@ function attachEventHandlers() {
         deleteHaul(haulId);
       }
     }
+  });
+
+  elements.carrierSelect?.addEventListener('change', () => {
+    syncUnloadFromCompany();
   });
 }
 
@@ -1426,6 +1470,9 @@ async function applyView(view, haulId, options = {}) {
   state.view = view;
   state.currentHaulId = view === views.EDIT ? haulId : null;
   state.currentHaulSnapshot = null;
+  if (view !== views.CREATE) {
+    state.formTemplate = null;
+  }
   elements.app?.setAttribute('data-view', view);
 
   if (view === views.LIST) {
@@ -1443,6 +1490,10 @@ async function applyView(view, haulId, options = {}) {
 
   if (view === views.CREATE) {
     prepareCreateForm();
+    if (state.formTemplate) {
+      applyTemplateToForm(state.formTemplate, { includeStatus: false });
+      state.formTemplate = null;
+    }
     openEditor('Создание рейса');
     return;
   }
@@ -1467,12 +1518,14 @@ function setDealId(id) {
     elements.dealInput.value = id;
   }
   updateDealMeta();
+  void refreshDealMeta();
 }
 
 function updateDealMeta() {
   const label = state.dealId ? `#${state.dealId}` : '—';
   if (elements.dealLabel) {
-    elements.dealLabel.textContent = label;
+    const dealTitle = state.dealMeta?.title ? `${state.dealMeta.title} · ${label}` : label;
+    elements.dealLabel.textContent = dealTitle;
   }
 
   if (!elements.dealSubtitle) {
@@ -1485,11 +1538,39 @@ function updateDealMeta() {
   }
 
   const count = state.hauls.length;
-  if (count === 0) {
-    elements.dealSubtitle.textContent = 'Рейсов ещё нет — создайте первый рейс.';
-  } else {
-    elements.dealSubtitle.textContent = `Всего рейсов: ${count}`;
+  const parts = [];
+
+  if (state.dealMeta?.company?.title) {
+    parts.push(`Клиент: ${state.dealMeta.company.title}`);
   }
+
+  if (count === 0) {
+    parts.push('Рейсов ещё нет — создайте первый рейс.');
+  } else {
+    parts.push(`Всего рейсов: ${count}`);
+  }
+
+  elements.dealSubtitle.textContent = parts.join(' · ');
+}
+
+async function refreshDealMeta() {
+  if (!state.dealId) {
+    state.dealMeta = null;
+    updateDealMeta();
+    syncUnloadToCompany();
+    return;
+  }
+
+  try {
+    const response = await request(`/api/deals/${state.dealId}`);
+    state.dealMeta = response?.data ?? null;
+  } catch (error) {
+    console.warn('Не удалось получить данные сделки', error);
+    state.dealMeta = null;
+  }
+
+  updateDealMeta();
+  syncUnloadToCompany();
 }
 
 async function detectDealId() {
@@ -1682,9 +1763,11 @@ async function detectDealId() {
 
 async function loadReferenceData() {
   try {
-    const [trucks, materials] = await Promise.all([
+    const [trucks, materials, suppliers, carriers] = await Promise.all([
       request('/api/trucks'),
       request('/api/materials'),
+      loadCompanyDirectory('supplier'),
+      loadCompanyDirectory('carrier'),
     ]);
 
     let driversResponse = null;
@@ -1696,12 +1779,54 @@ async function loadReferenceData() {
 
     state.trucks = Array.isArray(trucks?.data) ? trucks.data : [];
     state.materials = Array.isArray(materials?.data) ? materials.data : [];
+    state.suppliers = suppliers;
+    state.carriers = carriers;
 
     const driverData = driversResponse?.data ?? driversResponse ?? [];
     state.drivers = Array.isArray(driverData) ? driverData : Object.values(driverData);
     renderReferenceSelects();
+    syncUnloadFromCompany();
   } catch (error) {
     console.error('Не удалось загрузить справочники', error);
+  }
+}
+
+async function loadCompanyDirectory(type) {
+  try {
+    const response = await request(`/api/crm/companies?type=${encodeURIComponent(type)}`);
+    const list = Array.isArray(response?.data) ? response.data : [];
+    return list.map((item) => ({
+      id: item.id,
+      title: item.title || `#${item.id}`,
+      phone: item.phone ?? null,
+    }));
+  } catch (error) {
+    console.warn(`Не удалось загрузить компании (${type})`, error);
+    return [];
+  }
+}
+
+async function resolveActorFromBitrix() {
+  if (!state.embedded) {
+    return;
+  }
+
+  try {
+    const data = await callBx24Method('user.current');
+    if (!data) {
+      return;
+    }
+    const userId = data.ID ?? data.id ?? null;
+    const lastName = typeof data.LAST_NAME === 'string' ? data.LAST_NAME.trim() : '';
+    const firstName = typeof data.NAME === 'string' ? data.NAME.trim() : '';
+    const secondName = typeof data.SECOND_NAME === 'string' ? data.SECOND_NAME.trim() : '';
+    const nameParts = [lastName, firstName, secondName].filter(Boolean);
+
+    state.actor.id = userId ? Number(userId) : null;
+    state.actor.name = nameParts.length ? nameParts.join(' ') : (data.EMAIL ?? null);
+    state.actor.role = 'manager';
+  } catch (error) {
+    console.warn('Не удалось определить пользователя Bitrix24', error);
   }
 }
 
@@ -1729,6 +1854,42 @@ function renderReferenceSelects() {
     allowEmpty: false,
     getLabel: (material) => material.name || material.id,
   });
+
+  renderCompanySelect(elements.supplierSelect, state.suppliers, 'Выберите поставщика');
+  renderCompanySelect(elements.carrierSelect, state.carriers, 'Выберите перевозчика');
+}
+
+function syncUnloadFromCompany() {
+  if (!elements.unloadFromInput) {
+    return;
+  }
+
+  const carrierId = elements.carrierSelect?.value ?? '';
+  elements.unloadFromInput.value = carrierId || '';
+  if (elements.unloadFromDisplay) {
+    const label = lookupCompanyName(state.carriers, carrierId) ?? (carrierId ? `#${carrierId}` : '');
+    elements.unloadFromDisplay.value = label;
+  }
+}
+
+function syncUnloadToCompany(idOverride = null, titleOverride = null) {
+  if (!elements.unloadToInput) {
+    return;
+  }
+
+  const companyId = idOverride ?? state.dealMeta?.company?.id ?? null;
+  const companyTitle = titleOverride ?? (companyId ? null : state.dealMeta?.company?.title ?? '');
+
+  elements.unloadToInput.value = companyId ? String(companyId) : '';
+  if (elements.unloadToDisplay) {
+    if (titleOverride !== null) {
+      elements.unloadToDisplay.value = titleOverride;
+    } else if (companyId === null) {
+      elements.unloadToDisplay.value = companyTitle ?? '';
+    } else {
+      elements.unloadToDisplay.value = companyTitle ?? state.dealMeta?.company?.title ?? `#${companyId}`;
+    }
+  }
 }
 
 function renderSelect(select, items, options) {
@@ -1766,6 +1927,40 @@ function renderSelect(select, items, options) {
     const option = document.createElement('option');
     option.value = String(item.id);
     option.textContent = getLabel(item);
+    select.appendChild(option);
+  });
+}
+
+function renderCompanySelect(select, items, placeholder) {
+  if (!select) {
+    return;
+  }
+
+  select.innerHTML = '';
+
+  if (!items.length) {
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = 'список пуст';
+    option.disabled = true;
+    option.selected = true;
+    select.appendChild(option);
+    select.disabled = true;
+    return;
+  }
+
+  select.disabled = false;
+  const placeholderOption = document.createElement('option');
+  placeholderOption.value = '';
+  placeholderOption.textContent = placeholder;
+  placeholderOption.disabled = true;
+  placeholderOption.selected = true;
+  select.appendChild(placeholderOption);
+
+  items.forEach((item) => {
+    const option = document.createElement('option');
+    option.value = String(item.id);
+    option.textContent = item.title || `#${item.id}`;
     select.appendChild(option);
   });
 }
@@ -1855,6 +2050,7 @@ function createHaulCard(haul) {
 
   const body = document.createElement('div');
   body.className = 'haul-card__body';
+  body.appendChild(createHaulMetrics(haul));
   body.appendChild(createAddressSection('Загрузка', haul.load));
   body.appendChild(createAddressSection('Выгрузка', haul.unload, true));
 
@@ -1868,6 +2064,13 @@ function createHaulCard(haul) {
   editButton.dataset.action = 'edit';
   editButton.dataset.haulId = haul.id;
 
+  const copyButton = document.createElement('button');
+  copyButton.type = 'button';
+  copyButton.className = 'button button--ghost';
+  copyButton.textContent = 'Копировать';
+  copyButton.dataset.action = 'copy';
+  copyButton.dataset.haulId = haul.id;
+
   const deleteButton = document.createElement('button');
   deleteButton.type = 'button';
   deleteButton.className = 'button button--ghost';
@@ -1876,6 +2079,7 @@ function createHaulCard(haul) {
   deleteButton.dataset.haulId = haul.id;
 
   footer.appendChild(editButton);
+  footer.appendChild(copyButton);
   footer.appendChild(deleteButton);
 
   if (haul.updated_at) {
@@ -1900,30 +2104,35 @@ function createAddressSection(title, data, isUnload = false) {
   section.appendChild(heading);
 
   const address = document.createElement('div');
-  address.textContent = data?.address_text || '—';
-  section.appendChild(address);
-
-  if (data?.address_url) {
+  address.className = 'haul-card__address';
+  if (data?.address_url && data?.address_text) {
     const link = document.createElement('a');
     link.href = data.address_url;
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
-    link.textContent = 'Открыть на карте';
-    section.appendChild(link);
+    link.textContent = data.address_text;
+    link.className = 'haul-card__address-link';
+    address.appendChild(link);
+  } else {
+    address.textContent = data?.address_text || '—';
   }
+  section.appendChild(address);
 
   const details = [];
   if (data?.from_company_id) {
-    details.push(`От кого: ${data.from_company_id}`);
+    const fromLabel = isUnload
+      ? lookupCompanyName(state.carriers, data.from_company_id)
+      : lookupCompanyName(state.suppliers, data.from_company_id);
+    details.push(`От кого: ${fromLabel ?? data.from_company_id}`);
   }
   if (data?.to_company_id) {
-    details.push(`Кому: ${data.to_company_id}`);
+    const toLabel = !isUnload
+      ? lookupCompanyName(state.carriers, data.to_company_id)
+      : state.dealMeta?.company?.title;
+    details.push(`Кому: ${toLabel ?? data.to_company_id}`);
   }
   if (!isUnload && Number.isFinite(Number(data?.volume))) {
     details.push(`Объём: ${Number(data.volume).toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} м³`);
-  }
-  if (isUnload && (data?.contact_name || data?.contact_phone)) {
-    details.push(`Контакт: ${[data.contact_name, data.contact_phone].filter(Boolean).join(', ')}`);
   }
 
   if (details.length) {
@@ -1933,7 +2142,57 @@ function createAddressSection(title, data, isUnload = false) {
     section.appendChild(detailsEl);
   }
 
+  if (isUnload && (data?.contact_name || data?.contact_phone)) {
+    const hasPhone = Boolean(data?.contact_phone);
+    const contact = document.createElement(hasPhone ? 'a' : 'div');
+    contact.className = 'haul-card__contact';
+    if (hasPhone) {
+      contact.href = formatPhoneHref(data.contact_phone);
+      contact.classList.add('haul-card__contact-link');
+    }
+    if (data.contact_name) {
+      const name = document.createElement('span');
+      name.textContent = data.contact_name;
+      contact.appendChild(name);
+    }
+    if (hasPhone) {
+      const phoneValue = document.createElement('span');
+      phoneValue.textContent = data.contact_phone;
+      contact.appendChild(phoneValue);
+    }
+    section.appendChild(contact);
+  }
+
   return section;
+}
+
+function createHaulMetrics(haul) {
+  const metrics = document.createElement('div');
+  metrics.className = 'haul-card__metrics';
+
+  metrics.appendChild(createMetricItem('Материал', lookupLabel(state.materials, haul.material_id, 'name')));
+  metrics.appendChild(createMetricItem('План, м³', formatVolume(haul.load?.volume) || '—'));
+  metrics.appendChild(createMetricItem('Факт, м³', formatVolume(haul.load?.actual_volume) || '—'));
+  metrics.appendChild(createMetricItem('Плечо, км', formatDistance(haul.leg_distance_km) || '—'));
+
+  return metrics;
+}
+
+function createMetricItem(label, value) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'haul-card__metric';
+
+  const labelEl = document.createElement('span');
+  labelEl.className = 'haul-card__metric-label';
+  labelEl.textContent = label;
+  wrapper.appendChild(labelEl);
+
+  const valueEl = document.createElement('span');
+  valueEl.className = 'haul-card__metric-value';
+  valueEl.textContent = value ?? '—';
+  wrapper.appendChild(valueEl);
+
+  return wrapper;
 }
 
 function createTag(text, muted) {
@@ -1988,35 +2247,63 @@ function prepareCreateForm() {
   setSelectValue(elements.driverSelect, '');
   setSelectValue(elements.truckSelect, '');
   setSelectValue(elements.materialSelect, '');
+   setSelectValue(elements.supplierSelect, '');
+   setSelectValue(elements.carrierSelect, '');
   clearFormError();
   elements.submitHaul.textContent = 'Сохранить';
+  syncUnloadFromCompany();
+  syncUnloadToCompany();
 }
 
 function prepareEditForm(haul) {
   if (!elements.haulForm) return;
   elements.haulForm.reset();
   clearFormError();
+  applyTemplateToForm(haul, { includeStatus: true });
+
+  elements.submitHaul.textContent = 'Обновить';
+}
+
+function applyTemplateToForm(haul, options = {}) {
+  if (!elements.haulForm) {
+    return;
+  }
+
+  const includeStatus = options.includeStatus !== false;
 
   setSelectValue(elements.driverSelect, haul.responsible_id);
   setSelectValue(elements.truckSelect, haul.truck_id);
   setSelectValue(elements.materialSelect, haul.material_id);
-  setFieldValue('status', haul.status?.value ?? haul.status);
-  setFieldValue('general_notes', haul.general_notes);
+  setSelectValue(elements.supplierSelect, haul.load?.from_company_id);
+  setSelectValue(elements.carrierSelect, haul.load?.to_company_id);
 
+  if (includeStatus) {
+    setFieldValue('status', haul.status?.value ?? haul.status ?? 0);
+  } else {
+    setFieldValue('status', 0);
+  }
+
+  setFieldValue('general_notes', haul.general_notes);
   setFieldValue('load_volume', haul.load?.volume);
+  setFieldValue('leg_distance_km', haul.leg_distance_km);
   setFieldValue('load_address_text', haul.load?.address_text);
   setFieldValue('load_address_url', haul.load?.address_url);
-  setFieldValue('load_from_company_id', haul.load?.from_company_id);
-  setFieldValue('load_to_company_id', haul.load?.to_company_id);
   setFieldValue('unload_address_text', haul.unload?.address_text);
   setFieldValue('unload_address_url', haul.unload?.address_url);
-  setFieldValue('unload_from_company_id', haul.unload?.from_company_id);
-  setFieldValue('unload_to_company_id', haul.unload?.to_company_id);
   setFieldValue('unload_contact_name', haul.unload?.contact_name);
   setFieldValue('unload_contact_phone', haul.unload?.contact_phone);
   setFieldValue('unload_acceptance_time', haul.unload?.acceptance_time);
 
-  elements.submitHaul.textContent = 'Обновить';
+  syncUnloadFromCompany();
+
+  const unloadToId = haul.unload?.to_company_id ?? null;
+  if (unloadToId) {
+    const sameAsDeal = state.dealMeta?.company?.id === unloadToId;
+    const title = sameAsDeal ? state.dealMeta?.company?.title ?? null : `#${unloadToId}`;
+    syncUnloadToCompany(unloadToId, title);
+  } else {
+    syncUnloadToCompany();
+  }
 }
 
 function setFieldValue(name, value) {
@@ -2108,6 +2395,7 @@ function collectFormPayload() {
     load_address_url: toNullableString(data.load_address_url),
     load_from_company_id: toNullableNumber(data.load_from_company_id),
     load_to_company_id: toNullableNumber(data.load_to_company_id),
+    leg_distance_km: toNullableNumber(data.leg_distance_km),
     unload_address_text: toNullableString(data.unload_address_text, true),
     unload_address_url: toNullableString(data.unload_address_url),
     unload_from_company_id: toNullableNumber(data.unload_from_company_id),
@@ -2162,6 +2450,10 @@ function validatePayload(payload) {
     }
   }
 
+  if (payload.leg_distance_km !== null && payload.leg_distance_km < 0) {
+    errors.push('Плечо не может быть отрицательным');
+  }
+
   return errors;
 }
 
@@ -2208,6 +2500,17 @@ async function deleteHaul(haulId) {
     console.error('Не удалось удалить рейс', error);
     alert('Не удалось удалить рейс, попробуйте ещё раз');
   }
+}
+
+async function handleCopyRequest(haulId) {
+  const haul = await resolveHaul(haulId);
+  if (!haul) {
+    alert('Рейс не найден или был удалён.');
+    return;
+  }
+
+  state.formTemplate = haul;
+  navigateTo(views.CREATE);
 }
 
 async function handleCreateRequest(event) {
@@ -2270,6 +2573,23 @@ function closeEditor() {
 function lookupLabel(collection, id, field) {
   const item = collection.find((entry) => String(entry.id) === String(id));
   return item ? item[field] || item.id : id ?? '—';
+}
+
+function lookupCompanyName(collection, id) {
+  if (id === undefined || id === null || id === '') {
+    return null;
+  }
+
+  const item = collection.find((entry) => String(entry.id) === String(id));
+  return item ? item.title || `#${item.id}` : null;
+}
+
+function formatPhoneHref(phone) {
+  if (!phone) {
+    return '';
+  }
+  const normalized = String(phone).replace(/[^+\d]/g, '');
+  return normalized ? `tel:${normalized}` : `tel:${phone}`;
 }
 
 function lookupDriver(id) {
@@ -2496,6 +2816,39 @@ async function waitForBx24(timeout = 5000) {
   return bx24Ready;
 }
 
+async function callBx24Method(method, params = {}) {
+  const bx24 = await waitForBx24();
+  if (!bx24 || typeof bx24.callMethod !== 'function') {
+    throw new Error('BX24 API недоступна');
+  }
+
+  return new Promise((resolve, reject) => {
+    try {
+      bx24.callMethod(method, params, (result) => {
+        if (!result) {
+          reject(new Error('BX24 вернул пустой ответ'));
+          return;
+        }
+
+        if (typeof result.error === 'function') {
+          const error = result.error();
+          if (error) {
+            reject(new Error(typeof error === 'string' ? error : 'BX24 error'));
+            return;
+          }
+        } else if (result.error) {
+          reject(new Error(String(result.error)));
+          return;
+        }
+
+        resolve(result.data ?? result.result ?? null);
+      });
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
 async function readJsonResponse(response) {
   try {
     return await response.json();
@@ -2515,6 +2868,18 @@ async function request(path, options = {}) {
     },
     credentials: 'include',
   };
+
+  if (state.actor) {
+    if (state.actor.id) {
+      init.headers['X-Actor-Id'] = String(state.actor.id);
+    }
+    if (state.actor.name) {
+      init.headers['X-Actor-Name'] = String(state.actor.name);
+    }
+    if (state.actor.role) {
+      init.headers['X-Actor-Role'] = state.actor.role;
+    }
+  }
 
   if (body !== undefined) {
     init.body = typeof body === 'string' ? body : JSON.stringify(body);

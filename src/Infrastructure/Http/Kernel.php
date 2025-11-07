@@ -10,14 +10,19 @@ use B24\Center\Infrastructure\Http\Response;
 use B24\Center\Infrastructure\Auth\SessionAuthManager;
 use B24\Center\Infrastructure\Auth\LocalDriverAuthenticator;
 use B24\Center\Modules\Hauls\Application\Services\HaulService;
+use B24\Center\Modules\Hauls\Application\DTO\ActorContext;
 use B24\Center\Modules\Hauls\Infrastructure\MaterialRepository;
 use B24\Center\Modules\Hauls\Infrastructure\TruckRepository;
 use B24\Center\Modules\Hauls\Application\Services\DriverLookupService;
+use B24\Center\Modules\Hauls\Application\Services\CompanyDirectoryService;
+use B24\Center\Modules\Hauls\Application\Services\DealInfoService;
 use B24\Center\Modules\Hauls\Ui\HaulController;
 use B24\Center\Modules\Hauls\Ui\MaterialController;
 use B24\Center\Modules\Hauls\Ui\TruckController;
 use B24\Center\Modules\Hauls\Ui\DriverController;
 use B24\Center\Modules\Hauls\Ui\HaulPlacementPageRenderer;
+use B24\Center\Modules\Hauls\Ui\CompanyDirectoryController;
+use B24\Center\Modules\Hauls\Ui\DealInfoController;
 use DateTimeImmutable;
 use RuntimeException;
 use Throwable;
@@ -144,6 +149,8 @@ class Kernel
         $truckController = new TruckController($this->container->get(TruckRepository::class));
         $materialController = new MaterialController($this->container->get(MaterialRepository::class));
         $driverController = new DriverController($this->container->get(DriverLookupService::class));
+        $companyController = new CompanyDirectoryController($this->container->get(CompanyDirectoryService::class));
+        $dealController = new DealInfoController($this->container->get(DealInfoService::class));
 
         if ($path === '/api/mobile/hauls') {
             $user = $authManager->user();
@@ -169,7 +176,22 @@ class Kernel
                 return $this->methodNotAllowed(['POST']);
             }
 
-            return $haulController->transitionStatus($matches[1], $request, (int) $user['id'], 'driver');
+            $actor = new ActorContext(
+                isset($user['id']) ? (int) $user['id'] : null,
+                isset($user['name']) ? (string) $user['name'] : null,
+                'driver'
+            );
+
+            return $haulController->transitionStatus($matches[1], $request, $actor);
+        }
+
+        if (preg_match('#^/api/deals/(\d+)$#', $path, $matches)) {
+            $dealId = (int) $matches[1];
+
+            return match ($method) {
+                'GET' => $dealController->show($dealId),
+                default => $this->methodNotAllowed(['GET']),
+            };
         }
 
         if (preg_match('#^/api/deals/(\d+)/hauls$#', $path, $matches)) {
@@ -206,6 +228,13 @@ class Kernel
             };
         }
 
+        if ($path === '/api/crm/companies') {
+            return match ($method) {
+                'GET' => $companyController->index($request),
+                default => $this->methodNotAllowed(['GET']),
+            };
+        }
+
         if ($path === '/api/materials') {
             return match ($method) {
                 'GET' => $materialController->index(),
@@ -227,7 +256,7 @@ class Kernel
             $haulId = $matches[1];
 
             return match ($method) {
-                'POST', 'PUT', 'PATCH' => $haulController->transitionStatus($haulId, $request, null, 'manager'),
+                'POST', 'PUT', 'PATCH' => $haulController->transitionStatus($haulId, $request, null),
                 default => $this->methodNotAllowed(['POST', 'PUT', 'PATCH']),
             };
         }
