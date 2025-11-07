@@ -109,17 +109,14 @@
     <div class="editor-overlay" id="editor-overlay" aria-hidden="true">
       <section class="editor" role="dialog" aria-modal="true" aria-labelledby="editor-title">
         <header class="editor__header">
-          <div>
-            <p class="editor__mode" id="editor-mode"></p>
-            <h2 id="editor-title">Рейс</h2>
-          </div>
           <div class="editor__header-actions">
             <button type="button" class="button button--ghost" id="close-editor">Закрыть</button>
+            <button type="button" class="button button--primary" id="header-save">Сохранить</button>
           </div>
         </header>
         <form id="haul-form" novalidate>
           <div class="form-group">
-            <h3>Основное</h3>
+            <h3>Основная информация</h3>
             <div class="field-grid">
               <label>
                 <span>Водитель <small>(обязательно)</small></span>
@@ -168,7 +165,7 @@
           </div>
 
           <div class="form-group">
-            <h3>Точка загрузки</h3>
+            <h3>Загрузка</h3>
             <div class="field-grid field-grid--two">
               <label>
                 <span>Адрес <small>(обязательно)</small></span>
@@ -190,7 +187,7 @@
           </div>
 
           <div class="form-group">
-            <h3>Точка выгрузки</h3>
+            <h3>Выгрузка</h3>
             <div class="field-grid field-grid--two">
               <label>
                 <span>Адрес <small>(обязательно)</small></span>

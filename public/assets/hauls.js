@@ -61,6 +61,7 @@ const elements = {
   formError: document.getElementById('form-error'),
   closeEditor: document.getElementById('close-editor'),
   cancelEditor: document.getElementById('cancel-editor'),
+  headerSave: document.getElementById('header-save'),
   submitHaul: document.getElementById('submit-haul'),
 };
 
@@ -1370,6 +1371,12 @@ function attachEventHandlers() {
   elements.editorOverlay?.addEventListener('click', (event) => {
     if (event.target === elements.editorOverlay) {
       navigateTo(views.LIST);
+    }
+  });
+
+  elements.headerSave?.addEventListener('click', () => {
+    if (elements.haulForm) {
+      elements.haulForm.requestSubmit();
     }
   });
 

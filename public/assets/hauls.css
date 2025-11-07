@@ -843,25 +843,14 @@ body.mobile-driver .mobile-app {
   padding: 20px 24px 12px;
   border-bottom: 1px solid var(--border);
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 16px;
-  align-items: flex-start;
-}
-
-.editor__mode {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.85rem;
-}
-
-.editor__header h2 {
-  margin: 4px 0 0;
-  font-size: 1.35rem;
+  align-items: center;
 }
 
 .editor__header-actions {
   display: flex;
-  gap: 8px;
+  gap: 12px;
 }
 
 form#haul-form {
@@ -875,13 +864,19 @@ form#haul-form {
 
 .form-group {
   display: grid;
-  gap: 12px;
+  gap: 16px;
   grid-template-rows: min-content 1fr;
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.8);
+  box-shadow: 0 5px 20px rgba(15, 23, 42, 0.08);
+  margin-bottom: 18px;
 }
 
 .form-group h3 {
   margin: 0;
-  font-size: 1rem;
+  font-size: 1.05rem;
 }
 
 .field-grid {
