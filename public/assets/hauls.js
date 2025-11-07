@@ -1799,7 +1799,11 @@ async function detectDealId() {
     return Boolean(state.dealId);
   }
 
-  scheduleBx24DealLookup();
+  if (!state.dealId) {
+    await fetchDealFromBx24();
+  } else {
+    scheduleBx24DealLookup();
+  }
 
   return Boolean(state.dealId);
 }
