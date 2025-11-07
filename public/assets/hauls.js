@@ -8,10 +8,12 @@ const views = {
 
 const knownPlacements = new Set(['CRM_DEAL_DETAIL_TAB', 'CRM_DEAL_LIST_MENU', 'HAULS']);
 
+const initialDealContext = readInitialDealContext();
+
 const embeddedMode = detectEmbeddedMode();
 
 const state = {
-  dealId: null,
+  dealId: initialDealContext.id,
   view: views.LIST,
   currentHaulId: null,
   currentHaulSnapshot: null,
@@ -21,7 +23,7 @@ const state = {
   hauls: [],
   suppliers: [],
   carriers: [],
-  dealMeta: null,
+  dealMeta: initialDealContext.meta,
   formTemplate: null,
   embedded: embeddedMode,
   actor: {
@@ -304,17 +306,18 @@ async function initEmbedded() {
   detectDarkMode();
   configureEmbedding();
   attachEventHandlers();
-  await resolveActorFromBitrix();
-  await loadReferenceData();
+  const actorPromise = resolveActorFromBitrix();
+  const referencePromise = loadReferenceData();
   const hasDeal = await detectDealId();
   updateDealMeta();
   initRouter();
-  setAppReady(true);
+  await Promise.allSettled([actorPromise, referencePromise]);
   if (hasDeal) {
-    await loadHauls();
+    void loadHauls();
   } else {
     renderList();
   }
+  setAppReady(true);
   scheduleFitWindow();
 }
 
@@ -1591,6 +1594,10 @@ async function refreshDealMeta() {
 }
 
 async function detectDealId() {
+  if (state.dealId) {
+    return true;
+  }
+
   const bootstrap = window.B24_INSTALL_PAYLOAD || null;
   const bootstrapPayload = bootstrap?.payload || null;
   const bootstrapQuery = bootstrap?.get || bootstrap?.query || null;
@@ -1675,6 +1682,9 @@ async function detectDealId() {
     const numericId = Number(candidate);
     if (Number.isFinite(numericId)) {
       setDealId(numericId);
+      if (titleParam) {
+        applyDealTitle(titleParam, { force: true });
+      }
       return true;
     }
 
@@ -1682,6 +1692,9 @@ async function detectDealId() {
     const fallbackId = Number(digits);
     if (Number.isFinite(fallbackId) && digits.length > 0) {
       setDealId(fallbackId);
+      if (titleParam) {
+        applyDealTitle(titleParam, { force: true });
+      }
       return true;
     }
   }
@@ -1693,13 +1706,13 @@ async function detectDealId() {
   }
 
   if (!state.embedded) {
-    return false;
+    return Boolean(state.dealId);
   }
 
   const bx24 = await waitForBx24();
   if (!bx24) {
     console.warn('BX24 API не готова — ID сделки не определён автоматически');
-    return false;
+    return Boolean(state.dealId);
   }
 
   await new Promise((resolve) => {
@@ -2802,12 +2815,43 @@ function extractDealIdFromObject(subject) {
   return null;
 }
 
-function applyDealTitle(title, options = {}) {
-  if (!title || typeof title !== 'string') {
-    return;
+function readInitialDealContext() {
+  if (typeof window === 'undefined') {
+    return { id: null, meta: null };
   }
 
-  const normalized = title.trim();
+  try {
+    const params = new URLSearchParams(window.location.search || '');
+    const idParam = params.get('dealId') || params.get('deal_id');
+    const titleParam =
+      params.get('dealTitle') ||
+      params.get('deal_title') ||
+      params.get('DEAL_TITLE');
+
+    let dealId = null;
+    if (idParam) {
+      const numeric = Number(idParam);
+      if (Number.isFinite(numeric)) {
+        dealId = numeric;
+      } else {
+        const digits = idParam.replace(/\D+/g, '');
+        const fallback = Number(digits);
+        dealId = Number.isFinite(fallback) && fallback > 0 ? fallback : null;
+      }
+    }
+
+    const title = normalizeDealTitle(titleParam);
+    return {
+      id: dealId,
+      meta: title ? { title } : null,
+    };
+  } catch (error) {
+    return { id: null, meta: null };
+  }
+}
+
+function applyDealTitle(title, options = {}) {
+  const normalized = normalizeDealTitle(title);
   if (!normalized) {
     return;
   }
@@ -2826,6 +2870,15 @@ function applyDealTitle(title, options = {}) {
 
   state.dealMeta = { ...state.dealMeta, title: normalized };
   updateDealMeta();
+}
+
+function normalizeDealTitle(value) {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const replaced = value.replace(/\+/g, ' ');
+  const trimmed = replaced.trim();
+  return trimmed || null;
 }
 
 function extractDealTitleFromObject(subject) {

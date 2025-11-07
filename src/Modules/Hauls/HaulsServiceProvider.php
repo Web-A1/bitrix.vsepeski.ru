@@ -17,6 +17,7 @@ use B24\Center\Modules\Hauls\Application\Services\DriverLookupService;
 use B24\Center\Modules\Hauls\Application\Services\CompanyDirectoryService;
 use B24\Center\Modules\Hauls\Application\Services\DealInfoService;
 use B24\Center\Modules\Hauls\Ui\HaulPlacementPageRenderer;
+use B24\Center\Support\FileCache;
 use PDO;
 
 class HaulsServiceProvider
@@ -72,18 +73,33 @@ class HaulsServiceProvider
             return new BitrixRestClient($webhookUrl);
         });
 
+        $app->singleton(FileCache::class, static function (): FileCache {
+            $projectRoot = dirname(__DIR__, 3);
+            $directory = $projectRoot . '/storage/cache';
+
+            return new FileCache($directory);
+        });
+
         $app->singleton(DriverLookupService::class, static function (Application $container): DriverLookupService {
             $config = require dirname(__DIR__, 3) . '/config/bitrix.php';
             $department = $config['drivers_department'] ?? 'Водители';
 
-            return new DriverLookupService($container->get(BitrixRestClient::class), $department);
+            return new DriverLookupService(
+                $container->get(BitrixRestClient::class),
+                $department,
+                $container->get(FileCache::class)
+            );
         });
 
         $app->singleton(CompanyDirectoryService::class, static function (Application $container): CompanyDirectoryService {
             $config = require dirname(__DIR__, 3) . '/config/bitrix.php';
             $types = $config['company_types'] ?? [];
 
-            return new CompanyDirectoryService($container->get(BitrixRestClient::class), $types);
+            return new CompanyDirectoryService(
+                $container->get(BitrixRestClient::class),
+                $container->get(FileCache::class),
+                $types
+            );
         });
 
         $app->singleton(DealInfoService::class, static function (Application $container): DealInfoService {

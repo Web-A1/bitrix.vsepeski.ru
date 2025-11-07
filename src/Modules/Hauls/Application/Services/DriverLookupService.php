@@ -5,13 +5,16 @@ declare(strict_types=1);
 namespace B24\Center\Modules\Hauls\Application\Services;
 
 use B24\Center\Infrastructure\Bitrix\BitrixRestClient;
+use B24\Center\Support\FileCache;
 use RuntimeException;
 
 final class DriverLookupService
 {
     public function __construct(
         private readonly BitrixRestClient $client,
-        private readonly string $departmentName
+        private readonly string $departmentName,
+        private readonly FileCache $cache,
+        private readonly int $cacheTtl = 300,
     ) {
     }
 
@@ -22,6 +25,16 @@ final class DriverLookupService
     {
         $departmentId = $this->resolveDepartmentId();
 
+        return $this->cache->remember('drivers_' . $departmentId, $this->cacheTtl, function () use ($departmentId): array {
+            return $this->fetchDrivers($departmentId);
+        });
+    }
+
+    /**
+     * @return array<int,array{id:int,name:string,position:?string,phone:?string}>
+     */
+    private function fetchDrivers(int $departmentId): array
+    {
         $result = $this->client->call('user.get', [
             'FILTER' => [
                 'UF_DEPARTMENT' => $departmentId,
@@ -67,6 +80,7 @@ final class DriverLookupService
 
     private function resolveDepartmentId(): int
     {
+        return $this->cache->remember('department_' . md5($this->departmentName), 3600, function (): int {
         $start = 0;
         $departmentName = mb_strtolower($this->departmentName);
 
@@ -91,6 +105,7 @@ final class DriverLookupService
             $start = (int) $response['next'];
         }
 
-        throw new RuntimeException(sprintf('Department "%s" not found in Bitrix.', $this->departmentName));
+            throw new RuntimeException(sprintf('Department "%s" not found in Bitrix.', $this->departmentName));
+        });
     }
 }

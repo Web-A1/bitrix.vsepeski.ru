@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace B24\Center\Modules\Hauls\Application\Services;
 
 use B24\Center\Infrastructure\Bitrix\BitrixRestClient;
+use B24\Center\Support\FileCache;
 use RuntimeException;
 
 final class CompanyDirectoryService
@@ -14,8 +15,10 @@ final class CompanyDirectoryService
      */
     public function __construct(
         private readonly BitrixRestClient $client,
+        private readonly FileCache $cache,
         private readonly array $typeMap = [],
         private readonly int $maxItems = 200,
+        private readonly int $cacheTtl = 300,
     ) {
     }
 
@@ -30,6 +33,16 @@ final class CompanyDirectoryService
             throw new RuntimeException(sprintf('Неизвестный тип компании "%s".', $alias));
         }
 
+        return $this->cache->remember('companies_' . $alias, $this->cacheTtl, function () use ($typeId): array {
+            return $this->fetchCompanies($typeId);
+        });
+    }
+
+    /**
+     * @return list<array{id:int,title:string,type_id:string,phone:?string}>
+     */
+    private function fetchCompanies(string $typeId): array
+    {
         $items = [];
         $start = 0;
 
