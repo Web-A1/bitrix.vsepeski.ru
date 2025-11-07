@@ -2602,8 +2602,10 @@ async function handleCreateRequest(event) {
   navigateTo(views.CREATE);
 }
 
-function openEditor(modeText) {
-  elements.editorMode.textContent = modeText;
+function openEditor(modeText = '') {
+  if (elements.editorMode) {
+    elements.editorMode.textContent = modeText;
+  }
   elements.editorOverlay.classList.add('is-open');
   elements.editorOverlay.setAttribute('aria-hidden', 'false');
   document.body.style.overflow = 'hidden';
