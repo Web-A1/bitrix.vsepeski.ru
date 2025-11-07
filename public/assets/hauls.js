@@ -1557,19 +1557,15 @@ function updateDealMeta() {
   }
 
   const count = state.hauls.length;
-  const parts = [];
-
-  if (state.dealMeta?.company?.title) {
-    parts.push(`Клиент: ${state.dealMeta.company.title}`);
+  if (elements.dealSubtitle) {
+    if (state.dealMeta?.company?.title) {
+      elements.dealSubtitle.textContent = `Клиент: ${state.dealMeta.company.title}`;
+    } else if (count > 0) {
+      elements.dealSubtitle.textContent = `Всего рейсов: ${count}`;
+    } else {
+      elements.dealSubtitle.textContent = '';
+    }
   }
-
-  if (count === 0) {
-    parts.push('Рейсов ещё нет — создайте первый рейс.');
-  } else {
-    parts.push(`Всего рейсов: ${count}`);
-  }
-
-  elements.dealSubtitle.textContent = parts.join(' · ');
 }
 
 async function refreshDealMeta() {
