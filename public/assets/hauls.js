@@ -1798,9 +1798,6 @@ async function detectDealId() {
   }
 
   scheduleBx24DealLookup();
-  if (bx24DealLookupPromise) {
-    await bx24DealLookupPromise;
-  }
 
   return Boolean(state.dealId);
 }
