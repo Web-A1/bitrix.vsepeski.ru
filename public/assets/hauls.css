@@ -891,8 +891,8 @@ form#haul-form {
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
-  padding-bottom: calc(72px + env(safe-area-inset-bottom, 28px));
-  scroll-padding-bottom: calc(72px + env(safe-area-inset-bottom, 28px));
+  padding-bottom: calc(180px + env(safe-area-inset-bottom, 48px));
+  scroll-padding-bottom: calc(180px + env(safe-area-inset-bottom, 48px));
 }
 
 .form-group {
@@ -984,11 +984,17 @@ textarea:focus {
 }
 
 .editor__footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 64px);
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin-top: -4px;
-  padding: 4px 0 calc(16px + env(safe-area-inset-bottom, 14px));
+  gap: 8px;
+  padding: 6px 18px 0;
+  align-items: center;
+  z-index: 60;
+  pointer-events: none;
 }
 
 .form-error {
@@ -997,24 +1003,31 @@ textarea:focus {
   min-height: 1em;
 }
 
+.editor__footer .form-error {
+  width: min(520px, calc(100% - 32px));
+  align-self: center;
+  text-align: center;
+  pointer-events: none;
+}
+
 .editor__footer-actions {
   display: flex;
   gap: 8px;
   align-items: center;
-  position: sticky;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 4px);
-  padding: 6px 10px;
+  width: min(520px, calc(100% - 32px));
+  padding: 10px 14px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.18);
-  border: 1px solid rgba(15, 23, 42, 0.06);
-  backdrop-filter: blur(8px);
-  z-index: 10;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 18px 32px rgba(15, 23, 42, 0.2);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(10px);
+  position: relative;
+  pointer-events: auto;
 }
 
 .editor__footer-actions .button {
   flex: 1 1 0;
-  min-height: 44px;
+  min-height: 46px;
 }
 
 .editor__footer-actions::after {
@@ -1023,8 +1036,8 @@ textarea:focus {
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5);
-  opacity: 0.8;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45);
+  opacity: 0.9;
 }
 
 @media (min-width: 641px) {
@@ -1034,13 +1047,19 @@ textarea:focus {
   }
 
   .editor__footer {
-    margin-top: 0;
+    position: static;
+    align-items: stretch;
+    gap: 16px;
     padding: 16px 0 0;
+    pointer-events: auto;
+  }
+
+  .editor__footer .form-error,
+  .editor__footer-actions {
+    width: 100%;
   }
 
   .editor__footer-actions {
-    position: static;
-    bottom: auto;
     padding: 0;
     border-radius: 12px;
     background: transparent;
