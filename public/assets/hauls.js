@@ -1521,13 +1521,13 @@ function parseHash(hash) {
   return { view: views.LIST, haulId: null };
 }
 
-function navigateTo(view, haulId = null) {
+function navigateTo(view, haulId = null, extra = {}) {
   const targetHash = buildHash(view, haulId);
   if (window.location.hash !== targetHash) {
     pendingHashSkips += 1;
     window.location.hash = targetHash;
   }
-  return applyView(view, haulId, { updateHash: false });
+  return applyView(view, haulId, { updateHash: false, template: extra.template });
 }
 
 function buildHash(view, haulId) {
@@ -1547,6 +1547,10 @@ async function applyView(view, haulId, options = {}) {
       pendingHashSkips += 1;
       window.location.hash = targetHash;
     }
+  }
+
+  if (options.template) {
+    state.formTemplate = options.template;
   }
 
   state.view = view;
@@ -2699,12 +2703,8 @@ async function handleCopyRequest(haulId) {
     return;
   }
 
-  state.formTemplate = cloneHaulTemplate(haul);
-  await navigateTo(views.CREATE);
-  if (state.formTemplate) {
-    applyTemplateToForm(state.formTemplate, { includeStatus: false });
-    state.formTemplate = null;
-  }
+  const template = cloneHaulTemplate(haul);
+  await navigateTo(views.CREATE, null, { template });
 }
 
 async function handleCreateRequest(event) {
