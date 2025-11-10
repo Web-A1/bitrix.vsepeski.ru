@@ -891,14 +891,14 @@ form#haul-form {
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
-  padding-bottom: calc(96px + env(safe-area-inset-bottom, 32px));
-  scroll-padding-bottom: calc(96px + env(safe-area-inset-bottom, 32px));
+  padding-bottom: calc(196px + env(safe-area-inset-bottom, 48px));
+  scroll-padding-bottom: calc(196px + env(safe-area-inset-bottom, 48px));
 }
 
 form#haul-form::after {
   content: '';
   display: block;
-  height: calc(140px + env(safe-area-inset-bottom, 36px));
+  height: calc(180px + env(safe-area-inset-bottom, 48px));
 }
 
 .form-group {
