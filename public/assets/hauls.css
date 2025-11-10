@@ -985,6 +985,8 @@ textarea:focus {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  margin-top: -8px;
+  padding-bottom: calc(24px + env(safe-area-inset-bottom, 16px));
 }
 
 .form-error {
