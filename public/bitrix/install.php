@@ -92,11 +92,11 @@ if ($rawBody !== '') {
 
 // Собираем все доступные источники данных (JSON + form-data + query string).
 $payload = [];
-if (is_array($decoded)) {
-    $payload = $decoded;
+if (is_array($formData)) {
+    $payload = $formData;
 }
-if (is_array($formData) && $formData !== []) {
-    $payload = array_merge($formData, $payload);
+if (is_array($decoded) && $decoded !== []) {
+    $payload = array_merge($payload, $decoded);
 }
 
 foreach ($_REQUEST as $key => $value) {
@@ -137,7 +137,7 @@ if (isset($payload['event']) && is_string($payload['event'])) {
 
 $isInstallEvent = is_string($eventName) && stripos($eventName, 'ONAPPINSTALL') !== false;
 
-if ($isPlacementLaunch && !$isInstallEvent) {
+if ($isPlacementLaunch && !$isInstallEvent && !$hasTokens) {
     if (!$hasTokens) {
         logInstallEvent('install.php placement launch without tokens', [
             'payload_keys' => array_keys($payload),
