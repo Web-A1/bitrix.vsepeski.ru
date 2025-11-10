@@ -891,8 +891,8 @@ form#haul-form {
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
-  padding-bottom: calc(110px + env(safe-area-inset-bottom, 32px));
-  scroll-padding-bottom: calc(110px + env(safe-area-inset-bottom, 32px));
+  padding-bottom: calc(72px + env(safe-area-inset-bottom, 28px));
+  scroll-padding-bottom: calc(72px + env(safe-area-inset-bottom, 28px));
 }
 
 .form-group {
@@ -988,7 +988,7 @@ textarea:focus {
   flex-direction: column;
   gap: 10px;
   margin-top: -4px;
-  padding: 8px 0 calc(20px + env(safe-area-inset-bottom, 16px));
+  padding: 4px 0 calc(16px + env(safe-area-inset-bottom, 14px));
 }
 
 .form-error {
@@ -1002,8 +1002,8 @@ textarea:focus {
   gap: 8px;
   align-items: center;
   position: sticky;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
-  padding: 8px 12px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 4px);
+  padding: 6px 10px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.95);
   box-shadow: 0 12px 26px rgba(15, 23, 42, 0.18);
