@@ -891,7 +891,8 @@ form#haul-form {
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
-  padding-bottom: calc(48px + env(safe-area-inset-bottom, 24px));
+  padding-bottom: calc(96px + env(safe-area-inset-bottom, 32px));
+  scroll-padding-bottom: calc(96px + env(safe-area-inset-bottom, 32px));
 }
 
 .form-group {
@@ -987,30 +988,14 @@ textarea:focus {
   flex-direction: column;
   gap: 16px;
   margin-top: -8px;
-  position: sticky;
-  bottom: 0;
-  z-index: 5;
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.8) 0%,
-    var(--surface) 35%
-  );
-  padding-bottom: calc(16px + env(safe-area-inset-bottom, 16px));
   padding-top: 12px;
-  border-top: 1px solid rgba(15, 23, 42, 0.08);
-  box-shadow: 0 -6px 18px rgba(15, 23, 42, 0.1);
+  padding-bottom: calc(24px + env(safe-area-inset-bottom, 16px));
 }
 
 @media (max-width: 640px) {
   form#haul-form {
-    padding-bottom: calc(140px + env(safe-area-inset-bottom, 32px));
-  }
-
-  .editor__footer {
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 72px);
-    padding-bottom: 8px;
-    padding-top: 8px;
-    border-top-color: rgba(15, 23, 42, 0.12);
+    padding-bottom: calc(140px + env(safe-area-inset-bottom, 40px));
+    scroll-padding-bottom: calc(140px + env(safe-area-inset-bottom, 40px));
   }
 }
 
