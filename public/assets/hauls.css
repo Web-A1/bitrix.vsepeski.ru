@@ -833,10 +833,12 @@ body.mobile-driver .mobile-app {
   border: none;
   display: flex;
   flex-direction: column;
-  height: 100%;
-  min-height: 100%;
+  min-height: 100vh;
+  height: auto;
   max-height: none;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 .editor-open .fab {
@@ -888,17 +890,14 @@ form#haul-form {
   gap: 24px;
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
-  padding-bottom: calc(196px + env(safe-area-inset-bottom, 48px));
-  scroll-padding-bottom: calc(196px + env(safe-area-inset-bottom, 48px));
+  padding-bottom: calc(96px + env(safe-area-inset-bottom, 32px));
+  scroll-padding-bottom: calc(96px + env(safe-area-inset-bottom, 32px));
 }
 
 form#haul-form::after {
   content: '';
   display: block;
-  height: calc(180px + env(safe-area-inset-bottom, 48px));
+  height: calc(80px + env(safe-area-inset-bottom, 28px));
 }
 
 .form-group {
