@@ -8,6 +8,7 @@ use Monolog\Formatter\JsonFormatter;
 use Monolog\Handler\StreamHandler;
 use Monolog\Level;
 use Monolog\Logger;
+use Monolog\LogRecord;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 
@@ -28,7 +29,11 @@ final class InstallLoggerFactory
         }
 
         $levelName = strtoupper((string) ($_ENV['INSTALL_LOG_LEVEL'] ?? 'INFO'));
-        $level = Level::tryFromName($levelName) ?? Level::Info;
+        try {
+            $level = Level::fromName($levelName);
+        } catch (\Throwable) {
+            $level = Level::Info;
+        }
 
         try {
             $handler = new StreamHandler($targetPath, $level);
@@ -41,10 +46,10 @@ final class InstallLoggerFactory
         $logger = new Logger('install');
         $logger->pushHandler($handler);
 
-        $logger->pushProcessor(static function (array $record): array {
-            if (isset($record['context']['exception']) && $record['context']['exception'] instanceof \Throwable) {
-                $exception = $record['context']['exception'];
-                $record['context']['exception'] = [
+        $logger->pushProcessor(static function (LogRecord $record): LogRecord {
+            if (isset($record->context['exception']) && $record->context['exception'] instanceof \Throwable) {
+                $exception = $record->context['exception'];
+                $record->context['exception'] = [
                     'message' => $exception->getMessage(),
                     'code' => $exception->getCode(),
                     'file' => $exception->getFile(),

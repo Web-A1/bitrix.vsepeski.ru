@@ -13,7 +13,7 @@
     },
     "autoload": {
         "psr-4": {
-            "B24\\\\Center\\\\": "src/"
+            "B24\\Center\\": "src/"
         },
         "classmap": [
             "src/"
@@ -21,7 +21,7 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "B24\\\\Center\\\\Tests\\\\": "tests/"
+            "B24\\Center\\Tests\\": "tests/"
         }
     },
     "scripts": {
