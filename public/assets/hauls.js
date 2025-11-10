@@ -1554,6 +1554,8 @@ async function applyView(view, haulId, options = {}) {
   state.currentHaulSnapshot = null;
   if (view !== views.CREATE) {
     state.formTemplate = null;
+  } else if (!state.formTemplate && state.currentHaulId && state.currentHaulSnapshot) {
+    state.formTemplate = cloneHaulTemplate(state.currentHaulSnapshot);
   }
   elements.app?.setAttribute('data-view', view);
   updatePanelsVisibility(view);
@@ -2699,6 +2701,10 @@ async function handleCopyRequest(haulId) {
 
   state.formTemplate = cloneHaulTemplate(haul);
   await navigateTo(views.CREATE);
+  if (state.formTemplate) {
+    applyTemplateToForm(state.formTemplate, { includeStatus: false });
+    state.formTemplate = null;
+  }
 }
 
 async function handleCreateRequest(event) {
