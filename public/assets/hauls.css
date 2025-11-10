@@ -42,11 +42,6 @@ body.dark {
   --shadow: none;
 }
 
-body.editor-open {
-  height: 100vh;
-  height: 100dvh;
-}
-
 body.mobile-driver {
   background: var(--surface);
 }
@@ -805,44 +800,29 @@ body.mobile-driver .mobile-app {
   text-decoration: underline;
 }
 
-.editor-overlay {
-  position: fixed;
-  inset: 0;
-  width: 100vw;
-  height: 100vh;
-  height: 100dvh;
-  background: rgba(10, 15, 25, 0.45);
-  backdrop-filter: blur(2px);
-  display: none;
-  place-items: stretch;
-  overflow: hidden;
-  z-index: 50;
-  padding: 0;
-}
-
-.editor-overlay.is-open {
-  display: grid;
-}
-
 .editor {
   background: var(--surface);
   color: var(--on-surface);
-  width: 100%;
-  border-radius: 0;
-  box-shadow: none;
-  border: none;
+  width: min(980px, 100%);
+  margin: 0 auto 32px;
+  border-radius: 24px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
-  height: auto;
-  max-height: none;
-  overflow-y: auto;
-  overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
+  gap: 16px;
+  padding-bottom: 32px;
 }
 
-.editor-open .fab {
-  display: none;
+@media (max-width: 640px) {
+  .editor {
+    width: 100%;
+    margin: 0;
+    border-radius: 0;
+    border: none;
+    box-shadow: none;
+    padding-bottom: 24px;
+  }
 }
 
 .editor__header {
@@ -881,6 +861,25 @@ body.mobile-driver .mobile-app {
 .editor__header-actions {
   display: flex;
   gap: 12px;
+}
+
+.app[data-view='list'] .editor {
+  display: none;
+}
+
+.app[data-view='create'] .editor,
+.app[data-view='edit'] .editor {
+  display: flex;
+}
+
+.app[data-view='create'] .app__main,
+.app[data-view='edit'] .app__main {
+  display: none;
+}
+
+.app[data-view='create'] .fab,
+.app[data-view='edit'] .fab {
+  display: none;
 }
 
 form#haul-form {
@@ -1055,10 +1054,6 @@ body.embedded .deal-controls {
 
 body.embedded .fab {
   display: flex;
-}
-
-body.editor-open .fab {
-  display: none !important;
 }
 
 @media (max-width: 820px) {

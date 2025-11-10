@@ -107,7 +107,7 @@ const elements = {
   loadButton: document.getElementById('load-hauls'),
   floatingCreate: document.getElementById('floating-create'),
   haulsList: document.getElementById('hauls-list'),
-  editorOverlay: document.getElementById('editor-overlay'),
+  editorPanel: document.getElementById('editor-panel'),
   editorMode: document.getElementById('editor-mode'),
   haulForm: document.getElementById('haul-form'),
   driverSelect: document.getElementById('driver-select'),
@@ -1439,12 +1439,6 @@ function attachEventHandlers() {
   elements.closeEditor?.addEventListener('click', () => navigateTo(views.LIST));
   elements.cancelEditor?.addEventListener('click', () => navigateTo(views.LIST));
 
-  elements.editorOverlay?.addEventListener('click', (event) => {
-    if (event.target === elements.editorOverlay) {
-      navigateTo(views.LIST);
-    }
-  });
-
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && state.view !== views.LIST) {
       navigateTo(views.LIST);
@@ -1550,6 +1544,9 @@ async function applyView(view, haulId, options = {}) {
     state.formTemplate = null;
   }
   elements.app?.setAttribute('data-view', view);
+  if (elements.editorPanel) {
+    elements.editorPanel.setAttribute('aria-hidden', view === views.LIST ? 'true' : 'false');
+  }
 
   if (view === views.LIST) {
     closeEditor();
@@ -2719,10 +2716,10 @@ async function handleCreateRequest(event) {
 
 function openEditor(metaText = '') {
   updateEditorHeader(metaText);
-  elements.editorOverlay.classList.add('is-open');
-  elements.editorOverlay.setAttribute('aria-hidden', 'false');
-  document.body.style.overflow = 'hidden';
-  document.body.classList.add('editor-open');
+  elements.editorPanel?.setAttribute('aria-hidden', 'false');
+  if (typeof window.scrollTo === 'function') {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
 
   if (state.embedded && window.BX24) {
     const canResize = typeof window.BX24.resizeWindow === 'function';
@@ -2741,10 +2738,7 @@ function openEditor(metaText = '') {
 }
 
 function closeEditor() {
-  elements.editorOverlay.classList.remove('is-open');
-  elements.editorOverlay.setAttribute('aria-hidden', 'true');
-  document.body.style.overflow = '';
-  document.body.classList.remove('editor-open');
+  elements.editorPanel?.setAttribute('aria-hidden', 'true');
   state.currentHaulSnapshot = null;
   elements.haulForm?.reset();
   clearFormError();
