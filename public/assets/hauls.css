@@ -891,8 +891,8 @@ form#haul-form {
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
-  padding-bottom: calc(140px + env(safe-area-inset-bottom, 36px));
-  scroll-padding-bottom: calc(140px + env(safe-area-inset-bottom, 36px));
+  padding-bottom: calc(96px + env(safe-area-inset-bottom, 32px));
+  scroll-padding-bottom: calc(96px + env(safe-area-inset-bottom, 32px));
 }
 
 .form-group {
@@ -986,16 +986,10 @@ textarea:focus {
 .editor__footer {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin-top: -4px;
-  padding: 8px 0 calc(12px + env(safe-area-inset-bottom, 16px));
-  position: sticky;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
-  z-index: 5;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.85) 0%, var(--surface) 40%);
-  backdrop-filter: blur(6px);
+  gap: 12px;
+  margin-top: 8px;
+  padding-top: 8px;
   border-top: 1px solid rgba(15, 23, 42, 0.08);
-  box-shadow: 0 -10px 24px rgba(15, 23, 42, 0.15);
 }
 
 .form-error {
@@ -1005,37 +999,17 @@ textarea:focus {
 }
 
 .editor__footer .form-error {
-  width: 100%;
-  text-align: center;
-  pointer-events: none;
   min-height: 1.2em;
 }
 
 .editor__footer-actions {
   display: flex;
-  gap: 8px;
-  align-items: center;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.96);
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.2);
-  position: relative;
+  justify-content: flex-end;
+  gap: 12px;
 }
 
 .editor__footer-actions .button {
-  flex: 1 1 0;
-  min-height: 44px;
-}
-
-.editor__footer-actions::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5);
-  opacity: 0.8;
+  min-width: 140px;
 }
 
 @media (min-width: 641px) {
@@ -1045,32 +1019,10 @@ textarea:focus {
   }
 
   .editor__footer {
-    position: static;
-    margin-top: 12px;
-    padding: 16px 0 0;
-    gap: 16px;
-    background: transparent;
-    border-top: none;
-    box-shadow: none;
-    backdrop-filter: none;
-  }
-
-  .editor__footer-actions {
-    justify-content: flex-end;
-    padding: 0;
-    border-radius: 12px;
-    background: transparent;
-    border: none;
-    box-shadow: none;
-  }
-
-  .editor__footer-actions::after {
-    display: none;
+    padding-top: 16px;
   }
 
   .editor__footer-actions .button {
-    flex: 0 0 auto;
-    min-width: 140px;
     min-height: 40px;
   }
 }
