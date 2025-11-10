@@ -495,7 +495,7 @@ body.mobile-driver .mobile-app {
 }
 
 .app {
-  max-width: min(1080px, 100%);
+  width: min(1080px, 100%);
   margin: 0 auto;
   padding: 24px 16px 64px;
   display: flex;
@@ -582,6 +582,27 @@ body.mobile-driver .mobile-app {
 .hauls-list {
   display: grid;
   gap: 16px;
+}
+
+@media (min-width: 1200px) {
+  .app {
+    width: 100%;
+    max-width: none;
+    padding: 32px 32px 72px;
+  }
+
+  .editor {
+    width: 100%;
+  }
+
+  #deal-title,
+  #deal-id-label {
+    display: none;
+  }
+
+  .hauls-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .empty-state {
