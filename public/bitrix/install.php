@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use B24\Center\Infrastructure\Bitrix\Install\InstallRequestHandler;
+use B24\Center\Infrastructure\Bitrix\Install\QueuedPlacementBindingDispatcher;
 use B24\Center\Infrastructure\Bitrix\Install\SyncPlacementBindingDispatcher;
 use B24\Center\Infrastructure\Logging\InstallLoggerFactory;
 
@@ -47,7 +48,10 @@ if ($rawBody !== '') {
     $logger->debug('install.php raw payload preview', ['raw' => mb_substr($rawBody, 0, 500)]);
 }
 
-$bindingDispatcher = new SyncPlacementBindingDispatcher($logger);
+$shouldQueue = filter_var($_ENV['INSTALL_QUEUE_PLACEMENTS'] ?? 'true', FILTER_VALIDATE_BOOL);
+$bindingDispatcher = $shouldQueue
+    ? new QueuedPlacementBindingDispatcher($projectRoot, $logger)
+    : new SyncPlacementBindingDispatcher($logger);
 $handler = new InstallRequestHandler($projectRoot, $logger, $bindingDispatcher);
 $result = $handler->handle(
     $payload,

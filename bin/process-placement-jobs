@@ -1,0 +1,55 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+use B24\Center\Infrastructure\Bitrix\Install\QueuedPlacementBindingDispatcher;
+use B24\Center\Infrastructure\Bitrix\Install\SyncPlacementBindingDispatcher;
+use B24\Center\Infrastructure\Logging\InstallLoggerFactory;
+
+$projectRoot = dirname(__DIR__);
+require $projectRoot . '/vendor/autoload.php';
+
+$logger = InstallLoggerFactory::create($projectRoot);
+$syncDispatcher = new SyncPlacementBindingDispatcher($logger);
+
+$queueDir = $projectRoot . '/storage/bitrix/placement-jobs';
+if (!is_dir($queueDir)) {
+    $logger->info('placement queue directory missing, nothing to process', ['dir' => $queueDir]);
+    exit(0);
+}
+
+$files = glob($queueDir . '/*.json') ?: [];
+if ($files === []) {
+    $logger->info('placement queue empty');
+    exit(0);
+}
+
+foreach ($files as $file) {
+    $job = json_decode((string) file_get_contents($file), true);
+    if (!is_array($job)) {
+        $logger->error('invalid placement job payload, deleting', ['file' => $file]);
+        @unlink($file);
+        continue;
+    }
+
+    $logger->info('processing placement job', ['job_id' => $job['id'] ?? basename($file)]);
+
+    try {
+        $syncDispatcher->dispatch(
+            (string) ($job['domain'] ?? ''),
+            (string) ($job['token'] ?? ''),
+            (string) ($job['handler'] ?? 'https://bitrix.vsepeski.ru/bitrix/install.php?placement=hauls'),
+            (array) ($job['placements'] ?? []),
+            (array) ($job['options'] ?? [])
+        );
+        @unlink($file);
+    } catch (\Throwable $exception) {
+        $logger->error('placement job failed', [
+            'job_id' => $job['id'] ?? basename($file),
+            'error' => $exception->getMessage(),
+        ]);
+        $failed = $file . '.failed';
+        @rename($file, $failed);
+    }
+}
