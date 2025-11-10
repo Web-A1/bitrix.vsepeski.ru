@@ -73,6 +73,10 @@ register_shutdown_function(static function (): void {
 
 $rawBody = file_get_contents('php://input') ?: '';
 $decoded = json_decode($rawBody, true);
+$formData = [];
+if ($rawBody !== '') {
+    parse_str($rawBody, $formData);
+}
 
 logInstallEvent('install.php request received', [
     'has_raw_body' => $rawBody !== '',
@@ -90,6 +94,9 @@ if ($rawBody !== '') {
 $payload = [];
 if (is_array($decoded)) {
     $payload = $decoded;
+}
+if (is_array($formData) && $formData !== []) {
+    $payload = array_merge($formData, $payload);
 }
 
 foreach ($_REQUEST as $key => $value) {
