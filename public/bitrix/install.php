@@ -125,12 +125,12 @@ if (isset($payload['event']) && is_string($payload['event'])) {
 
 $isInstallEvent = is_string($eventName) && stripos($eventName, 'ONAPPINSTALL') !== false;
 
-if ($isPlacementLaunch && !$isInstallEvent && !$hasTokens) {
-    logInstallEvent('install.php placement launch without tokens', [
-        'is_install_event' => $isInstallEvent,
-        'has_tokens' => $hasTokens,
-        'payload_keys' => array_keys($payload),
-    ]);
+if ($isPlacementLaunch && !$isInstallEvent) {
+    if (!$hasTokens) {
+        logInstallEvent('install.php placement launch without tokens', [
+            'payload_keys' => array_keys($payload),
+        ]);
+    }
     $projectRoot = dirname(__DIR__, 2);
     $renderer = new HaulPlacementPageRenderer($projectRoot);
 
@@ -225,7 +225,7 @@ if (file_put_contents($filePath, $json) === false) {
 $domain = $auth['domain'] ?? $payload['DOMAIN'] ?? null;
 $bindings = [];
 
-if (is_string($domain) && $domain !== '') {
+if ($isInstallEvent && is_string($domain) && $domain !== '') {
     $primaryHandler = 'https://bitrix.vsepeski.ru/bitrix/install.php?placement=hauls&v=20241118';
 
     $options = buildPlacementOptions();
