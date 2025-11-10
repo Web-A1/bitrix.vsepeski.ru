@@ -887,8 +887,10 @@ form#haul-form {
   flex-direction: column;
   gap: 24px;
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 .form-group {
@@ -903,7 +905,6 @@ form#haul-form {
   margin-bottom: 18px;
   width: 100%;
   box-sizing: border-box;
-  overflow: hidden;
 }
 
 .form-group h3 {
