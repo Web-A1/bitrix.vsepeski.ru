@@ -20,7 +20,9 @@ final class InstallRequestHandler
 
     public function __construct(
         private readonly string $projectRoot,
-        private readonly LoggerInterface $logger
+        private readonly LoggerInterface $logger,
+        private readonly PlacementBindingDispatcher $bindingDispatcher,
+        private readonly string $placementHandlerUri = 'https://bitrix.vsepeski.ru/bitrix/install.php?placement=hauls'
     ) {
         $this->renderer = new HaulPlacementPageRenderer($projectRoot);
     }
@@ -77,11 +79,12 @@ final class InstallRequestHandler
             return $this->renderPlacement($payload, $query, $post, $request);
         }
 
-        $bindings = [];
         $domain = $auth['domain'] ?? $payload['DOMAIN'] ?? null;
 
+        $bindings = [];
+
         if ($isInstallEvent && is_string($domain) && $domain !== '') {
-            $bindings = $this->rebindPlacements($domain, $auth['access_token']);
+            $bindings = $this->rebindPlacements($domain, (string) $auth['access_token']);
         }
 
         return InstallResult::json(['result' => true, 'bindings' => $bindings]);
@@ -187,7 +190,6 @@ final class InstallRequestHandler
      */
     private function rebindPlacements(string $domain, string $token): array
     {
-        $primaryHandler = 'https://bitrix.vsepeski.ru/bitrix/install.php?placement=hauls';
         $options = $this->buildPlacementOptions();
 
         $this->logger->info('install.php rebind placements', [
@@ -195,32 +197,13 @@ final class InstallRequestHandler
             'placements' => self::DEFAULT_PLACEMENTS,
         ]);
 
-        $results = [];
-
-        foreach (self::DEFAULT_PLACEMENTS as $placement) {
-            $results[$placement] = [
-                'unbind' => $this->callBitrix(
-                    $domain,
-                    'placement.unbind.json',
-                    [
-                        'auth' => $token,
-                        'PLACEMENT' => $placement,
-                        'HANDLER' => $primaryHandler,
-                    ]
-                ),
-                'bind' => $this->callBitrix(
-                    $domain,
-                    'placement.bind.json',
-                    array_merge([
-                        'auth' => $token,
-                        'PLACEMENT' => $placement,
-                        'HANDLER' => $primaryHandler,
-                    ], $options)
-                ),
-            ];
-        }
-
-        return $results;
+        return $this->bindingDispatcher->dispatch(
+            $domain,
+            $token,
+            $this->placementHandlerUri,
+            self::DEFAULT_PLACEMENTS,
+            $options
+        );
     }
 
     /**
@@ -298,64 +281,4 @@ final class InstallRequestHandler
         ];
     }
 
-    /**
-     * @param array<string,mixed> $params
-     *
-     * @return array<string,mixed>
-     */
-    private function callBitrix(string $domain, string $method, array $params): array
-    {
-        $url = sprintf('https://%s/rest/%s', $domain, $method);
-        $query = http_build_query($params);
-        $hasComplexParams = preg_match('/%5B.+%5D=/', $query) === 1;
-
-        $endpoint = $url;
-        $ch = curl_init($endpoint);
-        if ($ch === false) {
-            return ['error' => 'curl_init_failed', 'url' => $endpoint];
-        }
-
-        $options = [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => 10,
-            CURLOPT_SSL_VERIFYPEER => true,
-            CURLOPT_SSL_VERIFYHOST => 2,
-            CURLOPT_USERAGENT => 'vsepeski-local-app-install',
-        ];
-
-        $options[CURLOPT_URL] = $hasComplexParams ? $endpoint : $endpoint . '?' . $query;
-
-        if ($hasComplexParams) {
-            $options[CURLOPT_POST] = true;
-            $options[CURLOPT_POSTFIELDS] = $query;
-        }
-
-        curl_setopt_array($ch, $options);
-
-        $body = curl_exec($ch);
-        if ($body === false) {
-            $error = curl_error($ch) ?: 'curl_exec_failed';
-            curl_close($ch);
-            return ['error' => $error, 'url' => $endpoint];
-        }
-
-        $status = curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
-        curl_close($ch);
-
-        $decoded = json_decode($body, true);
-
-        if (!is_array($decoded)) {
-            return [
-                'error' => 'invalid_json',
-                'http_status' => $status,
-                'raw' => $body,
-                'url' => $endpoint,
-            ];
-        }
-
-        $decoded['http_status'] = $status;
-        $decoded['url'] = $endpoint;
-
-        return $decoded;
-    }
 }

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use B24\Center\Infrastructure\Bitrix\Install\InstallRequestHandler;
+use B24\Center\Infrastructure\Bitrix\Install\SyncPlacementBindingDispatcher;
 use B24\Center\Infrastructure\Logging\InstallLoggerFactory;
 
 require dirname(__DIR__, 2) . '/vendor/autoload.php';
@@ -46,7 +47,8 @@ if ($rawBody !== '') {
     $logger->debug('install.php raw payload preview', ['raw' => mb_substr($rawBody, 0, 500)]);
 }
 
-$handler = new InstallRequestHandler($projectRoot, $logger);
+$bindingDispatcher = new SyncPlacementBindingDispatcher($logger);
+$handler = new InstallRequestHandler($projectRoot, $logger, $bindingDispatcher);
 $result = $handler->handle(
     $payload,
     $_GET,
