@@ -356,6 +356,7 @@ const driverVisibleStatuses = new Set([1, 2, 3]);
 
 let fitTimer = null;
 let bx24Ready = null;
+let pendingHashSkips = 0;
 
 if (state.embedded) {
   initEmbedded().catch((error) => {
@@ -1483,6 +1484,10 @@ function attachEventHandlers() {
 
 function initRouter() {
   window.addEventListener('hashchange', () => {
+    if (pendingHashSkips > 0) {
+      pendingHashSkips -= 1;
+      return;
+    }
     handleHashChange().catch((error) => console.error('Routing error', error));
   });
 
@@ -1517,7 +1522,12 @@ function parseHash(hash) {
 }
 
 function navigateTo(view, haulId = null) {
-  return applyView(view, haulId, { updateHash: true });
+  const targetHash = buildHash(view, haulId);
+  if (window.location.hash !== targetHash) {
+    pendingHashSkips += 1;
+    window.location.hash = targetHash;
+  }
+  return applyView(view, haulId, { updateHash: false });
 }
 
 function buildHash(view, haulId) {
@@ -1534,6 +1544,7 @@ async function applyView(view, haulId, options = {}) {
   if (options.updateHash !== false) {
     const targetHash = buildHash(view, haulId);
     if (window.location.hash !== targetHash) {
+      pendingHashSkips += 1;
       window.location.hash = targetHash;
     }
   }
@@ -2686,12 +2697,8 @@ async function handleCopyRequest(haulId) {
     return;
   }
 
-  const template = cloneHaulTemplate(haul);
-  state.formTemplate = template;
+  state.formTemplate = cloneHaulTemplate(haul);
   await navigateTo(views.CREATE);
-  if (template) {
-    applyTemplateToForm(template, { includeStatus: false });
-  }
 }
 
 async function handleCreateRequest(event) {
