@@ -124,6 +124,7 @@ const elements = {
   editorDealTitle: document.getElementById('editor-deal-title'),
   editorDealMeta: document.getElementById('editor-deal-meta'),
   formError: document.getElementById('form-error'),
+  globalError: document.getElementById('app-error'),
   closeEditor: document.getElementById('close-editor'),
   cancelEditor: document.getElementById('cancel-editor'),
   submitHaul: document.getElementById('submit-haul'),
@@ -166,6 +167,30 @@ const mobileViewStates = {
 };
 
 const mobileStorageKey = 'b24-mobile-hauls-login';
+
+function showGlobalError(message) {
+  if (!elements.globalError) {
+    if (message) {
+      console.error(message);
+    }
+    return;
+  }
+
+  if (message) {
+    elements.globalError.textContent = message;
+    elements.globalError.hidden = false;
+  } else {
+    clearGlobalError();
+  }
+}
+
+function clearGlobalError() {
+  if (!elements.globalError) {
+    return;
+  }
+  elements.globalError.textContent = '';
+  elements.globalError.hidden = true;
+}
 
 function detectEmbeddedMode() {
   if (typeof window === 'undefined') {
@@ -439,16 +464,7 @@ function attachMobileHandlers() {
 
 async function mobileCheckAuth() {
   try {
-    const response = await fetch(apiBase + '/api/auth/me', {
-      headers: { Accept: 'application/json' },
-      credentials: 'include',
-    });
-
-    if (!response.ok) {
-      throw new Error('Unauthorized');
-    }
-
-    const data = await readJsonResponse(response);
+    const data = await request('/api/auth/me');
     if (!data?.data) {
       throw new Error('Unauthorized');
     }
@@ -461,6 +477,9 @@ async function mobileCheckAuth() {
     mobileState.user = null;
     showMobileLogin();
     resetRoleToDefault();
+    if (!(error instanceof Error && error.message === 'Unauthorized')) {
+      console.warn('mobile auth check failed', error);
+    }
   }
 }
 
@@ -558,22 +577,10 @@ async function mobileLogin(login, password) {
   setMobileLoading(true);
   setMobileLoginError('');
   try {
-    const response = await fetch(apiBase + '/api/auth/login', {
+    const data = await request('/api/auth/login', {
       method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include',
-      body: JSON.stringify({ login, password }),
+      body: { login, password },
     });
-
-    const data = await readJsonResponse(response);
-    if (!response.ok) {
-      const message = data?.error || 'Не удалось авторизоваться.';
-      throw new Error(message);
-    }
-
     if (!data?.data) {
       throw new Error('Не удалось получить данные пользователя.');
     }
@@ -584,8 +591,7 @@ async function mobileLogin(login, password) {
     showMobileHauls();
     await loadMobileHauls();
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Не удалось авторизоваться.';
-    setMobileLoginError(message);
+    handleApiError(error, { target: 'mobile-login', message: 'Не удалось авторизоваться.' });
   } finally {
     setMobileLoading(false);
   }
@@ -593,10 +599,7 @@ async function mobileLogin(login, password) {
 
 async function mobileLogout() {
   try {
-    await fetch(apiBase + '/api/auth/logout', {
-      method: 'POST',
-      credentials: 'include',
-    });
+    await request('/api/auth/logout', { method: 'POST' });
   } catch (error) {
     console.warn('Ошибка при выходе', error);
   } finally {
@@ -623,28 +626,17 @@ async function loadMobileHauls() {
   }
 
   try {
-    const response = await fetch(apiBase + '/api/mobile/hauls', {
-      headers: { Accept: 'application/json' },
-      credentials: 'include',
-    });
-
-    if (response.status === 401) {
+    const data = await request('/api/mobile/hauls');
+    mobileState.hauls = Array.isArray(data?.data) ? data.data : [];
+    renderMobileHauls();
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       mobileState.user = null;
       showMobileLogin();
       return;
     }
 
-    const data = await readJsonResponse(response);
-    if (!response.ok) {
-      const message = data?.error || 'Не удалось загрузить рейсы.';
-      throw new Error(message);
-    }
-
-    mobileState.hauls = Array.isArray(data?.data) ? data.data : [];
-    renderMobileHauls();
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Не удалось загрузить рейсы.';
-    setMobileError(message);
+    handleApiError(error, { target: 'mobile', message: 'Не удалось загрузить рейсы.' });
     mobileState.hauls = [];
     renderMobileHauls();
   } finally {
@@ -1257,22 +1249,10 @@ async function handleUnloadStatusClick(haulId) {
 async function mobileUpdateStatus(haulId, status, extra = {}) {
   try {
     setMobileDialogLoading(true);
-    const response = await fetch(apiBase + `/api/mobile/hauls/${haulId}/status`, {
+    const data = await request(`/api/mobile/hauls/${haulId}/status`, {
       method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include',
-      body: JSON.stringify({ status, ...extra }),
+      body: { status, ...extra },
     });
-
-    const data = await readJsonResponse(response);
-    if (!response.ok) {
-      const message = data?.error || 'Не удалось обновить статус.';
-      throw new Error(message);
-    }
-
     if (data?.data) {
       applyMobileHaulUpdate(data.data);
       renderMobileHauls();
@@ -1281,8 +1261,7 @@ async function mobileUpdateStatus(haulId, status, extra = {}) {
       }
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Не удалось обновить статус.';
-    setMobileDialogError(message);
+    handleApiError(error, { target: 'mobile-dialog', message: 'Не удалось обновить статус.' });
   } finally {
     setMobileDialogLoading(false);
   }
@@ -1429,9 +1408,10 @@ function attachEventHandlers() {
   elements.loadButton?.addEventListener('click', () => {
     const dealId = Number(elements.dealInput.value);
     if (!Number.isFinite(dealId) || dealId <= 0) {
-      alert('Введите корректный ID сделки');
+      showGlobalError('Введите корректный ID сделки');
       return;
     }
+    clearGlobalError();
     setDealId(dealId);
     navigateTo(views.LIST);
     loadHauls();
@@ -1572,7 +1552,7 @@ async function applyView(view, haulId, options = {}) {
   }
 
   if (!state.dealId) {
-    alert('Сначала выберите сделку.');
+    showGlobalError('Сначала выберите сделку.');
     navigateTo(views.LIST);
     return;
   }
@@ -1595,7 +1575,7 @@ async function applyView(view, haulId, options = {}) {
   if (view === views.EDIT && haulId) {
     const haul = await resolveHaul(haulId, { forceReload: true });
     if (!haul) {
-      alert('Рейс не найден или был удалён.');
+      handleApiError(null, { message: 'Рейс не найден или был удалён.' });
       navigateTo(views.LIST);
       return;
     }
@@ -2170,9 +2150,9 @@ async function loadHauls() {
     const response = await request(`/api/deals/${state.dealId}/hauls`);
     const data = Array.isArray(response?.data) ? response.data : [];
     state.hauls = data.slice().sort(compareHauls);
+    clearGlobalError();
   } catch (error) {
-    console.error('Ошибка загрузки рейсов', error);
-    alert('Не удалось загрузить список рейсов');
+    handleApiError(error, { message: 'Не удалось загрузить список рейсов' });
   } finally {
     state.loading = false;
     renderList();
@@ -2692,15 +2672,14 @@ async function deleteHaul(haulId) {
       scheduleFitWindow();
     }
   } catch (error) {
-    console.error('Не удалось удалить рейс', error);
-    alert('Не удалось удалить рейс, попробуйте ещё раз');
+    handleApiError(error, { message: 'Не удалось удалить рейс, попробуйте ещё раз' });
   }
 }
 
 async function handleCopyRequest(haulId) {
   const haul = await resolveHaul(haulId, { forceReload: true });
   if (!haul) {
-    alert('Рейс не найден или был удалён.');
+    handleApiError(null, { message: 'Рейс не найден или был удалён.' });
     return;
   }
 
@@ -2724,7 +2703,7 @@ async function handleCreateRequest(event) {
   }
 
   if (!state.dealId) {
-    alert('Сначала укажите ID сделки и загрузите список рейсов.');
+    showGlobalError('Сначала укажите ID сделки и загрузите список рейсов.');
     return;
   }
 
@@ -3247,14 +3226,6 @@ async function callBx24Method(method, params = {}) {
   });
 }
 
-async function readJsonResponse(response) {
-  try {
-    return await response.json();
-  } catch (error) {
-    return null;
-  }
-}
-
 async function request(path, options = {}) {
   const { method = 'GET', body, headers = {} } = options;
 
@@ -3295,6 +3266,33 @@ async function request(path, options = {}) {
   }
 
   return data ?? {};
+}
+
+function handleApiError(error, options = {}) {
+  const config = typeof options === 'string' ? { message: options } : options ?? {};
+  const fallback = config.message || 'Произошла ошибка. Попробуйте позже.';
+  const message = error instanceof Error && error.message ? error.message : fallback;
+
+  console.error('API error', error);
+
+  switch (config.target) {
+    case 'mobile':
+      setMobileError(message);
+      break;
+    case 'mobile-login':
+      setMobileLoginError(message);
+      break;
+    case 'mobile-dialog':
+      setMobileDialogError(message);
+      break;
+    case 'form':
+      setFormError(message);
+      break;
+    default:
+      showGlobalError(message);
+  }
+
+  return message;
 }
 function cloneHaulTemplate(haul) {
   if (!haul || typeof haul !== 'object') {
