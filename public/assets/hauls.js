@@ -107,6 +107,7 @@ const elements = {
   loadButton: document.getElementById('load-hauls'),
   floatingCreate: document.getElementById('floating-create'),
   haulsList: document.getElementById('hauls-list'),
+  mainSection: document.querySelector('.app__main'),
   editorPanel: document.getElementById('editor-panel'),
   editorMode: document.getElementById('editor-mode'),
   haulForm: document.getElementById('haul-form'),
@@ -1544,12 +1545,9 @@ async function applyView(view, haulId, options = {}) {
     state.formTemplate = null;
   }
   elements.app?.setAttribute('data-view', view);
-  if (elements.editorPanel) {
-    elements.editorPanel.setAttribute('aria-hidden', view === views.LIST ? 'true' : 'false');
-  }
+  updatePanelsVisibility(view);
 
   if (view === views.LIST) {
-    closeEditor();
     renderList();
     scheduleFitWindow();
     return;
@@ -2717,9 +2715,8 @@ async function handleCreateRequest(event) {
 function openEditor(metaText = '') {
   updateEditorHeader(metaText);
   elements.editorPanel?.setAttribute('aria-hidden', 'false');
-  if (typeof window.scrollTo === 'function') {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
+  elements.editorPanel?.removeAttribute('hidden');
+  elements.mainSection?.setAttribute('hidden', '');
 
   if (state.embedded && window.BX24) {
     const canResize = typeof window.BX24.resizeWindow === 'function';
@@ -2739,10 +2736,22 @@ function openEditor(metaText = '') {
 
 function closeEditor() {
   elements.editorPanel?.setAttribute('aria-hidden', 'true');
+  elements.editorPanel?.setAttribute('hidden', '');
+  elements.mainSection?.removeAttribute('hidden');
   state.currentHaulSnapshot = null;
   elements.haulForm?.reset();
   clearFormError();
   scheduleFitWindow();
+}
+
+function updatePanelsVisibility(view) {
+  if (view === views.LIST) {
+    closeEditor();
+    return;
+  }
+  elements.mainSection?.setAttribute('hidden', '');
+  elements.editorPanel?.removeAttribute('hidden');
+  elements.editorPanel?.setAttribute('aria-hidden', 'false');
 }
 
 function lookupLabel(collection, id, field) {
