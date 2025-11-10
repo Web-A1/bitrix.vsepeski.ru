@@ -81,6 +81,11 @@ logInstallEvent('install.php request received', [
     'query' => $_GET,
 ]);
 
+if ($rawBody !== '') {
+    $preview = mb_substr($rawBody, 0, 500);
+    logInstallEvent('install.php raw payload preview', ['raw' => $preview]);
+}
+
 // Собираем все доступные источники данных (JSON + form-data + query string).
 $payload = [];
 if (is_array($decoded)) {
