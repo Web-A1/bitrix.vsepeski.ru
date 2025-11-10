@@ -356,6 +356,7 @@ const driverVisibleStatuses = new Set([1, 2, 3]);
 
 let fitTimer = null;
 let bx24Ready = null;
+let bx24InitPromise = null;
 let pendingHashSkips = 0;
 
 if (state.embedded) {
@@ -3176,11 +3177,7 @@ async function waitForBx24(timeout = 5000) {
     return null;
   }
 
-  if (window.BX24) {
-    return window.BX24;
-  }
-
-  if (!bx24Ready) {
+  if (!window.BX24 && !bx24Ready) {
     bx24Ready = new Promise((resolve) => {
       const started = Date.now();
       const poll = () => {
@@ -3198,7 +3195,23 @@ async function waitForBx24(timeout = 5000) {
     });
   }
 
-  return bx24Ready;
+  const bx24 = window.BX24 || (await bx24Ready);
+  if (!bx24) {
+    return null;
+  }
+
+  if (!bx24InitPromise) {
+    bx24InitPromise = new Promise((resolve) => {
+      try {
+        bx24.init(() => resolve(bx24));
+      } catch (error) {
+        console.warn('BX24.init не выполнился, продолжаем без него', error);
+        resolve(bx24);
+      }
+    });
+  }
+
+  return bx24InitPromise;
 }
 
 async function callBx24Method(method, params = {}) {
