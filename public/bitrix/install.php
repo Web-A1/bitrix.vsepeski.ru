@@ -127,6 +127,13 @@ if (isset($payload['auth']) && is_array($payload['auth'])) {
 
 $hasTokens = !empty($auth['access_token']) && !empty($auth['refresh_token']);
 $isPlacementLaunch = isset($payload['PLACEMENT']) || isset($payload['placement']);
+$appSidPresent = false;
+foreach (['APP_SID', 'app_sid'] as $sidKey) {
+    if (isset($_GET[$sidKey]) || isset($_POST[$sidKey]) || isset($payload[$sidKey])) {
+        $appSidPresent = true;
+        break;
+    }
+}
 $eventName = null;
 
 if (isset($payload['event']) && is_string($payload['event'])) {
@@ -137,7 +144,7 @@ if (isset($payload['event']) && is_string($payload['event'])) {
 
 $isInstallEvent = is_string($eventName) && stripos($eventName, 'ONAPPINSTALL') !== false;
 
-if ($isPlacementLaunch && !$isInstallEvent && !$hasTokens) {
+if ($isPlacementLaunch && !$isInstallEvent && !$appSidPresent) {
     if (!$hasTokens) {
         logInstallEvent('install.php placement launch without tokens', [
             'payload_keys' => array_keys($payload),
