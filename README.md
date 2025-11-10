@@ -44,6 +44,7 @@
 - `GET /api/crm/companies?type=supplier|carrier` — справочники компаний Bitrix24 по типам.
 - `GET /api/deals/{dealId}` — заголовок сделки + данные клиента/контакта для автозаполнения формы.
 - `GET /hauls` — отдаёт widget с вставленным `window.B24_INSTALL_PAYLOAD`.
+- `GET /health` — health-check (app, база, очередь привязок) возвращает `status: ok|degraded`.
 
 ## UI widget
 - HTML: `public/hauls/index.html`, JS: `public/assets/hauls.js`, CSS: `public/assets/hauls.css`.
@@ -63,6 +64,7 @@
 - Миграции: `composer run db:migrate` → `bin/migrate` → SQL в `database/migrations`.
 - Виджет локально: `php -S localhost:8000 -t public` → `http://localhost:8000/hauls`.
 - Очередь привязок: `php bin/process-placement-jobs` (можно повесить на cron/systemd timer).
+- Мониторинг: `curl https://bitrix.vsepeski.ru/health` — 200/ok при норме, 503/degraded если БД или очередь недоступны.
 - Коммит/пуш: `bin/quick-push.sh [note]` (генерирует сообщение по git diff).
 - Тесты: `composer test` (PHPUnit 10) — см. `tests/Unit/InstallRequestHandlerTest.php` для примера, запускаем `./vendor/bin/phpunit`.
 

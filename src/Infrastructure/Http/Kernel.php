@@ -24,6 +24,7 @@ use B24\Center\Modules\Hauls\Ui\HaulPlacementPageRenderer;
 use B24\Center\Modules\Hauls\Ui\CompanyDirectoryController;
 use B24\Center\Modules\Hauls\Ui\DealInfoController;
 use DateTimeImmutable;
+use PDO;
 use RuntimeException;
 use Throwable;
 
@@ -63,6 +64,10 @@ class Kernel
                     'debug' => filter_var($_ENV['APP_DEBUG'] ?? true, FILTER_VALIDATE_BOOL),
                 ],
             ]);
+        }
+
+        if ($path === '/health') {
+            return $this->healthCheck();
         }
 
         if ($path === '/hauls') {
@@ -285,5 +290,71 @@ class Kernel
             405,
             ['Content-Type' => 'application/json', 'Allow' => implode(', ', $allowed)]
         );
+    }
+
+    private function healthCheck(): Response
+    {
+        $app = [
+            'status' => 'ok',
+            'timestamp' => (new DateTimeImmutable())->format(DATE_ATOM),
+            'env' => $_ENV['APP_ENV'] ?? 'local',
+            'debug' => filter_var($_ENV['APP_DEBUG'] ?? true, FILTER_VALIDATE_BOOL),
+        ];
+
+        $database = [
+            'status' => 'ok',
+        ];
+
+        try {
+            /** @var PDO $pdo */
+            $pdo = $this->container->get(PDO::class);
+            $pdo->query('SELECT 1');
+        } catch (Throwable $exception) {
+            $database['status'] = 'error';
+            $database['message'] = $exception->getMessage();
+        }
+
+        $queueDir = $this->projectRoot() . '/storage/bitrix/placement-jobs';
+        $queue = [
+            'status' => 'ok',
+            'pending' => 0,
+            'failed' => 0,
+        ];
+
+        if (!is_dir($queueDir)) {
+            $queue['status'] = 'warning';
+            $queue['message'] = 'queue directory missing';
+        } else {
+            $pending = glob($queueDir . '/*.json') ?: [];
+            $failed = glob($queueDir . '/*.failed') ?: [];
+            $queue['pending'] = count($pending);
+            $queue['failed'] = count($failed);
+
+            if ($queue['pending'] > 10 || $queue['failed'] > 0) {
+                $queue['status'] = 'warning';
+            }
+        }
+
+        $overallOk = $database['status'] === 'ok' && $queue['status'] === 'ok';
+
+        return Response::json([
+            'status' => $overallOk ? 'ok' : 'degraded',
+            'checks' => [
+                'app' => $app,
+                'database' => $database,
+                'queue' => $queue,
+            ],
+        ], $overallOk ? 200 : 503);
+    }
+
+    private function projectRoot(): string
+    {
+        static $root = null;
+
+        if ($root === null) {
+            $root = dirname(__DIR__, 3);
+        }
+
+        return $root;
     }
 }
