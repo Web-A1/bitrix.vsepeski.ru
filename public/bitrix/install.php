@@ -8,6 +8,33 @@ use B24\Center\Modules\Hauls\Ui\HaulPlacementPageRenderer;
 require dirname(__DIR__, 2) . '/vendor/autoload.php';
 
 /**
+ * @param array<string,mixed> $context
+ */
+function logInstallEvent(string $message, array $context = []): void
+{
+    static $logPath = null;
+
+    if ($logPath === null) {
+        $logPath = dirname(__DIR__, 2) . '/storage/logs/install.log';
+    }
+
+    try {
+        $entry = sprintf('[%s] %s', (new DateTimeImmutable())->format(DATE_ATOM), $message);
+
+        if ($context !== []) {
+            $encoded = json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            if (is_string($encoded)) {
+                $entry .= ' ' . $encoded;
+            }
+        }
+
+        file_put_contents($logPath, $entry . PHP_EOL, FILE_APPEND);
+    } catch (\Throwable $exception) {
+        error_log('bitrix install log failure: ' . $exception->getMessage());
+    }
+}
+
+/**
  * Bitrix24 application installation handler.
  *
  * Bitrix отправляет данные об авторизации (access_token / refresh_token и т.д.)
@@ -18,6 +45,13 @@ require dirname(__DIR__, 2) . '/vendor/autoload.php';
 
 $rawBody = file_get_contents('php://input') ?: '';
 $decoded = json_decode($rawBody, true);
+
+logInstallEvent('install.php request received', [
+    'has_raw_body' => $rawBody !== '',
+    'content_length' => strlen($rawBody),
+    'request_method' => $_SERVER['REQUEST_METHOD'] ?? null,
+    'query' => $_GET,
+]);
 
 // Собираем все доступные источники данных (JSON + form-data + query string).
 $payload = [];
@@ -87,6 +121,14 @@ if ($isPlacementLaunch && !$isInstallEvent) {
     return;
 }
 
+logInstallEvent('install.php payload parsed', [
+    'event' => $eventName,
+    'is_install_event' => $isInstallEvent,
+    'is_placement_launch' => $isPlacementLaunch,
+    'has_tokens' => $hasTokens,
+    'domain' => $auth['domain'] ?? $payload['DOMAIN'] ?? null,
+]);
+
 if (!$hasTokens) {
     header('Content-Type: application/json; charset=utf-8');
     // Нет авторизационных данных — вероятно, ручной запрос или пинг.
@@ -131,7 +173,13 @@ if (!is_dir($storageDir) && !mkdir($storageDir, 0775, true) && !is_dir($storageD
 $filePath = $storageDir . '/oauth.json';
 $json = json_encode($storedData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
+logInstallEvent('install.php writing oauth.json', [
+    'target' => $filePath,
+    'payload_keys' => array_keys($storedData),
+]);
+
 if (file_put_contents($filePath, $json) === false) {
+    logInstallEvent('install.php failed to persist auth payload', ['path' => $filePath]);
     http_response_code(500);
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode([
@@ -148,6 +196,11 @@ if (is_string($domain) && $domain !== '') {
     $primaryHandler = 'https://bitrix.vsepeski.ru/bitrix/install.php?placement=hauls&v=20241118';
 
     $options = buildPlacementOptions();
+
+    logInstallEvent('install.php rebind placements', [
+        'domain' => $domain,
+        'placements' => ['CRM_DEAL_DETAIL_TAB', 'CRM_DEAL_LIST_MENU'],
+    ]);
 
     $bindings['CRM_DEAL_DETAIL_TAB'] = rebindPlacement(
         $domain,
