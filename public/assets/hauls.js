@@ -1517,7 +1517,7 @@ function parseHash(hash) {
 }
 
 function navigateTo(view, haulId = null) {
-  void applyView(view, haulId, { updateHash: true });
+  return applyView(view, haulId, { updateHash: true });
 }
 
 function buildHash(view, haulId) {
@@ -1575,7 +1575,7 @@ async function applyView(view, haulId, options = {}) {
   }
 
   if (view === views.EDIT && haulId) {
-    const haul = await resolveHaul(haulId);
+    const haul = await resolveHaul(haulId, { forceReload: true });
     if (!haul) {
       alert('Рейс не найден или был удалён.');
       navigateTo(views.LIST);
@@ -2394,10 +2394,13 @@ function formatSequence(haul) {
   return index >= 0 ? index + 1 : '-';
 }
 
-async function resolveHaul(haulId) {
-  const existing = state.hauls.find((item) => item.id === haulId);
-  if (existing) {
-    return existing;
+async function resolveHaul(haulId, options = {}) {
+  const forceReload = options.forceReload === true;
+  if (!forceReload) {
+    const existing = state.hauls.find((item) => String(item.id) === String(haulId));
+    if (existing) {
+      return existing;
+    }
   }
 
   try {
@@ -2406,9 +2409,7 @@ async function resolveHaul(haulId) {
     if (!haul) {
       return null;
     }
-    state.hauls.push(haul);
-    state.hauls.sort(compareHauls);
-    renderList();
+    upsertHaul(haul);
     return haul;
   } catch (error) {
     console.error('Не удалось получить рейс', error);
@@ -2679,14 +2680,18 @@ async function deleteHaul(haulId) {
 }
 
 async function handleCopyRequest(haulId) {
-  const haul = await resolveHaul(haulId);
+  const haul = await resolveHaul(haulId, { forceReload: true });
   if (!haul) {
     alert('Рейс не найден или был удалён.');
     return;
   }
 
-  state.formTemplate = haul;
-  navigateTo(views.CREATE);
+  const template = cloneHaulTemplate(haul);
+  state.formTemplate = template;
+  await navigateTo(views.CREATE);
+  if (template) {
+    applyTemplateToForm(template, { includeStatus: false });
+  }
 }
 
 async function handleCreateRequest(event) {
@@ -3264,4 +3269,22 @@ async function request(path, options = {}) {
   }
 
   return data ?? {};
+}
+function cloneHaulTemplate(haul) {
+  if (!haul || typeof haul !== 'object') {
+    return null;
+  }
+  if (typeof structuredClone === 'function') {
+    try {
+      return structuredClone(haul);
+    } catch (error) {
+      console.warn('structuredClone failed, fallback to JSON clone', error);
+    }
+  }
+  try {
+    return JSON.parse(JSON.stringify(haul));
+  } catch (error) {
+    console.warn('JSON clone failed', error);
+    return { ...haul };
+  }
 }
