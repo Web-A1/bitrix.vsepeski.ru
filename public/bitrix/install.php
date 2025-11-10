@@ -125,7 +125,12 @@ if (isset($payload['event']) && is_string($payload['event'])) {
 
 $isInstallEvent = is_string($eventName) && stripos($eventName, 'ONAPPINSTALL') !== false;
 
-if ($isPlacementLaunch && !$isInstallEvent) {
+if ($isPlacementLaunch && !$isInstallEvent && !$hasTokens) {
+    logInstallEvent('install.php placement launch without tokens', [
+        'is_install_event' => $isInstallEvent,
+        'has_tokens' => $hasTokens,
+        'payload_keys' => array_keys($payload),
+    ]);
     $projectRoot = dirname(__DIR__, 2);
     $renderer = new HaulPlacementPageRenderer($projectRoot);
 
