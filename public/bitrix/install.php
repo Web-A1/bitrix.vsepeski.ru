@@ -3,48 +3,21 @@
 declare(strict_types=1);
 
 use B24\Center\Infrastructure\Http\Response;
+use B24\Center\Infrastructure\Logging\InstallLoggerFactory;
 use B24\Center\Modules\Hauls\Ui\HaulPlacementPageRenderer;
+use Psr\Log\LoggerInterface;
 
 require dirname(__DIR__, 2) . '/vendor/autoload.php';
 
-/**
- * @param array<string,mixed> $context
- */
-function logInstallEvent(string $message, array $context = []): void
-{
-    static $logPath = null;
+$projectRoot = dirname(__DIR__, 2);
+$logger = InstallLoggerFactory::create($projectRoot);
 
-    if ($logPath === null) {
-        $logPath = dirname(__DIR__, 2) . '/storage/logs/install.log';
-    }
-
-    try {
-        $entry = sprintf('[%s] %s', (new DateTimeImmutable())->format(DATE_ATOM), $message);
-
-        if ($context !== []) {
-            $encoded = json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-            if (is_string($encoded)) {
-                $entry .= ' ' . $encoded;
-            }
-        }
-
-        file_put_contents($logPath, $entry . PHP_EOL, FILE_APPEND);
-    } catch (\Throwable $exception) {
-        error_log('bitrix install log failure: ' . $exception->getMessage());
-    }
-}
-
-set_exception_handler(static function (\Throwable $exception): void {
-    logInstallEvent('install.php uncaught exception', [
-        'message' => $exception->getMessage(),
-        'file' => $exception->getFile(),
-        'line' => $exception->getLine(),
-        'trace' => $exception->getTraceAsString(),
-    ]);
+set_exception_handler(static function (\Throwable $exception) use ($logger): void {
+    $logger->error('install.php uncaught exception', ['exception' => $exception]);
 });
 
-set_error_handler(static function (int $severity, string $message, string $file, int $line): bool {
-    logInstallEvent('install.php php error', [
+set_error_handler(static function (int $severity, string $message, string $file, int $line) use ($logger): bool {
+    $logger->error('install.php php error', [
         'severity' => $severity,
         'message' => $message,
         'file' => $file,
@@ -54,11 +27,11 @@ set_error_handler(static function (int $severity, string $message, string $file,
     return false;
 });
 
-register_shutdown_function(static function (): void {
+register_shutdown_function(static function () use ($logger): void {
     $error = error_get_last();
 
     if ($error !== null) {
-        logInstallEvent('install.php shutdown error', $error);
+        $logger->error('install.php shutdown error', $error);
     }
 });
 
@@ -72,37 +45,16 @@ register_shutdown_function(static function (): void {
  */
 
 $rawBody = file_get_contents('php://input') ?: '';
-$decoded = json_decode($rawBody, true);
-$formData = [];
-if ($rawBody !== '') {
-    parse_str($rawBody, $formData);
-}
+$payload = collectPayload($rawBody, $_REQUEST);
 
-logInstallEvent('install.php request received', [
+$logger->info('install.php request received', [
     'has_raw_body' => $rawBody !== '',
-    'content_length' => strlen($rawBody),
     'request_method' => $_SERVER['REQUEST_METHOD'] ?? null,
     'query' => $_GET,
 ]);
 
 if ($rawBody !== '') {
-    $preview = mb_substr($rawBody, 0, 500);
-    logInstallEvent('install.php raw payload preview', ['raw' => $preview]);
-}
-
-// Собираем все доступные источники данных (JSON + form-data + query string).
-$payload = [];
-if (is_array($formData)) {
-    $payload = $formData;
-}
-if (is_array($decoded) && $decoded !== []) {
-    $payload = array_merge($payload, $decoded);
-}
-
-foreach ($_REQUEST as $key => $value) {
-    if (!array_key_exists($key, $payload)) {
-        $payload[$key] = $value;
-    }
+    $logger->debug('install.php raw payload preview', ['raw' => mb_substr($rawBody, 0, 500)]);
 }
 
 $auth = [];
@@ -141,30 +93,11 @@ if (isset($payload['event']) && is_string($payload['event'])) {
 $isInstallEvent = is_string($eventName) && stripos($eventName, 'ONAPPINSTALL') !== false;
 
 if ($isPlacementLaunch && !$isInstallEvent && !$isTokenDelivery) {
-    $projectRoot = dirname(__DIR__, 2);
-    $renderer = new HaulPlacementPageRenderer($projectRoot);
-
-    try {
-        $response = $renderer->render($payload, $_GET, $_POST, $_REQUEST);
-    } catch (\RuntimeException $exception) {
-        http_response_code(500);
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode([
-            'result' => false,
-            'error' => 'failed to render hauls placement',
-            'message' => $exception->getMessage(),
-        ], JSON_UNESCAPED_UNICODE);
-        return;
-    }
-
-    if ($response instanceof Response) {
-        $response->send();
-    }
-
+    renderPlacement($projectRoot, $payload, $_GET, $_POST, $_REQUEST, $logger);
     return;
 }
 
-logInstallEvent('install.php payload parsed', [
+$logger->info('install.php payload parsed', [
     'event' => $eventName,
     'is_install_event' => $isInstallEvent,
     'is_placement_launch' => $isPlacementLaunch,
@@ -173,12 +106,10 @@ logInstallEvent('install.php payload parsed', [
 ]);
 
 if (!$hasTokens) {
-    header('Content-Type: application/json; charset=utf-8');
-    // Нет авторизационных данных — вероятно, ручной запрос или пинг.
-    echo json_encode([
+    respondJson([
         'result' => true,
         'message' => 'Install endpoint ready',
-    ], JSON_UNESCAPED_UNICODE);
+    ]);
     return;
 }
 
@@ -201,59 +132,16 @@ $storedData = [
     'raw' => $payload,
 ];
 
-$projectRoot = dirname(__DIR__, 2);
-$storageDir = $projectRoot . '/storage/bitrix';
-
-if (!is_dir($storageDir) && !mkdir($storageDir, 0775, true) && !is_dir($storageDir)) {
-    http_response_code(500);
-    echo json_encode([
-        'result' => false,
-        'error' => 'failed to create storage directory',
-    ], JSON_UNESCAPED_UNICODE);
-    return;
-}
-
-$filePath = $storageDir . '/oauth.json';
-$json = json_encode($storedData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-
-logInstallEvent('install.php writing oauth.json', [
-    'target' => $filePath,
-    'payload_keys' => array_keys($storedData),
-]);
-
-if (file_put_contents($filePath, $json) === false) {
-    logInstallEvent('install.php failed to persist auth payload', ['path' => $filePath]);
-    http_response_code(500);
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode([
+if (!persistOAuthPayload($projectRoot, $storedData, $logger)) {
+    respondJson([
         'result' => false,
         'error' => 'failed to persist auth payload',
-    ], JSON_UNESCAPED_UNICODE);
+    ], 500);
     return;
 }
 
-$projectRoot = dirname(__DIR__, 2);
-
 if ($isPlacementLaunch && !$isInstallEvent) {
-    $renderer = new HaulPlacementPageRenderer($projectRoot);
-
-    try {
-        $response = $renderer->render($payload, $_GET, $_POST, $_REQUEST);
-    } catch (\RuntimeException $exception) {
-        http_response_code(500);
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode([
-            'result' => false,
-            'error' => 'failed to render hauls placement',
-            'message' => $exception->getMessage(),
-        ], JSON_UNESCAPED_UNICODE);
-        return;
-    }
-
-    if ($response instanceof Response) {
-        $response->send();
-    }
-
+    renderPlacement($projectRoot, $payload, $_GET, $_POST, $_REQUEST, $logger);
     return;
 }
 
@@ -265,7 +153,7 @@ if ($isInstallEvent && is_string($domain) && $domain !== '') {
 
     $options = buildPlacementOptions();
 
-    logInstallEvent('install.php rebind placements', [
+    $logger->info('install.php rebind placements', [
         'domain' => $domain,
         'placements' => ['CRM_DEAL_DETAIL_TAB', 'CRM_DEAL_LIST_MENU'],
     ]);
@@ -287,8 +175,7 @@ if ($isInstallEvent && is_string($domain) && $domain !== '') {
     );
 }
 
-header('Content-Type: application/json; charset=utf-8');
-echo json_encode(['result' => true, 'bindings' => $bindings], JSON_UNESCAPED_UNICODE);
+respondJson(['result' => true, 'bindings' => $bindings]);
 
 /**
  * Снимает старый обработчик и привязывает новый для указанного placement.
@@ -395,4 +282,112 @@ function callBitrix(string $domain, string $method, array $params): array
     $decoded['url'] = $endpoint;
 
     return $decoded;
+}
+
+/**
+ * @param array<string,mixed> $request
+ *
+ * @return array<string,mixed>
+ */
+function collectPayload(string $rawBody, array $request): array
+{
+    $payload = [];
+    $decoded = json_decode($rawBody, true);
+    $formData = [];
+
+    if ($rawBody !== '') {
+        parse_str($rawBody, $formData);
+    }
+
+    if (is_array($formData)) {
+        $payload = $formData;
+    }
+
+    if (is_array($decoded) && $decoded !== []) {
+        $payload = array_merge($payload, $decoded);
+    }
+
+    foreach ($request as $key => $value) {
+        if (!array_key_exists($key, $payload)) {
+            $payload[$key] = $value;
+        }
+    }
+
+    return $payload;
+}
+
+/**
+ * @param array<string,mixed> $payload
+ *
+ * @return array<string,mixed>
+ */
+function renderPlacement(
+    string $projectRoot,
+    array $payload,
+    array $query,
+    array $post,
+    array $request,
+    LoggerInterface $logger
+): void {
+    $renderer = new HaulPlacementPageRenderer($projectRoot);
+
+    try {
+        $response = $renderer->render($payload, $query, $post, $request);
+    } catch (\RuntimeException $exception) {
+        $logger->error('failed to render hauls placement', ['exception' => $exception]);
+        respondJson([
+            'result' => false,
+            'error' => 'failed to render hauls placement',
+            'message' => $exception->getMessage(),
+        ], 500);
+        return;
+    }
+
+    if ($response instanceof Response) {
+        $response->send();
+    }
+}
+
+/**
+ * @param array<string,mixed> $payload
+ */
+function respondJson(array $payload, int $status = 200): void
+{
+    http_response_code($status);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode($payload, JSON_UNESCAPED_UNICODE);
+}
+
+/**
+ * @param array<string,mixed> $payload
+ */
+function persistOAuthPayload(string $projectRoot, array $payload, LoggerInterface $logger): bool
+{
+    $storageDir = $projectRoot . '/storage/bitrix';
+
+    if (!is_dir($storageDir) && !mkdir($storageDir, 0775, true) && !is_dir($storageDir)) {
+        $logger->error('failed to create storage directory', ['path' => $storageDir]);
+        return false;
+    }
+
+    $filePath = $storageDir . '/oauth.json';
+    $encoded = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+    if (!is_string($encoded)) {
+        $logger->error('failed to encode auth payload');
+        return false;
+    }
+
+    if (file_put_contents($filePath, $encoded) === false) {
+        $logger->error('failed to persist auth payload', ['path' => $filePath]);
+        return false;
+    }
+
+    $logger->info('install.php oauth payload persisted', [
+        'path' => $filePath,
+        'expires_at' => $payload['expires_at'] ?? null,
+        'domain' => $payload['domain'] ?? null,
+    ]);
+
+    return true;
 }
