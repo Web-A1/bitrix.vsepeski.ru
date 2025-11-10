@@ -226,7 +226,7 @@ $domain = $auth['domain'] ?? $payload['DOMAIN'] ?? null;
 $bindings = [];
 
 if ($isInstallEvent && is_string($domain) && $domain !== '') {
-    $primaryHandler = 'https://bitrix.vsepeski.ru/bitrix/install.php?placement=hauls&v=20241118';
+    $primaryHandler = 'https://bitrix.vsepeski.ru/bitrix/install.php?placement=hauls';
 
     $options = buildPlacementOptions();
 
@@ -288,9 +288,10 @@ function buildPlacementOptions(): array
     return [
         'TITLE' => 'Рейсы',
         'DESCRIPTION' => 'Вкладка с рейсами сделки',
+        'LANG' => 'ru',
         'LANG_ALL' => [
-            'ru' => ['NAME' => 'Рейсы', 'DESCRIPTION' => 'Вкладка с рейсами сделки'],
-            'en' => ['NAME' => 'Hauls', 'DESCRIPTION' => 'Deal hauls tab'],
+            'ru' => ['TITLE' => 'Рейсы', 'DESCRIPTION' => 'Вкладка с рейсами сделки', 'GROUP_NAME' => ''],
+            'en' => ['TITLE' => 'Hauls', 'DESCRIPTION' => 'Deal hauls tab', 'GROUP_NAME' => ''],
         ],
         'OPTIONS' => [
             'register' => 'Y',
