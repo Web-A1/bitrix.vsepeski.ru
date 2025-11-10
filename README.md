@@ -56,7 +56,7 @@
 - Авто ребайндинг placements `CRM_DEAL_DETAIL_TAB` и `CRM_DEAL_LIST_MENU` (см. `docs/bitrix/mobile-placement.md`).
 - Привязки выполняются асинхронно, если `INSTALL_QUEUE_PLACEMENTS=true`: `QueuedPlacementBindingDispatcher` складывает задания в `storage/bitrix/placement-jobs`, а CLI `bin/process-placement-jobs` выполняет их (добавьте cron `* * * * * cd ~/bitrix.vsepeski.ru/app && php bin/process-placement-jobs`).
 - Если нужно синхронно (отладка), установите `INSTALL_QUEUE_PLACEMENTS=false` — тогда используется `SyncPlacementBindingDispatcher`.
-- TODO: реализовать проверку `BITRIX_WEBHOOK_SECRET` на входящих REST-запросах (сейчас только сохраняем значение).
+- В install hook проверяем `X-Bitrix-Signature` (HMAC SHA-256 по GET/POST) с `BITRIX_WEBHOOK_SECRET`; запросы с неверной подписью отклоняются.
 
 ## Tooling & commands
 - `composer install`, `.env` на базе `.env.example` (dotenv 5.6).
@@ -77,5 +77,5 @@
 
 ## Known gaps / reminders
 - Тестов всё ещё мало: покрыта только установка (`InstallRequestHandlerTest`); API/UI модули требуют интеграционных сценариев.
-- Проверка входящих вебхуков (`BITRIX_WEBHOOK_SECRET`) не реализована.
+- Для других вебхуков пока нет проверок подписи — если появятся новые точки входа, нужно так же применять `WebhookSignatureVerifier`.
 - При расширении модулей регистрировать провайдеры в `config/modules.php`.

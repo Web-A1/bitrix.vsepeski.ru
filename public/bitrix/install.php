@@ -5,6 +5,7 @@ declare(strict_types=1);
 use B24\Center\Infrastructure\Bitrix\Install\InstallRequestHandler;
 use B24\Center\Infrastructure\Bitrix\Install\QueuedPlacementBindingDispatcher;
 use B24\Center\Infrastructure\Bitrix\Install\SyncPlacementBindingDispatcher;
+use B24\Center\Infrastructure\Security\WebhookSignatureVerifier;
 use B24\Center\Infrastructure\Logging\InstallLoggerFactory;
 
 require dirname(__DIR__, 2) . '/vendor/autoload.php';
@@ -36,6 +37,19 @@ register_shutdown_function(static function () use ($logger): void {
 });
 
 $rawBody = file_get_contents('php://input') ?: '';
+
+$secret = $_ENV['BITRIX_WEBHOOK_SECRET'] ?? '';
+if ($secret !== '') {
+    $verifier = new WebhookSignatureVerifier($secret);
+    if (!$verifier->verify($_SERVER, $_GET, $_POST, $rawBody)) {
+        $logger->warning('install.php signature verification failed');
+        http_response_code(401);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['result' => false, 'error' => 'invalid signature'], JSON_UNESCAPED_UNICODE);
+        return;
+    }
+}
+
 $payload = collectPayload($rawBody, $_REQUEST);
 
 $logger->info('install.php request received', [
