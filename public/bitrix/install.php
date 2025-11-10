@@ -34,6 +34,34 @@ function logInstallEvent(string $message, array $context = []): void
     }
 }
 
+set_exception_handler(static function (\Throwable $exception): void {
+    logInstallEvent('install.php uncaught exception', [
+        'message' => $exception->getMessage(),
+        'file' => $exception->getFile(),
+        'line' => $exception->getLine(),
+        'trace' => $exception->getTraceAsString(),
+    ]);
+});
+
+set_error_handler(static function (int $severity, string $message, string $file, int $line): bool {
+    logInstallEvent('install.php php error', [
+        'severity' => $severity,
+        'message' => $message,
+        'file' => $file,
+        'line' => $line,
+    ]);
+
+    return false;
+});
+
+register_shutdown_function(static function (): void {
+    $error = error_get_last();
+
+    if ($error !== null) {
+        logInstallEvent('install.php shutdown error', $error);
+    }
+});
+
 /**
  * Bitrix24 application installation handler.
  *
