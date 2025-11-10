@@ -232,6 +232,31 @@ if (file_put_contents($filePath, $json) === false) {
     return;
 }
 
+$projectRoot = dirname(__DIR__, 2);
+
+if ($isPlacementLaunch && !$isInstallEvent) {
+    $renderer = new HaulPlacementPageRenderer($projectRoot);
+
+    try {
+        $response = $renderer->render($payload, $_GET, $_POST, $_REQUEST);
+    } catch (\RuntimeException $exception) {
+        http_response_code(500);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'result' => false,
+            'error' => 'failed to render hauls placement',
+            'message' => $exception->getMessage(),
+        ], JSON_UNESCAPED_UNICODE);
+        return;
+    }
+
+    if ($response instanceof Response) {
+        $response->send();
+    }
+
+    return;
+}
+
 $domain = $auth['domain'] ?? $payload['DOMAIN'] ?? null;
 $bindings = [];
 
