@@ -15,6 +15,7 @@ const embeddedMode = detectEmbeddedMode();
 const driverKeyword = 'водител';
 let referenceDataPromise = null;
 let bx24DealLookupPromise = null;
+const portalBaseUrl = detectPortalBaseUrl();
 
 const state = {
   dealId: initialDealContext.id,
@@ -42,6 +43,22 @@ const state = {
 
 function detectDefaultRole(isEmbedded) {
   return isEmbedded ? 'manager' : 'driver';
+}
+
+function detectPortalBaseUrl() {
+  if (typeof window === 'undefined') {
+    return '';
+  }
+  const htmlPortal = document.documentElement?.getAttribute('data-portal-url');
+  if (typeof htmlPortal === 'string' && htmlPortal.trim()) {
+    return htmlPortal.trim();
+  }
+  const globalPortal = typeof window.BITRIX_PORTAL_URL === 'string' ? window.BITRIX_PORTAL_URL.trim() : '';
+  if (globalPortal) {
+    return globalPortal;
+  }
+  const origin = window.location?.origin;
+  return typeof origin === 'string' ? origin : '';
 }
 
 function deriveRoleFromBitrixUser(user) {
@@ -2217,10 +2234,13 @@ function createHaulCard(haul) {
 
   const driverName = lookupDriver(haul.responsible_id) || 'Не назначен';
   const truckLabel = lookupLabel(state.trucks, haul.truck_id, 'license_plate');
-  const headingDetails = [driverName, truckLabel].filter(Boolean);
+  const headingDetails = [
+    { text: driverName, href: buildDriverProfileUrl(haul.responsible_id) },
+    { text: truckLabel },
+  ].filter((detail) => detail.text);
   headingDetails.forEach((detail) => {
     mainGroup.appendChild(createHeadingSeparator());
-    mainGroup.appendChild(createHeadingDetail(detail));
+    mainGroup.appendChild(createHeadingDetail(detail.text, { href: detail.href }));
   });
 
   headingRow.appendChild(mainGroup);
@@ -2338,12 +2358,19 @@ function createInfoItem(label, value, options = {}) {
   return wrapper;
 }
 
-function createHeadingDetail(text) {
-  const span = document.createElement('span');
-  span.className = 'haul-card__heading-detail';
+function createHeadingDetail(text, options = {}) {
+  const { href = null } = options;
   const value = typeof text === 'string' ? text.trim() : text;
-  span.textContent = value ? String(value) : '—';
-  return span;
+  const element = document.createElement(href ? 'a' : 'span');
+  element.className = 'haul-card__heading-detail';
+  if (href) {
+    element.href = href;
+    element.target = '_blank';
+    element.rel = 'noopener noreferrer';
+    element.classList.add('haul-card__heading-link');
+  }
+  element.textContent = value ? String(value) : '—';
+  return element;
 }
 
 function createHeadingSeparator() {
@@ -2758,6 +2785,14 @@ function lookupDriver(id) {
     return id;
   }
   return formatShortName(driver.name) || driver.name || driver.id;
+}
+
+function buildDriverProfileUrl(driverId) {
+  if (!portalBaseUrl || !driverId) {
+    return null;
+  }
+  const normalizedBase = portalBaseUrl.replace(/\/$/, '');
+  return `${normalizedBase}/company/personal/user/${driverId}/`;
 }
 
 function formatShortName(name) {

@@ -759,6 +759,15 @@ body.mobile-driver .mobile-app {
   white-space: nowrap;
 }
 
+.haul-card__heading-link {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.haul-card__heading-link:hover {
+  text-decoration: underline;
+}
+
 .haul-card__heading-separator {
   font-size: var(--font-size-base);
   font-weight: var(--font-weight-regular);
