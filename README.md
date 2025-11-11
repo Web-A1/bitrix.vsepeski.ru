@@ -67,6 +67,10 @@
 - Мониторинг: `curl https://bitrix.vsepeski.ru/health` — 200/ok при норме, 503/degraded если БД или очередь недоступны.
 - Коммит/пуш: `bin/quick-push.sh [note]` (генерирует сообщение по git diff).
 - Тесты: `composer test` (PHPUnit 10) — см. `tests/Unit/InstallRequestHandlerTest.php` для примера, запускаем `./vendor/bin/phpunit`.
+### Тесты
+- Unit: `InstallRequestHandlerTest`, `WebhookSignatureVerifierTest`.
+- Feature: `HealthEndpointTest`.
+- Запуск: `composer test` или `./vendor/bin/phpunit`.
 
 ### Фоновый воркер для привязок
 Запросы Bitrix на установку лишь ставят задания в `storage/bitrix/placement-jobs`. Чтобы обработать их, на сервере должен крутиться воркер — самый простой вариант cron:
