@@ -896,7 +896,7 @@ body.mobile-driver .mobile-app {
   background: var(--accent);
   box-shadow: 0 0 0 4px rgba(47, 107, 255, 0.25);
 }
-
+.haul-card__status-item.is-active::before,
 .haul-card__status-item.is-active::after {
   background: var(--accent);
 }
