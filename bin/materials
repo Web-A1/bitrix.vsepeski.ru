@@ -1,0 +1,91 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+use B24\Center\Core\Application;
+use B24\Center\Modules\Hauls\Infrastructure\MaterialRepository;
+
+$rootPath = dirname(__DIR__);
+$autoload = $rootPath . '/vendor/autoload.php';
+
+if (!file_exists($autoload)) {
+    fwrite(STDERR, "Composer autoload not found. Run `composer install`.\n");
+    exit(1);
+}
+
+require $autoload;
+
+$options = getopt('', [
+    'list',
+    'add',
+    'name:',
+    'description::',
+    'help'
+]);
+
+$needHelp = isset($options['help']) || (!isset($options['list']) && !isset($options['add']));
+
+if ($needHelp) {
+    fwrite(
+        STDOUT,
+        <<<TXT
+Утилита управления материалами.
+
+Доступные действия:
+  --list                 Показать список материалов.
+  --add --name="..."    Добавить новый материал. Необязательно: --description="..."
+  --help                 Показать эту справку.
+
+Примеры:
+  php bin/materials --list
+  php bin/materials --add --name="Щебень" --description="Фр. 20-40"
+
+TXT
+    );
+    exit(isset($options['help']) ? 0 : 1);
+}
+
+/** @var Application $app */
+$app = require $rootPath . '/bootstrap/app.php';
+/** @var MaterialRepository $materials */
+$materials = $app->get(MaterialRepository::class);
+
+if (isset($options['list'])) {
+    $rows = $materials->all();
+    if (!$rows) {
+        fwrite(STDOUT, "Материалы пока не добавлены.\n");
+        exit(0);
+    }
+
+    foreach ($rows as $material) {
+        fwrite(STDOUT, sprintf("- %s (%s)%s\n",
+            $material->name(),
+            $material->id(),
+            $material->description() ? ' — ' . $material->description() : ''
+        ));
+    }
+    exit(0);
+}
+
+if (isset($options['add'])) {
+    $name = isset($options['name']) ? trim((string) $options['name']) : '';
+    if ($name === '') {
+        fwrite(STDERR, "Укажите название материала: --name=\"...\"\n");
+        exit(1);
+    }
+    $description = isset($options['description']) ? trim((string) $options['description']) : null;
+
+    try {
+        $created = $materials->create($name, $description ?: null);
+    } catch (Throwable $e) {
+        fwrite(STDERR, 'Ошибка сохранения: ' . $e->getMessage() . "\n");
+        exit(1);
+    }
+
+    fwrite(STDOUT, sprintf("Материал создан: %s (%s)\n", $created->name(), $created->id()));
+    exit(0);
+}
+
+fwrite(STDERR, "Неизвестная команда. Запустите с --help\n");
+exit(1);

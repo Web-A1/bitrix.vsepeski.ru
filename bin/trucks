@@ -1,0 +1,89 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+use B24\Center\Core\Application;
+use B24\Center\Modules\Hauls\Infrastructure\TruckRepository;
+
+$rootPath = dirname(__DIR__);
+$autoload = $rootPath . '/vendor/autoload.php';
+
+if (!file_exists($autoload)) {
+    fwrite(STDERR, "Composer autoload not found. Run `composer install`.\n");
+    exit(1);
+}
+
+require $autoload;
+
+$options = getopt('', [
+    'list',
+    'add',
+    'plate:',
+    'make::',
+    'notes::',
+    'help',
+]);
+
+if (isset($options['help']) || (!isset($options['list']) && !isset($options['add']))) {
+    fwrite(
+        STDOUT,
+        <<<TXT
+Утилита для управления самосвалами.
+
+Доступные действия:
+  --list                       Показать все сохранённые госномера.
+  --add --plate="A123BC77"     Добавить новый самосвал. Необязательно: --make="КАМАЗ" --notes="до 20 т"
+  --help                       Показать эту подсказку.
+
+TXT
+    );
+    exit(isset($options['help']) ? 0 : 1);
+}
+
+/** @var Application $app */
+$app = require $rootPath . '/bootstrap/app.php';
+/** @var TruckRepository $trucks */
+$trucks = $app->get(TruckRepository::class);
+
+if (isset($options['list'])) {
+    $rows = $trucks->all();
+    if (!$rows) {
+        fwrite(STDOUT, "Самосвалы ещё не добавлены.\n");
+        exit(0);
+    }
+
+    foreach ($rows as $truck) {
+        fwrite(STDOUT, sprintf("- %s (%s)%s%s\n",
+            $truck->licensePlate(),
+            $truck->id(),
+            $truck->makeModel() ? ' — ' . $truck->makeModel() : '',
+            $truck->notes() ? ' [' . $truck->notes() . ']' : ''
+        ));
+    }
+    exit(0);
+}
+
+if (isset($options['add'])) {
+    $plate = isset($options['plate']) ? trim((string) $options['plate']) : '';
+    if ($plate === '') {
+        fwrite(STDERR, "Укажите госномер: --plate=\"A123BC77\"\n");
+        exit(1);
+    }
+
+    $make = isset($options['make']) ? trim((string) $options['make']) : null;
+    $notes = isset($options['notes']) ? trim((string) $options['notes']) : null;
+
+    try {
+        $created = $trucks->create($plate, $make ?: null, $notes ?: null);
+    } catch (Throwable $e) {
+        fwrite(STDERR, 'Ошибка сохранения: ' . $e->getMessage() . "\n");
+        exit(1);
+    }
+
+    fwrite(STDOUT, sprintf("Самосвал создан: %s (%s)\n", $created->licensePlate(), $created->id()));
+    exit(0);
+}
+
+fwrite(STDERR, "Неизвестная команда. Запустите с --help\n");
+exit(1);
