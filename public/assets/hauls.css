@@ -800,7 +800,7 @@ body.mobile-driver .mobile-app {
 .haul-card__content {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 25px;
   min-height: 100%;
 }
 
