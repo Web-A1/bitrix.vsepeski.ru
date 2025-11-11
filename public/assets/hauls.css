@@ -650,6 +650,7 @@ body.mobile-driver .mobile-app {
   gap: 6px;
   align-items: center;
   justify-content: center;
+  font-weight: 400;
 }
 
 .button:disabled {
@@ -709,7 +710,7 @@ body.mobile-driver .mobile-app {
   box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 30px;
   border: 1px solid var(--border);
   font-size: 1rem;
   font-weight: 600;
