@@ -1826,6 +1826,7 @@ async function loadReferenceData() {
     state.drivers = Array.isArray(driverData) ? driverData : Object.values(driverData);
     renderReferenceSelects();
     syncUnloadFromCompany();
+    renderList();
   } catch (error) {
     console.error('Не удалось загрузить справочники', error);
     throw error;
