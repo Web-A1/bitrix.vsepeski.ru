@@ -811,6 +811,92 @@ body.mobile-driver .mobile-app {
   gap: 16px;
 }
 
+.haul-card__layout {
+  display: flex;
+  gap: 24px;
+  width: 100%;
+}
+
+.haul-card__content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.haul-card__status {
+  width: 220px;
+  border-left: 1px solid var(--border);
+  padding-left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.haul-card__status-title {
+  font-size: var(--font-size-label);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.haul-card__status-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.haul-card__status-item {
+  position: relative;
+  padding-left: 20px;
+  color: var(--muted);
+  font-size: var(--font-size-label);
+  display: flex;
+  align-items: flex-start;
+  min-height: 22px;
+}
+
+.haul-card__status-item::after {
+  content: '';
+  position: absolute;
+  left: 7px;
+  top: 16px;
+  width: 2px;
+  height: calc(100% - 16px);
+  background: var(--border);
+}
+
+.haul-card__status-item:last-child::after {
+  content: none;
+}
+
+.haul-card__status-marker {
+  position: absolute;
+  left: 0;
+  top: 6px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--border-strong);
+}
+
+.haul-card__status-label {
+  line-height: 1.3;
+}
+
+.haul-card__status-item.is-active {
+  color: var(--on-surface);
+  font-weight: var(--font-weight-semibold);
+}
+
+.haul-card__status-item.is-active .haul-card__status-marker {
+  background: var(--accent);
+  box-shadow: 0 0 0 4px rgba(47, 107, 255, 0.2);
+}
+
 .haul-card__row {
   display: grid;
   gap: 12px;
@@ -868,7 +954,7 @@ body.mobile-driver .mobile-app {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 
 .haul-card__actions .button {
@@ -904,7 +990,7 @@ body.mobile-driver .mobile-app {
 
 @media (min-width: 640px) {
   .haul-card__row--primary {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
@@ -933,6 +1019,26 @@ body.mobile-driver .mobile-app {
   .haul-card__heading-updated {
     width: 100%;
     justify-content: flex-start;
+  }
+}
+
+@media (max-width: 900px) {
+  .haul-card__layout {
+    flex-direction: column;
+  }
+
+  .haul-card__status {
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid var(--border);
+    padding-left: 0;
+    padding-top: 16px;
+  }
+}
+
+@media (max-width: 640px) {
+  .haul-card__status {
+    display: none;
   }
 }
 

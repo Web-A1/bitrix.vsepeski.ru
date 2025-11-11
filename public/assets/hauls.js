@@ -408,11 +408,16 @@ const mobileStorage = {
 
 const mobileStatusLabels = {
   0: 'Формирование рейса',
-  1: 'В работе',
+  1: 'Рейс в работе',
   2: 'Загрузился',
   3: 'Выгрузился',
   4: 'Проверено',
 };
+
+const statusTimelineSteps = [0, 1, 2, 3, 4].map((value) => ({
+  value,
+  label: mobileStatusLabels[value] ?? '—',
+}));
 
 const driverVisibleStatuses = new Set([1, 2, 3]);
 
@@ -2264,23 +2269,21 @@ function createHaulCard(haul) {
   });
 
   headingRow.appendChild(mainGroup);
-
-  const statusLabel = getStatusLabel(haul.status);
-  if (statusLabel) {
-    const aside = document.createElement('div');
-    aside.className = 'haul-card__heading-updated';
-    const metaInfo = document.createElement('span');
-    metaInfo.className = 'tag tag--muted';
-    metaInfo.textContent = statusLabel;
-    aside.appendChild(metaInfo);
-    headingRow.appendChild(aside);
-  }
   header.appendChild(headingRow);
 
   const body = document.createElement('div');
   body.className = 'haul-card__body';
-  body.appendChild(createPrimaryInfoRow(haul));
-  body.appendChild(createLocationsSection(haul));
+  const layout = document.createElement('div');
+  layout.className = 'haul-card__layout';
+
+  const content = document.createElement('div');
+  content.className = 'haul-card__content';
+  content.appendChild(createPrimaryInfoRow(haul));
+  content.appendChild(createLocationsSection(haul));
+
+  layout.appendChild(content);
+  layout.appendChild(createStatusTimeline(haul));
+  body.appendChild(layout);
 
   const footer = document.createElement('div');
   footer.className = 'haul-card__actions';
@@ -2325,6 +2328,8 @@ function createPrimaryInfoRow(haul) {
   row.appendChild(createInfoItem('Материал', materialLabel));
   const distanceValue = formatDistance(haul.leg_distance_km);
   row.appendChild(createInfoItem('Плечо', distanceValue ? `${distanceValue} км` : '—'));
+  const actualVolume = formatVolume(haul.load?.actual_volume);
+  row.appendChild(createInfoItem('Факт объём, м³', actualVolume || '—'));
 
   return row;
 }
@@ -2398,6 +2403,39 @@ function createHeadingSeparator() {
   span.className = 'haul-card__heading-separator';
   span.textContent = '—';
   return span;
+}
+
+function createStatusTimeline(haul) {
+  const wrapper = document.createElement('aside');
+  wrapper.className = 'haul-card__status';
+
+  const title = document.createElement('div');
+  title.className = 'haul-card__status-title';
+  title.textContent = 'Статус';
+  wrapper.appendChild(title);
+
+  const list = document.createElement('ol');
+  list.className = 'haul-card__status-list';
+  const activeValue = getStatusValue(haul.status);
+
+  statusTimelineSteps.forEach((step) => {
+    const item = document.createElement('li');
+    item.className = 'haul-card__status-item';
+    if (step.value === activeValue) {
+      item.classList.add('is-active');
+    }
+    const marker = document.createElement('span');
+    marker.className = 'haul-card__status-marker';
+    const label = document.createElement('span');
+    label.className = 'haul-card__status-label';
+    label.textContent = step.label;
+    item.appendChild(marker);
+    item.appendChild(label);
+    list.appendChild(item);
+  });
+
+  wrapper.appendChild(list);
+  return wrapper;
 }
 
 function compareHauls(a, b) {
