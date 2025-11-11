@@ -766,7 +766,7 @@ body.mobile-driver .mobile-app {
 
 .haul-card__title {
   font-size: var(--font-size-base);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-regular);
   margin: 0;
 }
 
