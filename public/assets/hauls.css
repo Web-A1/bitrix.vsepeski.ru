@@ -11,6 +11,13 @@
   --border-strong: #d1d5db;
   --danger: #dc2626;
   --shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+  --font-size-base: 0.875rem;
+  --font-size-label: 0.75rem;
+  --font-size-title: 1.5rem;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
 }
 
 *,
@@ -650,7 +657,7 @@ body.mobile-driver .mobile-app {
   gap: 6px;
   align-items: center;
   justify-content: center;
-  font-weight: 400;
+  font-weight: var(--font-weight-regular);
 }
 
 .button:disabled {
@@ -712,8 +719,8 @@ body.mobile-driver .mobile-app {
   flex-direction: column;
   gap: 40px;
   border: 1px solid var(--border);
-  font-size: 1rem;
-  font-weight: 600;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-regular);
 }
 
 .haul-card__header {
@@ -735,11 +742,13 @@ body.mobile-driver .mobile-app {
 
 .haul-card__heading .tag {
   margin-left: auto;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-regular);
 }
 
 .haul-card__title {
-  font-size: 1.5rem;
-  font-weight: 700;
+  font-size: var(--font-size-title);
+  font-weight: var(--font-weight-bold);
   margin: 0;
 }
 
@@ -778,16 +787,16 @@ body.mobile-driver .mobile-app {
 }
 
 .haul-card__info-label {
-  font-size: 0.6rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  font-size: var(--font-size-label);
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--muted);
-  font-weight: 400;
+  font-weight: var(--font-weight-regular);
 }
 
 .haul-card__info-value {
-  font-size: 1rem;
-  font-weight: 600;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
   color: var(--on-surface);
 }
 
@@ -809,7 +818,8 @@ body.mobile-driver .mobile-app {
 
 .haul-card__actions .button {
   padding: 6px 14px;
-  font-size: 0.9rem;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
 }
 
 .editor {
