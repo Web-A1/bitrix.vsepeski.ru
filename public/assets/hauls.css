@@ -855,7 +855,7 @@ body.mobile-driver .mobile-app {
   color: var(--muted);
   font-size: var(--font-size-label);
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   min-height: 22px;
 }
 

@@ -2271,8 +2271,6 @@ function createHaulCard(haul) {
   headingRow.appendChild(mainGroup);
   header.appendChild(headingRow);
 
-  const body = document.createElement('div');
-  body.className = 'haul-card__body';
   const layout = document.createElement('div');
   layout.className = 'haul-card__layout';
 
@@ -2280,42 +2278,13 @@ function createHaulCard(haul) {
   content.className = 'haul-card__content';
   content.appendChild(createPrimaryInfoRow(haul));
   content.appendChild(createLocationsSection(haul));
+  content.appendChild(createActionsRow(haul));
 
   layout.appendChild(content);
   layout.appendChild(createStatusTimeline(haul));
-  body.appendChild(layout);
-
-  const footer = document.createElement('div');
-  footer.className = 'haul-card__actions';
-
-  const editButton = document.createElement('button');
-  editButton.type = 'button';
-  editButton.className = 'button button--ghost';
-  editButton.textContent = 'Открыть';
-  editButton.dataset.action = 'edit';
-  editButton.dataset.haulId = haul.id;
-
-  const copyButton = document.createElement('button');
-  copyButton.type = 'button';
-  copyButton.className = 'button button--ghost';
-  copyButton.textContent = 'Копировать';
-  copyButton.dataset.action = 'copy';
-  copyButton.dataset.haulId = haul.id;
-
-  const deleteButton = document.createElement('button');
-  deleteButton.type = 'button';
-  deleteButton.className = 'button button--ghost';
-  deleteButton.textContent = 'Удалить';
-  deleteButton.dataset.action = 'delete';
-  deleteButton.dataset.haulId = haul.id;
-
-  footer.appendChild(editButton);
-  footer.appendChild(copyButton);
-  footer.appendChild(deleteButton);
 
   card.appendChild(header);
-  card.appendChild(body);
-  card.appendChild(footer);
+  card.appendChild(layout);
   return card;
 }
 
@@ -2403,6 +2372,26 @@ function createHeadingSeparator() {
   span.className = 'haul-card__heading-separator';
   span.textContent = '—';
   return span;
+}
+
+function createActionsRow(haul) {
+  const footer = document.createElement('div');
+  footer.className = 'haul-card__actions';
+
+  footer.appendChild(createActionButton('Открыть', 'edit', haul.id));
+  footer.appendChild(createActionButton('Копировать', 'copy', haul.id));
+  footer.appendChild(createActionButton('Удалить', 'delete', haul.id));
+  return footer;
+}
+
+function createActionButton(label, action, haulId) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'button button--ghost';
+  button.textContent = label;
+  button.dataset.action = action;
+  button.dataset.haulId = haulId;
+  return button;
 }
 
 function createStatusTimeline(haul) {
