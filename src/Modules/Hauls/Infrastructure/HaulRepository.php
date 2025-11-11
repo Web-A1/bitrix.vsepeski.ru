@@ -221,6 +221,56 @@ final class HaulRepository
         return (int) $row['next_sequence'];
     }
 
+    public function countUsageByMaterial(string $materialId): int
+    {
+        $statement = $this->connection->prepare(
+            'SELECT COUNT(*) FROM hauls WHERE material_id = :material_id AND deleted_at IS NULL'
+        );
+        $statement->execute(['material_id' => $materialId]);
+
+        return (int) $statement->fetchColumn();
+    }
+
+    /**
+     * @return array<int,array{id:string,deal_id:int,sequence:int}>
+     */
+    public function listUsageByMaterial(string $materialId, int $limit = 5): array
+    {
+        $statement = $this->connection->prepare(
+            'SELECT id, deal_id, sequence FROM hauls WHERE material_id = :material_id AND deleted_at IS NULL ORDER BY updated_at DESC LIMIT :limit'
+        );
+        $statement->bindValue(':material_id', $materialId);
+        $statement->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $statement->execute();
+
+        return $statement->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function countUsageByTruck(string $truckId): int
+    {
+        $statement = $this->connection->prepare(
+            'SELECT COUNT(*) FROM hauls WHERE truck_id = :truck_id AND deleted_at IS NULL'
+        );
+        $statement->execute(['truck_id' => $truckId]);
+
+        return (int) $statement->fetchColumn();
+    }
+
+    /**
+     * @return array<int,array{id:string,deal_id:int,sequence:int}>
+     */
+    public function listUsageByTruck(string $truckId, int $limit = 5): array
+    {
+        $statement = $this->connection->prepare(
+            'SELECT id, deal_id, sequence FROM hauls WHERE truck_id = :truck_id AND deleted_at IS NULL ORDER BY updated_at DESC LIMIT :limit'
+        );
+        $statement->bindValue(':truck_id', $truckId);
+        $statement->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $statement->execute();
+
+        return $statement->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
     /**
      * @param array<string,mixed> $row
      */

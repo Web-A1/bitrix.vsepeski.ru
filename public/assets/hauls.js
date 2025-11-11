@@ -39,6 +39,14 @@ const state = {
   },
   loading: false,
   saving: false,
+  directoryEditing: {
+    materials: null,
+    trucks: null,
+  },
+  directoryAlerts: {
+    materials: null,
+    trucks: null,
+  },
 };
 
 function detectDefaultRole(isEmbedded) {
@@ -86,6 +94,10 @@ function deriveRoleFromBitrixUser(user) {
     return 'manager';
   }
 
+  if (isBitrixAdmin(user)) {
+    return 'admin';
+  }
+
   const candidates = [
     user.WORK_POSITION,
     user.POSITION,
@@ -105,6 +117,55 @@ function isDriverPosition(value) {
   return value.toLowerCase().includes(driverKeyword);
 }
 
+function isBitrixAdmin(user) {
+  const candidates = [
+    user.ADMIN,
+    user.admin,
+    user.IS_ADMIN,
+    user.is_admin,
+    user.ISADMIN,
+    user.isAdmin,
+    user.IS_ADMINISTRATOR,
+    user.is_administrator,
+    user.IS_SUPER_ADMIN,
+    user.IS_SUPERADMIN,
+    user.is_super_admin,
+    user.IS_PORTAL_ADMIN,
+    user.is_portal_admin,
+  ];
+
+  if (Array.isArray(user.RIGHTS)) {
+    candidates.push(
+      user.RIGHTS.includes('admin') ? 'Y' : '',
+      user.RIGHTS.includes('ADMIN') ? 'Y' : ''
+    );
+  }
+
+  return candidates.some((value) => isTruthyFlag(value));
+}
+
+function isTruthyFlag(value) {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+  if (typeof value === 'number') {
+    return value === 1;
+  }
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    return ['y', 'yes', '1', 'true', 'admin'].includes(normalized);
+  }
+  return false;
+}
+
+function isAdminRole(role) {
+  return typeof role === 'string' && role.toLowerCase() === 'admin';
+}
+
+function canManageDirectories() {
+  return isAdminRole(state.actor.role);
+}
+
 function applyRole(role, context = {}) {
   state.role = role;
   if (typeof context.id !== 'undefined') {
@@ -115,6 +176,7 @@ function applyRole(role, context = {}) {
     state.actor.name = context.name;
   }
   state.actor.role = role;
+  updateDirectoryManagerVisibility();
 }
 
 function applyDriverRoleFromMobileUser(user) {
@@ -132,6 +194,153 @@ function applyDriverRoleFromMobileUser(user) {
 
 function resetRoleToDefault() {
   applyRole(detectDefaultRole(state.embedded));
+}
+
+function maybeApplyRoleOverrideFromPlacement() {
+  const override = detectRoleOverride();
+  if (!override || override === state.actor.role) {
+    return;
+  }
+  applyRole(override, { id: state.actor.id, name: state.actor.name });
+}
+
+function detectRoleOverride() {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    const searchParams = new URLSearchParams(window.location.search || '');
+    const queryRole = normalizeRole(
+      searchParams.get('role') || searchParams.get('ROLE')
+    );
+    if (queryRole) {
+      return queryRole;
+    }
+  } catch (error) {
+    console.warn('Не удалось разобрать роль из адресной строки', error);
+  }
+
+  const bootstrap = window.B24_INSTALL_PAYLOAD || null;
+  const sources = [
+    bootstrap?.payload,
+    bootstrap?.request,
+    bootstrap?.get,
+    bootstrap?.query,
+  ];
+
+  for (const source of sources) {
+    const role = extractRoleFromObject(source);
+    if (role) {
+      return role;
+    }
+
+    if (source && typeof source === 'object') {
+      const optionsRaw = extractPlacementOptionsRaw(source);
+      if (optionsRaw) {
+        const parsed = parsePlacementOptions(optionsRaw);
+        const nestedRole = extractRoleFromObject(parsed);
+        if (nestedRole) {
+          return nestedRole;
+        }
+      }
+    }
+  }
+
+  const payloadOptions = extractPlacementOptionsRaw(bootstrap?.payload ?? null);
+  if (payloadOptions) {
+    const parsedOptions = parsePlacementOptions(payloadOptions);
+    const role = extractRoleFromObject(parsedOptions);
+    if (role) {
+      return role;
+    }
+  }
+
+  return null;
+}
+
+function extractRoleFromObject(subject) {
+  if (!subject) {
+    return null;
+  }
+
+  if (typeof subject === 'string') {
+    return normalizeRole(subject);
+  }
+
+  if (subject instanceof URLSearchParams) {
+    const direct = subject.get('role') || subject.get('ROLE');
+    const fromParams = normalizeRole(direct);
+    if (fromParams) {
+      return fromParams;
+    }
+    return null;
+  }
+
+  if (typeof subject !== 'object') {
+    return null;
+  }
+
+  const candidates = [
+    subject.role,
+    subject.ROLE,
+    subject.actor_role,
+    subject.ACTOR_ROLE,
+    subject.actorRole,
+    subject.user_role,
+    subject.USER_ROLE,
+  ];
+
+  for (const candidate of candidates) {
+    const normalized = normalizeRole(candidate);
+    if (normalized) {
+      return normalized;
+    }
+  }
+
+  const nestedKeys = ['params', 'PARAMS', 'options', 'OPTIONS', 'payload', 'PAYLOAD'];
+  for (const key of nestedKeys) {
+    if (subject[key]) {
+      const nested = extractRoleFromObject(subject[key]);
+      if (nested) {
+        return nested;
+      }
+    }
+  }
+
+  const optionsRaw = extractPlacementOptionsRaw(subject);
+  if (optionsRaw) {
+    const parsed = parsePlacementOptions(optionsRaw);
+    if (parsed && parsed !== subject) {
+      const nested = extractRoleFromObject(parsed);
+      if (nested) {
+        return nested;
+      }
+    }
+  }
+
+  return null;
+}
+
+function normalizeRole(value) {
+  if (typeof value === 'number') {
+    value = String(value);
+  }
+
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) {
+    return null;
+  }
+
+  if (['admin', 'driver', 'manager'].includes(normalized)) {
+    return normalized;
+  }
+
+  return null;
 }
 
 const elements = {
@@ -170,6 +379,10 @@ const elements = {
   materialsForm: document.getElementById('materials-form'),
   trucksList: document.getElementById('trucks-list'),
   trucksForm: document.getElementById('trucks-form'),
+  manageTargetButtons: Array.from(document.querySelectorAll('[data-manage-target]')),
+  manageRefreshButtons: Array.from(document.querySelectorAll('[data-manage-refresh]')),
+  materialsAlert: document.querySelector('[data-directory-alert="materials"]'),
+  trucksAlert: document.querySelector('[data-directory-alert="trucks"]'),
 };
 
 const mobileElements = {
@@ -209,6 +422,8 @@ const mobileViewStates = {
 };
 
 const mobileStorageKey = 'b24-mobile-hauls-login';
+
+updateDirectoryManagerVisibility();
 
 function showGlobalError(message) {
   if (!elements.globalError) {
@@ -453,9 +668,13 @@ async function initEmbedded() {
   const hasDeal = await detectDealId();
   updateDealMeta();
   initRouter();
-  actorPromise.catch((error) => {
-    console.warn('Не удалось определить пользователя Bitrix24', error);
-  });
+  actorPromise
+    .catch((error) => {
+      console.warn('Не удалось определить пользователя Bitrix24', error);
+    })
+    .finally(() => {
+      maybeApplyRoleOverrideFromPlacement();
+    });
   if (hasDeal) {
     void loadHauls();
   } else {
@@ -2095,19 +2314,25 @@ function setupDirectoryManager() {
   elements.materialsList?.addEventListener('click', (event) => {
     handleDirectoryListClick(event, 'material');
   });
+  elements.materialsList?.addEventListener('submit', (event) => {
+    handleDirectoryEditSubmit(event, 'material');
+  });
   elements.trucksList?.addEventListener('click', (event) => {
     handleDirectoryListClick(event, 'truck');
   });
+  elements.trucksList?.addEventListener('submit', (event) => {
+    handleDirectoryEditSubmit(event, 'truck');
+  });
 
-  document.querySelectorAll('[data-manage-target]').forEach((button) => {
-    button.addEventListener('click', () => {
+  (elements.manageTargetButtons || []).forEach((button) => {
+    button?.addEventListener('click', () => {
       const target = button.getAttribute('data-manage-target');
       focusDirectoryCard(target);
     });
   });
 
-  document.querySelectorAll('[data-manage-refresh]').forEach((button) => {
-    button.addEventListener('click', () => {
+  (elements.manageRefreshButtons || []).forEach((button) => {
+    button?.addEventListener('click', () => {
       const target = button.getAttribute('data-manage-refresh');
       if (target === 'materials') {
         refreshMaterialsDirectory(button);
@@ -2122,17 +2347,59 @@ function setupDirectoryManager() {
 
 setupDirectoryManager.initialized = false;
 
+function updateDirectoryManagerVisibility() {
+  const allowed = canManageDirectories();
+
+  if (elements.directoryManager) {
+    elements.directoryManager.hidden = !allowed;
+    if (!allowed) {
+      elements.directoryManager.open = false;
+    }
+  }
+
+  (elements.manageTargetButtons || []).forEach((button) => {
+    if (!button) {
+      return;
+    }
+    button.hidden = !allowed;
+    button.setAttribute('aria-hidden', String(!allowed));
+  });
+
+  (elements.manageRefreshButtons || []).forEach((button) => {
+    if (!button) {
+      return;
+    }
+    button.hidden = !allowed;
+    button.disabled = !allowed;
+    button.setAttribute('aria-hidden', String(!allowed));
+  });
+}
+
 function renderDirectoryLists() {
   renderDirectoryList(elements.materialsList, state.materials, {
     emptyMessage: 'Материалы не заданы',
-    deleteAction: 'delete-material',
+    type: 'material',
     title: (item) => item.name || item.id,
     subtitle: (item) => item.description ?? '',
+    fields: [
+      {
+        name: 'name',
+        placeholder: 'Название материала',
+        required: true,
+        value: (item) => item.name ?? '',
+      },
+      {
+        name: 'description',
+        placeholder: 'Описание (опционально)',
+        value: (item) => item.description ?? '',
+      },
+    ],
   });
+  renderDirectoryAlert('material');
 
   renderDirectoryList(elements.trucksList, state.trucks, {
     emptyMessage: 'Самосвалы не заданы',
-    deleteAction: 'delete-truck',
+    type: 'truck',
     title: (item) => item.license_plate || item.name || item.id,
     subtitle: (item) => {
       const parts = [];
@@ -2140,14 +2407,43 @@ function renderDirectoryLists() {
       if (item.notes) parts.push(item.notes);
       return parts.join(' · ');
     },
+    fields: [
+      {
+        name: 'license_plate',
+        placeholder: 'Госномер (A123BC77)',
+        required: true,
+        value: (item) => item.license_plate ?? '',
+      },
+      {
+        name: 'make_model',
+        placeholder: 'Марка / модель (опционально)',
+        value: (item) => item.make_model ?? '',
+      },
+      {
+        name: 'notes',
+        placeholder: 'Заметки (опционально)',
+        value: (item) => item.notes ?? '',
+      },
+    ],
   });
+  renderDirectoryAlert('truck');
 }
 
 function renderDirectoryList(listElement, items, options = {}) {
   if (!listElement) {
     return;
   }
-  const { emptyMessage = 'Список пуст', deleteAction, title, subtitle } = options;
+  const {
+    emptyMessage = 'Список пуст',
+    type = 'material',
+    title,
+    subtitle,
+    fields = [],
+  } = options;
+  const manageable = canManageDirectories();
+  const editingKey = directoryKeyFromType(type);
+  const editingId = state.directoryEditing?.[editingKey] ?? null;
+
   listElement.innerHTML = '';
   if (!Array.isArray(items) || !items.length) {
     const empty = document.createElement('li');
@@ -2160,6 +2456,11 @@ function renderDirectoryList(listElement, items, options = {}) {
   items.forEach((item) => {
     const li = document.createElement('li');
     li.className = 'directory-card__item';
+    li.dataset.id = item.id;
+    if (item?.usage?.count) {
+      li.classList.add('directory-card__item--locked');
+    }
+
     const content = document.createElement('div');
     content.className = 'directory-card__item-content';
     const titleEl = document.createElement('strong');
@@ -2173,24 +2474,281 @@ function renderDirectoryList(listElement, items, options = {}) {
     }
     li.appendChild(content);
 
-    if (deleteAction) {
-      const removeButton = document.createElement('button');
-      removeButton.type = 'button';
-      removeButton.className = 'directory-card__delete';
-      removeButton.textContent = 'Удалить';
-      removeButton.dataset.action = deleteAction;
-      removeButton.dataset.id = item.id;
-      li.appendChild(removeButton);
+    const usageNode = renderDirectoryUsage(item.usage);
+    if (usageNode) {
+      li.appendChild(usageNode);
+    }
+
+    if (manageable) {
+      if (editingId === item.id) {
+        li.appendChild(buildDirectoryEditForm(type, item, fields));
+      } else {
+        const actions = document.createElement('div');
+        actions.className = 'directory-card__actions';
+
+        const editButton = document.createElement('button');
+        editButton.type = 'button';
+        editButton.className = 'directory-card__action';
+        editButton.dataset.action = type === 'truck' ? 'edit-truck' : 'edit-material';
+        editButton.dataset.id = item.id;
+        editButton.textContent = 'Редактировать';
+        actions.appendChild(editButton);
+
+        const deleteButton = document.createElement('button');
+        deleteButton.type = 'button';
+        deleteButton.className = 'directory-card__delete';
+        deleteButton.dataset.action = type === 'truck' ? 'delete-truck' : 'delete-material';
+        deleteButton.dataset.id = item.id;
+        const inUse = Boolean(item?.usage?.count);
+        deleteButton.disabled = inUse;
+        deleteButton.title = inUse
+          ? 'Нельзя удалить — используется в рейсах'
+          : 'Удалить из справочника';
+        deleteButton.textContent = 'Удалить';
+        actions.appendChild(deleteButton);
+
+        li.appendChild(actions);
+      }
     }
 
     listElement.appendChild(li);
   });
 }
 
+function renderDirectoryUsage(usage) {
+  if (!usage || !usage.count) {
+    return null;
+  }
+  const wrapper = document.createElement('div');
+  wrapper.className = 'directory-card__usage';
+  const countLabel = document.createElement('span');
+  countLabel.className = 'directory-card__usage-count';
+  countLabel.textContent = usage.count === 1
+    ? '1 рейс'
+    : `${usage.count} рейсов`;
+  wrapper.appendChild(countLabel);
+
+  if (Array.isArray(usage.samples) && usage.samples.length) {
+    const list = document.createElement('ul');
+    list.className = 'directory-card__usage-list';
+    usage.samples.forEach((sample) => {
+      const item = document.createElement('li');
+      item.textContent = formatUsageSample(sample);
+      list.appendChild(item);
+    });
+    wrapper.appendChild(list);
+  }
+
+  return wrapper;
+}
+
+function buildDirectoryEditForm(type, item, fields) {
+  const form = document.createElement('form');
+  form.className = 'directory-card__edit';
+  form.dataset.action = type === 'truck' ? 'update-truck' : 'update-material';
+  form.dataset.id = item.id;
+
+  const fieldsWrapper = document.createElement('div');
+  fieldsWrapper.className = 'directory-card__edit-fields';
+
+  fields.forEach((field) => {
+    const input = document.createElement('input');
+    input.type = field.type || 'text';
+    input.name = field.name;
+    input.placeholder = field.placeholder || '';
+    input.required = Boolean(field.required);
+    const value = typeof field.value === 'function' ? field.value(item) : item[field.name];
+    input.value = value ?? '';
+    fieldsWrapper.appendChild(input);
+  });
+
+  form.appendChild(fieldsWrapper);
+
+  const actions = document.createElement('div');
+  actions.className = 'directory-card__edit-actions';
+
+  const saveButton = document.createElement('button');
+  saveButton.type = 'submit';
+  saveButton.className = 'button button--primary';
+  saveButton.textContent = 'Сохранить';
+  actions.appendChild(saveButton);
+
+  const cancelButton = document.createElement('button');
+  cancelButton.type = 'button';
+  cancelButton.className = 'button button--ghost';
+  cancelButton.dataset.action = type === 'truck' ? 'cancel-edit-truck' : 'cancel-edit-material';
+  cancelButton.dataset.id = item.id;
+  cancelButton.textContent = 'Отмена';
+  actions.appendChild(cancelButton);
+
+  form.appendChild(actions);
+
+  return form;
+}
+
+function handleDirectoryEditSubmit(event, type) {
+  const form = event.target;
+  if (!(form instanceof HTMLFormElement)) {
+    return;
+  }
+  const expectedAction = type === 'truck' ? 'update-truck' : 'update-material';
+  if (form.dataset.action !== expectedAction) {
+    return;
+  }
+  event.preventDefault();
+
+  if (!canManageDirectories()) {
+    setDirectoryAlert(type, {
+      type: 'error',
+      message: 'Недостаточно прав для изменения справочника.',
+    });
+    return;
+  }
+
+  const id = form.dataset.id;
+  if (!id) {
+    return;
+  }
+
+  if (type === 'truck') {
+    void updateTruckById(id, form);
+  } else {
+    void updateMaterialById(id, form);
+  }
+}
+
+function startDirectoryEdit(type, id) {
+  if (!canManageDirectories()) {
+    setDirectoryAlert(type, {
+      type: 'error',
+      message: 'Недостаточно прав для редактирования.',
+    });
+    return;
+  }
+  const key = directoryKeyFromType(type);
+  state.directoryEditing[key] = id;
+  renderDirectoryLists();
+  requestAnimationFrame(() => {
+    const list = getDirectoryListElement(type);
+    const form = list?.querySelector(`form[data-id="${id}"]`);
+    form?.querySelector('input')?.focus();
+  });
+}
+
+function cancelDirectoryEdit(type) {
+  const key = directoryKeyFromType(type);
+  state.directoryEditing[key] = null;
+  renderDirectoryLists();
+}
+
+function directoryKeyFromType(type) {
+  return type === 'truck' || type === 'trucks' ? 'trucks' : 'materials';
+}
+
+function getDirectoryListElement(type) {
+  return type === 'truck' || type === 'trucks'
+    ? elements.trucksList
+    : elements.materialsList;
+}
+
+function formatUsageSample(sample) {
+  if (!sample) {
+    return '';
+  }
+  const deal = sample.deal_id ? `Сделка #${sample.deal_id}` : 'Сделка';
+  if (typeof sample.sequence === 'number') {
+    return `${deal} · рейс №${sample.sequence}`;
+  }
+  return deal;
+}
+
+function setDirectoryAlert(type, alert) {
+  const key = directoryKeyFromType(type);
+  state.directoryAlerts[key] = alert;
+  renderDirectoryAlert(type);
+}
+
+function clearDirectoryAlert(type) {
+  setDirectoryAlert(type, null);
+}
+
+function renderDirectoryAlert(type) {
+  const element = type === 'truck' || type === 'trucks'
+    ? elements.trucksAlert
+    : elements.materialsAlert;
+  if (!element) {
+    return;
+  }
+  const key = directoryKeyFromType(type);
+  const alert = state.directoryAlerts[key];
+  if (!alert) {
+    element.hidden = true;
+    element.innerHTML = '';
+    element.classList.remove('directory-card__alert--error');
+    return;
+  }
+
+  element.hidden = false;
+  element.innerHTML = '';
+  element.classList.toggle('directory-card__alert--error', alert.type === 'error');
+
+  const message = document.createElement('p');
+  message.textContent = alert.message;
+  element.appendChild(message);
+
+  if (alert.usage?.samples?.length) {
+    const list = document.createElement('ul');
+    list.className = 'directory-card__alert-list';
+    alert.usage.samples.forEach((sample) => {
+      const item = document.createElement('li');
+      item.textContent = formatUsageSample(sample);
+      list.appendChild(item);
+    });
+    element.appendChild(list);
+  }
+}
+
+function buildUsageAlertMessage(prefix, usage) {
+  if (!usage || !usage.count) {
+    return prefix;
+  }
+  const count = usage.count;
+  const suffix = count === 1 ? '1 рейс' : `${count} рейсов`;
+  return `${prefix}: ${suffix}`;
+}
+
+function replaceDirectoryItem(key, payload) {
+  if (!payload || !payload.id) {
+    return;
+  }
+  const listKey = key === 'trucks' ? 'trucks' : 'materials';
+  const source = Array.isArray(state[listKey]) ? state[listKey] : [];
+  const updated = source.map((item) => (item.id === payload.id ? payload : item));
+  state[listKey] = sortDirectoryCollection(updated, listKey);
+}
+
+function sortDirectoryCollection(items, key) {
+  const labelFor = (item) => {
+    if (key === 'trucks') {
+      return (item.license_plate || '').toString().toLowerCase();
+    }
+    return (item.name || '').toString().toLowerCase();
+  };
+
+  return [...items].sort((a, b) => labelFor(a).localeCompare(labelFor(b), 'ru', { sensitivity: 'base' }));
+}
+
 async function handleMaterialSubmit(event) {
   event.preventDefault();
   const form = event.currentTarget;
   if (!(form instanceof HTMLFormElement)) {
+    return;
+  }
+  if (!canManageDirectories()) {
+    setDirectoryAlert('material', {
+      type: 'error',
+      message: 'Недостаточно прав для добавления материалов.',
+    });
     return;
   }
   const nameInput = form.elements.namedItem('name');
@@ -2212,6 +2770,8 @@ async function handleMaterialSubmit(event) {
     });
     if (response?.data) {
       state.materials.push(response.data);
+      state.materials = sortDirectoryCollection(state.materials, 'materials');
+      clearDirectoryAlert('material');
       renderReferenceSelects();
       renderDirectoryLists();
       form.reset();
@@ -2227,6 +2787,13 @@ async function handleTruckSubmit(event) {
   event.preventDefault();
   const form = event.currentTarget;
   if (!(form instanceof HTMLFormElement)) {
+    return;
+  }
+  if (!canManageDirectories()) {
+    setDirectoryAlert('truck', {
+      type: 'error',
+      message: 'Недостаточно прав для добавления самосвалов.',
+    });
     return;
   }
   const plateInput = form.elements.namedItem('license_plate');
@@ -2254,12 +2821,94 @@ async function handleTruckSubmit(event) {
     });
     if (response?.data) {
       state.trucks.push(response.data);
+      state.trucks = sortDirectoryCollection(state.trucks, 'trucks');
+      clearDirectoryAlert('truck');
       renderReferenceSelects();
       renderDirectoryLists();
       form.reset();
     }
   } catch (error) {
     handleApiError(error, 'Не удалось добавить самосвал');
+  } finally {
+    setButtonLoading(submitButton, false);
+  }
+}
+
+async function updateMaterialById(id, form) {
+  const nameInput = form.elements.namedItem('name');
+  const descriptionInput = form.elements.namedItem('description');
+  const name = typeof nameInput?.value === 'string' ? nameInput.value.trim() : '';
+  const description = typeof descriptionInput?.value === 'string' ? descriptionInput.value.trim() : '';
+
+  if (!name) {
+    nameInput?.focus();
+    return;
+  }
+
+  const submitButton = form.querySelector('button[type="submit"]');
+  setButtonLoading(submitButton, true);
+  try {
+    const response = await request(`/api/materials/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: {
+        name,
+        description: description || null,
+      },
+    });
+    if (response?.data) {
+      replaceDirectoryItem('materials', response.data);
+      clearDirectoryAlert('material');
+      cancelDirectoryEdit('material');
+      renderReferenceSelects();
+      renderDirectoryLists();
+    }
+  } catch (error) {
+    handleApiError(error, 'Не удалось обновить материал');
+  } finally {
+    setButtonLoading(submitButton, false);
+  }
+}
+
+async function updateTruckById(id, form) {
+  const plateInput = form.elements.namedItem('license_plate');
+  const makeInput = form.elements.namedItem('make_model');
+  const notesInput = form.elements.namedItem('notes');
+  const plate = typeof plateInput?.value === 'string' ? plateInput.value.trim() : '';
+  const make = typeof makeInput?.value === 'string' ? makeInput.value.trim() : '';
+  const notes = typeof notesInput?.value === 'string' ? notesInput.value.trim() : '';
+
+  if (!plate) {
+    plateInput?.focus();
+    return;
+  }
+
+  const submitButton = form.querySelector('button[type="submit"]');
+  setButtonLoading(submitButton, true);
+  try {
+    const response = await request(`/api/trucks/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: {
+        license_plate: plate,
+        make_model: make || null,
+        notes: notes || null,
+      },
+    });
+    if (response?.data) {
+      replaceDirectoryItem('trucks', response.data);
+      clearDirectoryAlert('truck');
+      cancelDirectoryEdit('truck');
+      renderReferenceSelects();
+      renderDirectoryLists();
+    }
+  } catch (error) {
+    if (error?.status === 409 && error.message) {
+      setDirectoryAlert('truck', {
+        type: 'error',
+        message: error.message,
+      });
+    } else {
+      handleApiError(error, 'Не удалось обновить самосвал');
+    }
   } finally {
     setButtonLoading(submitButton, false);
   }
@@ -2274,48 +2923,105 @@ function handleDirectoryListClick(event, type) {
   if (!button) {
     return;
   }
+  const action = button.getAttribute('data-action');
   const id = button.getAttribute('data-id');
-  if (!id) {
+  if (!action || !id) {
     return;
   }
-  if (button.getAttribute('data-action') === 'delete-material' && type === 'material') {
-    void deleteMaterialById(id);
+
+  if (action === 'edit-material' && type === 'material') {
+    startDirectoryEdit('material', id);
+    return;
   }
-  if (button.getAttribute('data-action') === 'delete-truck' && type === 'truck') {
-    void deleteTruckById(id);
+  if (action === 'edit-truck' && type === 'truck') {
+    startDirectoryEdit('truck', id);
+    return;
+  }
+  if (action === 'cancel-edit-material' && type === 'material') {
+    cancelDirectoryEdit('material');
+    return;
+  }
+  if (action === 'cancel-edit-truck' && type === 'truck') {
+    cancelDirectoryEdit('truck');
+    return;
+  }
+
+  if (action === 'delete-material' && type === 'material') {
+    if (!canManageDirectories()) {
+      setDirectoryAlert('material', {
+        type: 'error',
+        message: 'Недостаточно прав для удаления материалов.',
+      });
+      return;
+    }
+    void deleteMaterialById(id, button);
+  }
+  if (action === 'delete-truck' && type === 'truck') {
+    if (!canManageDirectories()) {
+      setDirectoryAlert('truck', {
+        type: 'error',
+        message: 'Недостаточно прав для удаления самосвалов.',
+      });
+      return;
+    }
+    void deleteTruckById(id, button);
   }
 }
 
-async function deleteMaterialById(id) {
-  if (!confirm('Удалить материал?')) {
-    return;
-  }
+async function deleteMaterialById(id, trigger) {
+  setButtonLoading(trigger, true);
   try {
     await request(`/api/materials/${encodeURIComponent(id)}`, { method: 'DELETE' });
     state.materials = state.materials.filter((item) => item.id !== id);
+    if (state.directoryEditing.materials === id) {
+      state.directoryEditing.materials = null;
+    }
+    clearDirectoryAlert('material');
     renderReferenceSelects();
     renderDirectoryLists();
   } catch (error) {
-    handleApiError(error, 'Не удалось удалить материал');
+    if (error?.status === 409 && error.payload?.usage) {
+      setDirectoryAlert('material', {
+        type: 'error',
+        message: buildUsageAlertMessage('Материал используется в рейсах', error.payload.usage),
+        usage: error.payload.usage,
+      });
+    } else {
+      handleApiError(error, 'Не удалось удалить материал');
+    }
+  } finally {
+    setButtonLoading(trigger, false);
   }
 }
 
-async function deleteTruckById(id) {
-  if (!confirm('Удалить самосвал?')) {
-    return;
-  }
+async function deleteTruckById(id, trigger) {
+  setButtonLoading(trigger, true);
   try {
     await request(`/api/trucks/${encodeURIComponent(id)}`, { method: 'DELETE' });
     state.trucks = state.trucks.filter((item) => item.id !== id);
+    if (state.directoryEditing.trucks === id) {
+      state.directoryEditing.trucks = null;
+    }
+    clearDirectoryAlert('truck');
     renderReferenceSelects();
     renderDirectoryLists();
   } catch (error) {
-    handleApiError(error, 'Не удалось удалить самосвал');
+    if (error?.status === 409 && error.payload?.usage) {
+      setDirectoryAlert('truck', {
+        type: 'error',
+        message: buildUsageAlertMessage('Самосвал используется в рейсах', error.payload.usage),
+        usage: error.payload.usage,
+      });
+    } else {
+      handleApiError(error, 'Не удалось удалить самосвал');
+    }
+  } finally {
+    setButtonLoading(trigger, false);
   }
 }
 
 function focusDirectoryCard(target) {
-  if (!target || !elements.directoryManager) {
+  if (!target || !elements.directoryManager || !canManageDirectories()) {
     return;
   }
   elements.directoryManager.open = true;
@@ -2331,7 +3037,10 @@ async function refreshMaterialsDirectory(button) {
   setButtonLoading(button, true);
   try {
     const response = await request('/api/materials');
-    state.materials = Array.isArray(response?.data) ? response.data : [];
+    const data = Array.isArray(response?.data) ? response.data : [];
+    state.materials = sortDirectoryCollection(data, 'materials');
+    state.directoryEditing.materials = null;
+    clearDirectoryAlert('material');
     renderReferenceSelects();
     renderDirectoryLists();
   } catch (error) {
@@ -2345,7 +3054,10 @@ async function refreshTrucksDirectory(button) {
   setButtonLoading(button, true);
   try {
     const response = await request('/api/trucks');
-    state.trucks = Array.isArray(response?.data) ? response.data : [];
+    const data = Array.isArray(response?.data) ? response.data : [];
+    state.trucks = sortDirectoryCollection(data, 'trucks');
+    state.directoryEditing.trucks = null;
+    clearDirectoryAlert('truck');
     renderReferenceSelects();
     renderDirectoryLists();
   } catch (error) {
@@ -3641,7 +4353,10 @@ async function request(path, options = {}) {
 
   if (!response.ok) {
     const message = data?.error || response.statusText || 'Request failed';
-    throw new Error(message);
+    const apiError = new Error(message);
+    apiError.status = response.status;
+    apiError.payload = data;
+    throw apiError;
   }
 
   return data ?? {};

@@ -68,6 +68,22 @@ final class TruckRepository
         return new Truck($row['id'], $row['license_plate'], $row['make_model'], $row['notes']);
     }
 
+    public function findByLicensePlate(string $licensePlate): ?Truck
+    {
+        $statement = $this->connection->prepare(
+            'SELECT id, license_plate, make_model, notes FROM trucks WHERE license_plate = :license_plate LIMIT 1'
+        );
+        $statement->execute(['license_plate' => $licensePlate]);
+
+        $row = $statement->fetch();
+
+        if ($row === false) {
+            return null;
+        }
+
+        return new Truck($row['id'], $row['license_plate'], $row['make_model'], $row['notes']);
+    }
+
     public function save(Truck $truck): void
     {
         $statement = $this->connection->prepare(

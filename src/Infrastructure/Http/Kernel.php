@@ -11,6 +11,7 @@ use B24\Center\Infrastructure\Auth\SessionAuthManager;
 use B24\Center\Infrastructure\Auth\LocalDriverAuthenticator;
 use B24\Center\Modules\Hauls\Application\Services\HaulService;
 use B24\Center\Modules\Hauls\Application\DTO\ActorContext;
+use B24\Center\Modules\Hauls\Infrastructure\HaulRepository;
 use B24\Center\Modules\Hauls\Infrastructure\MaterialRepository;
 use B24\Center\Modules\Hauls\Infrastructure\TruckRepository;
 use B24\Center\Modules\Hauls\Application\Services\DriverLookupService;
@@ -151,8 +152,18 @@ class Kernel
         }
 
         $haulController = new HaulController($this->container->get(HaulService::class));
-        $truckController = new TruckController($this->container->get(TruckRepository::class));
-        $materialController = new MaterialController($this->container->get(MaterialRepository::class));
+
+        /** @var HaulRepository $haulRepository */
+        $haulRepository = $this->container->get(HaulRepository::class);
+
+        $truckController = new TruckController(
+            $this->container->get(TruckRepository::class),
+            $haulRepository
+        );
+        $materialController = new MaterialController(
+            $this->container->get(MaterialRepository::class),
+            $haulRepository
+        );
         $driverController = new DriverController($this->container->get(DriverLookupService::class));
         $companyController = new CompanyDirectoryController($this->container->get(CompanyDirectoryService::class));
         $dealController = new DealInfoController($this->container->get(DealInfoService::class));
@@ -221,8 +232,9 @@ class Kernel
             $truckId = $matches[1];
 
             return match ($method) {
-                'DELETE' => $truckController->destroy($truckId),
-                default => $this->methodNotAllowed(['DELETE']),
+                'PUT', 'PATCH' => $truckController->update($truckId, $request),
+                'DELETE' => $truckController->destroy($truckId, $request),
+                default => $this->methodNotAllowed(['PUT', 'PATCH', 'DELETE']),
             };
         }
 
@@ -252,8 +264,9 @@ class Kernel
             $materialId = $matches[1];
 
             return match ($method) {
-                'DELETE' => $materialController->destroy($materialId),
-                default => $this->methodNotAllowed(['DELETE']),
+                'PUT', 'PATCH' => $materialController->update($materialId, $request),
+                'DELETE' => $materialController->destroy($materialId, $request),
+                default => $this->methodNotAllowed(['PUT', 'PATCH', 'DELETE']),
             };
         }
 
