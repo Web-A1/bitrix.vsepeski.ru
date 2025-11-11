@@ -2204,10 +2204,22 @@ function createHaulCard(haul) {
   const header = document.createElement('div');
   header.className = 'haul-card__header';
 
+  const headingRow = document.createElement('div');
+  headingRow.className = 'haul-card__heading';
+
   const title = document.createElement('h3');
   title.className = 'haul-card__title';
   title.textContent = `#${formatSequence(haul)}`;
-  header.appendChild(title);
+  headingRow.appendChild(title);
+
+  if (haul.updated_at) {
+    const metaInfo = document.createElement('span');
+    metaInfo.className = 'tag tag--muted';
+    metaInfo.textContent = `Обновлено ${formatDate(haul.updated_at)}`;
+    headingRow.appendChild(metaInfo);
+  }
+
+  header.appendChild(headingRow);
 
   const body = document.createElement('div');
   body.className = 'haul-card__body';
@@ -2241,13 +2253,6 @@ function createHaulCard(haul) {
   footer.appendChild(editButton);
   footer.appendChild(copyButton);
   footer.appendChild(deleteButton);
-
-  if (haul.updated_at) {
-    const metaInfo = document.createElement('span');
-    metaInfo.className = 'tag tag--muted';
-    metaInfo.textContent = `Обновлено ${formatDate(haul.updated_at)}`;
-    footer.appendChild(metaInfo);
-  }
 
   card.appendChild(header);
   card.appendChild(body);
@@ -2725,7 +2730,35 @@ function formatPhoneHref(phone) {
 function lookupDriver(id) {
   if (!id) return null;
   const driver = state.drivers.find((entry) => String(entry.id) === String(id));
-  return driver ? driver.name : id;
+  if (!driver) {
+    return id;
+  }
+  return formatShortName(driver.name) || driver.name || driver.id;
+}
+
+function formatShortName(name) {
+  if (typeof name !== 'string') {
+    return null;
+  }
+  const parts = name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!parts.length) {
+    return null;
+  }
+  const [lastName, ...rest] = parts;
+  if (!rest.length) {
+    return lastName;
+  }
+  const initials = rest
+    .map((part) => {
+      const [firstChar] = part;
+      return firstChar ? `${firstChar.toUpperCase()}.` : '';
+    })
+    .filter(Boolean)
+    .join('');
+  return `${lastName} ${initials}`.trim();
 }
 
 function toNullableNumber(value) {

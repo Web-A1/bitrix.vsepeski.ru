@@ -721,6 +721,20 @@ body.mobile-driver .mobile-app {
   flex-direction: column;
   align-items: flex-start;
   gap: 8px;
+  width: 100%;
+}
+
+.haul-card__heading {
+  display: flex;
+  width: 100%;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.haul-card__heading .tag {
+  margin-left: auto;
 }
 
 .haul-card__title {
