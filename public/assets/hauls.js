@@ -2214,16 +2214,19 @@ function createHaulCard(haul) {
 
   const driverName = lookupDriver(haul.responsible_id) || 'Не назначен';
   const truckLabel = lookupLabel(state.trucks, haul.truck_id, 'license_plate');
-  headingRow.appendChild(createHeadingDetail(driverName));
-  headingRow.appendChild(createHeadingDetail(truckLabel));
+  const headingMeta = document.createElement('div');
+  headingMeta.className = 'haul-card__heading-meta';
+  headingMeta.appendChild(createHeadingDetail(driverName));
+  headingMeta.appendChild(createHeadingDetail(truckLabel));
 
   if (haul.updated_at) {
     const metaInfo = document.createElement('span');
     metaInfo.className = 'tag tag--muted';
     metaInfo.textContent = `Обновлено ${formatDate(haul.updated_at)}`;
-    headingRow.appendChild(metaInfo);
+    headingMeta.appendChild(metaInfo);
   }
 
+  headingRow.appendChild(headingMeta);
   header.appendChild(headingRow);
 
   const body = document.createElement('div');
