@@ -115,6 +115,41 @@
             <button type="button" class="button button--ghost" id="close-editor">Закрыть</button>
           </div>
         </header>
+        <details class="directory-manager" id="directory-manager">
+          <summary>Управление справочниками</summary>
+          <p class="directory-manager__hint">Быстро добавляйте новые материалы и самосвалы прямо из формы рейса.</p>
+          <div class="directory-manager__content">
+            <article class="directory-card" data-directory="materials">
+              <div class="directory-card__header">
+                <h4>Материалы</h4>
+                <button type="button" class="link-button" data-manage-refresh="materials">Обновить</button>
+              </div>
+              <ul class="directory-card__list" id="materials-list"></ul>
+              <form class="directory-card__form" id="materials-form">
+                <div class="directory-card__fields">
+                  <input type="text" name="name" placeholder="Название материала" required />
+                  <input type="text" name="description" placeholder="Описание (опционально)" />
+                </div>
+                <button type="submit" class="button button--ghost">Добавить материал</button>
+              </form>
+            </article>
+            <article class="directory-card" data-directory="trucks">
+              <div class="directory-card__header">
+                <h4>Самосвалы</h4>
+                <button type="button" class="link-button" data-manage-refresh="trucks">Обновить</button>
+              </div>
+              <ul class="directory-card__list" id="trucks-list"></ul>
+              <form class="directory-card__form" id="trucks-form">
+                <div class="directory-card__fields">
+                  <input type="text" name="license_plate" placeholder="Госномер (A123BC77)" required />
+                  <input type="text" name="make_model" placeholder="Марка / модель (опционально)" />
+                  <input type="text" name="notes" placeholder="Заметки (опционально)" />
+                </div>
+                <button type="submit" class="button button--ghost">Добавить самосвал</button>
+              </form>
+            </article>
+          </div>
+        </details>
         <form id="haul-form" novalidate>
           <div class="form-group">
             <h3>Основная информация</h3>
@@ -127,10 +162,26 @@
               <label>
                 <span>Самосвал <small>(обязательно)</small></span>
                 <select name="truck_id" id="truck-select" required></select>
+                <button
+                  type="button"
+                  class="link-button"
+                  data-manage-target="trucks"
+                  title="Управлять списком самосвалов"
+                >
+                  Управлять списком
+                </button>
               </label>
               <label>
                 <span>Материал <small>(обязательно)</small></span>
                 <select name="material_id" id="material-select" required></select>
+                <button
+                  type="button"
+                  class="link-button"
+                  data-manage-target="materials"
+                  title="Управлять списком материалов"
+                >
+                  Управлять списком
+                </button>
               </label>
               <label>
                 <span>Объём, м³</span>

@@ -972,6 +972,149 @@ body.mobile-driver .mobile-app {
   font-weight: var(--font-weight-regular);
 }
 
+.link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  text-decoration: underline;
+  display: inline-flex;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.link-button:hover,
+.link-button:focus-visible {
+  color: var(--accent-hover);
+}
+
+.directory-manager {
+  margin: 16px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px;
+  background: var(--surface);
+}
+
+.directory-manager summary {
+  cursor: pointer;
+  font-weight: var(--font-weight-semibold);
+  margin-bottom: 8px;
+}
+
+.directory-manager__hint {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: var(--font-size-label);
+}
+
+.directory-manager__content {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.directory-card {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--surface);
+}
+
+.directory-card--highlight {
+  box-shadow: 0 0 0 2px rgba(47, 107, 255, 0.2);
+}
+
+.directory-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.directory-card__header h4 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: var(--font-weight-semibold);
+}
+
+.directory-card__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.directory-card__empty {
+  color: var(--muted);
+  font-size: 0.85rem;
+  padding: 8px 4px;
+}
+
+.directory-card__item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  font-size: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.directory-card__item-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.directory-card__item small {
+  color: var(--muted);
+}
+
+.directory-card__delete {
+  background: none;
+  border: none;
+  color: var(--danger);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.directory-card__form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.directory-card__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.directory-card__fields input,
+.directory-card__fields textarea {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  padding: 8px 10px;
+  font: inherit;
+}
+
+.directory-card__form .button {
+  align-self: flex-start;
+}
+
 .editor {
   background: var(--surface);
   color: var(--on-surface);

@@ -165,6 +165,11 @@ const elements = {
   closeEditor: document.getElementById('close-editor'),
   cancelEditor: document.getElementById('cancel-editor'),
   submitHaul: document.getElementById('submit-haul'),
+  directoryManager: document.getElementById('directory-manager'),
+  materialsList: document.getElementById('materials-list'),
+  materialsForm: document.getElementById('materials-form'),
+  trucksList: document.getElementById('trucks-list'),
+  trucksForm: document.getElementById('trucks-form'),
 };
 
 const mobileElements = {
@@ -440,6 +445,7 @@ async function initEmbedded() {
   detectDarkMode();
   configureEmbedding();
   attachEventHandlers();
+  setupDirectoryManager();
   const actorPromise = resolveActorFromBitrix();
   referenceDataPromise = loadReferenceData().catch((error) => {
     console.error('Не удалось загрузить справочники', error);
@@ -1867,6 +1873,7 @@ async function loadReferenceData() {
     const driverData = driversResponse?.data ?? driversResponse ?? [];
     state.drivers = Array.isArray(driverData) ? driverData : Object.values(driverData);
     renderReferenceSelects();
+    renderDirectoryLists();
     syncUnloadFromCompany();
     renderList();
   } catch (error) {
@@ -2074,6 +2081,286 @@ function renderReferenceSelects() {
 
   renderCompanySelect(elements.supplierSelect, state.suppliers, 'Выберите поставщика');
   renderCompanySelect(elements.carrierSelect, state.carriers, 'Выберите перевозчика');
+}
+
+function setupDirectoryManager() {
+  if (!elements.directoryManager || setupDirectoryManager.initialized) {
+    return;
+  }
+  setupDirectoryManager.initialized = true;
+
+  elements.materialsForm?.addEventListener('submit', handleMaterialSubmit);
+  elements.trucksForm?.addEventListener('submit', handleTruckSubmit);
+
+  elements.materialsList?.addEventListener('click', (event) => {
+    handleDirectoryListClick(event, 'material');
+  });
+  elements.trucksList?.addEventListener('click', (event) => {
+    handleDirectoryListClick(event, 'truck');
+  });
+
+  document.querySelectorAll('[data-manage-target]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const target = button.getAttribute('data-manage-target');
+      focusDirectoryCard(target);
+    });
+  });
+
+  document.querySelectorAll('[data-manage-refresh]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const target = button.getAttribute('data-manage-refresh');
+      if (target === 'materials') {
+        refreshMaterialsDirectory(button);
+      } else if (target === 'trucks') {
+        refreshTrucksDirectory(button);
+      }
+    });
+  });
+
+  renderDirectoryLists();
+}
+
+setupDirectoryManager.initialized = false;
+
+function renderDirectoryLists() {
+  renderDirectoryList(elements.materialsList, state.materials, {
+    emptyMessage: 'Материалы не заданы',
+    deleteAction: 'delete-material',
+    title: (item) => item.name || item.id,
+    subtitle: (item) => item.description ?? '',
+  });
+
+  renderDirectoryList(elements.trucksList, state.trucks, {
+    emptyMessage: 'Самосвалы не заданы',
+    deleteAction: 'delete-truck',
+    title: (item) => item.license_plate || item.name || item.id,
+    subtitle: (item) => {
+      const parts = [];
+      if (item.make_model) parts.push(item.make_model);
+      if (item.notes) parts.push(item.notes);
+      return parts.join(' · ');
+    },
+  });
+}
+
+function renderDirectoryList(listElement, items, options = {}) {
+  if (!listElement) {
+    return;
+  }
+  const { emptyMessage = 'Список пуст', deleteAction, title, subtitle } = options;
+  listElement.innerHTML = '';
+  if (!Array.isArray(items) || !items.length) {
+    const empty = document.createElement('li');
+    empty.className = 'directory-card__empty';
+    empty.textContent = emptyMessage;
+    listElement.appendChild(empty);
+    return;
+  }
+
+  items.forEach((item) => {
+    const li = document.createElement('li');
+    li.className = 'directory-card__item';
+    const content = document.createElement('div');
+    content.className = 'directory-card__item-content';
+    const titleEl = document.createElement('strong');
+    titleEl.textContent = typeof title === 'function' ? title(item) : item.title ?? item.id;
+    content.appendChild(titleEl);
+    const subtitleText = typeof subtitle === 'function' ? subtitle(item) : '';
+    if (subtitleText) {
+      const subtitleEl = document.createElement('small');
+      subtitleEl.textContent = subtitleText;
+      content.appendChild(subtitleEl);
+    }
+    li.appendChild(content);
+
+    if (deleteAction) {
+      const removeButton = document.createElement('button');
+      removeButton.type = 'button';
+      removeButton.className = 'directory-card__delete';
+      removeButton.textContent = 'Удалить';
+      removeButton.dataset.action = deleteAction;
+      removeButton.dataset.id = item.id;
+      li.appendChild(removeButton);
+    }
+
+    listElement.appendChild(li);
+  });
+}
+
+async function handleMaterialSubmit(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  if (!(form instanceof HTMLFormElement)) {
+    return;
+  }
+  const nameInput = form.elements.namedItem('name');
+  const descriptionInput = form.elements.namedItem('description');
+  const name = typeof nameInput?.value === 'string' ? nameInput.value.trim() : '';
+  const description = typeof descriptionInput?.value === 'string' ? descriptionInput.value.trim() : '';
+
+  if (!name) {
+    nameInput?.focus();
+    return;
+  }
+
+  const submitButton = form.querySelector('button[type="submit"]');
+  setButtonLoading(submitButton, true);
+  try {
+    const response = await request('/api/materials', {
+      method: 'POST',
+      body: { name, description: description || undefined },
+    });
+    if (response?.data) {
+      state.materials.push(response.data);
+      renderReferenceSelects();
+      renderDirectoryLists();
+      form.reset();
+    }
+  } catch (error) {
+    handleApiError(error, 'Не удалось добавить материал');
+  } finally {
+    setButtonLoading(submitButton, false);
+  }
+}
+
+async function handleTruckSubmit(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  if (!(form instanceof HTMLFormElement)) {
+    return;
+  }
+  const plateInput = form.elements.namedItem('license_plate');
+  const makeInput = form.elements.namedItem('make_model');
+  const notesInput = form.elements.namedItem('notes');
+  const plate = typeof plateInput?.value === 'string' ? plateInput.value.trim() : '';
+  const make = typeof makeInput?.value === 'string' ? makeInput.value.trim() : '';
+  const notes = typeof notesInput?.value === 'string' ? notesInput.value.trim() : '';
+
+  if (!plate) {
+    plateInput?.focus();
+    return;
+  }
+
+  const submitButton = form.querySelector('button[type="submit"]');
+  setButtonLoading(submitButton, true);
+  try {
+    const response = await request('/api/trucks', {
+      method: 'POST',
+      body: {
+        license_plate: plate,
+        make_model: make || undefined,
+        notes: notes || undefined,
+      },
+    });
+    if (response?.data) {
+      state.trucks.push(response.data);
+      renderReferenceSelects();
+      renderDirectoryLists();
+      form.reset();
+    }
+  } catch (error) {
+    handleApiError(error, 'Не удалось добавить самосвал');
+  } finally {
+    setButtonLoading(submitButton, false);
+  }
+}
+
+function handleDirectoryListClick(event, type) {
+  const target = event.target;
+  if (!(target instanceof Element)) {
+    return;
+  }
+  const button = target.closest('[data-action]');
+  if (!button) {
+    return;
+  }
+  const id = button.getAttribute('data-id');
+  if (!id) {
+    return;
+  }
+  if (button.getAttribute('data-action') === 'delete-material' && type === 'material') {
+    void deleteMaterialById(id);
+  }
+  if (button.getAttribute('data-action') === 'delete-truck' && type === 'truck') {
+    void deleteTruckById(id);
+  }
+}
+
+async function deleteMaterialById(id) {
+  if (!confirm('Удалить материал?')) {
+    return;
+  }
+  try {
+    await request(`/api/materials/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    state.materials = state.materials.filter((item) => item.id !== id);
+    renderReferenceSelects();
+    renderDirectoryLists();
+  } catch (error) {
+    handleApiError(error, 'Не удалось удалить материал');
+  }
+}
+
+async function deleteTruckById(id) {
+  if (!confirm('Удалить самосвал?')) {
+    return;
+  }
+  try {
+    await request(`/api/trucks/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    state.trucks = state.trucks.filter((item) => item.id !== id);
+    renderReferenceSelects();
+    renderDirectoryLists();
+  } catch (error) {
+    handleApiError(error, 'Не удалось удалить самосвал');
+  }
+}
+
+function focusDirectoryCard(target) {
+  if (!target || !elements.directoryManager) {
+    return;
+  }
+  elements.directoryManager.open = true;
+  const card = elements.directoryManager.querySelector(`[data-directory="${target}"]`);
+  if (card) {
+    card.classList.add('directory-card--highlight');
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(() => card.classList.remove('directory-card--highlight'), 1500);
+  }
+}
+
+async function refreshMaterialsDirectory(button) {
+  setButtonLoading(button, true);
+  try {
+    const response = await request('/api/materials');
+    state.materials = Array.isArray(response?.data) ? response.data : [];
+    renderReferenceSelects();
+    renderDirectoryLists();
+  } catch (error) {
+    handleApiError(error, 'Не удалось обновить материалы');
+  } finally {
+    setButtonLoading(button, false);
+  }
+}
+
+async function refreshTrucksDirectory(button) {
+  setButtonLoading(button, true);
+  try {
+    const response = await request('/api/trucks');
+    state.trucks = Array.isArray(response?.data) ? response.data : [];
+    renderReferenceSelects();
+    renderDirectoryLists();
+  } catch (error) {
+    handleApiError(error, 'Не удалось обновить самосвалы');
+  } finally {
+    setButtonLoading(button, false);
+  }
+}
+
+function setButtonLoading(button, loading) {
+  if (!button) {
+    return;
+  }
+  button.disabled = Boolean(loading);
+  button.dataset.loading = loading ? 'true' : 'false';
 }
 
 function syncUnloadFromCompany() {
