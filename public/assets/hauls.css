@@ -13,13 +13,11 @@
   --shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
   --font-size-base: 0.875rem;
   --font-size-label: 0.75rem;
-  --font-size-title: 1.5625rem;
   --font-weight-regular: 400;
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
   --font-weight-bold: 700;
-  --heading-gap: 30px;
-  --heading-meta-gap: 30px;
+  --heading-gap: 16px;
 }
 
 *,
@@ -749,12 +747,6 @@ body.mobile-driver .mobile-app {
   flex-wrap: wrap;
 }
 
-.haul-card__heading-details {
-  display: flex;
-  gap: var(--heading-meta-gap);
-  flex-wrap: wrap;
-}
-
 .haul-card__heading-updated {
   display: flex;
   justify-content: flex-end;
@@ -762,9 +754,15 @@ body.mobile-driver .mobile-app {
 
 .haul-card__heading-detail {
   font-size: var(--font-size-base);
-  font-weight: var(--font-weight-regular);
+  font-weight: var(--font-weight-semibold);
   color: var(--on-surface);
   white-space: nowrap;
+}
+
+.haul-card__heading-separator {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-regular);
+  color: var(--muted);
 }
 
 .haul-card__heading .tag {
@@ -773,8 +771,8 @@ body.mobile-driver .mobile-app {
 }
 
 .haul-card__title {
-  font-size: var(--font-size-title);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
   margin: 0;
 }
 

@@ -370,8 +370,8 @@ const mobileStorage = {
 };
 
 const mobileStatusLabels = {
-  0: 'Подготовка рейса',
-  1: 'Рейс в работе',
+  0: 'Формирование рейса',
+  1: 'В работе',
   2: 'Загрузился',
   3: 'Выгрузился',
   4: 'Проверено',
@@ -2215,22 +2215,23 @@ function createHaulCard(haul) {
   title.textContent = `#${formatSequence(haul)}`;
   mainGroup.appendChild(title);
 
-  const headingDetails = document.createElement('div');
-  headingDetails.className = 'haul-card__heading-details';
   const driverName = lookupDriver(haul.responsible_id) || 'Не назначен';
   const truckLabel = lookupLabel(state.trucks, haul.truck_id, 'license_plate');
-  headingDetails.appendChild(createHeadingDetail(driverName));
-  headingDetails.appendChild(createHeadingDetail(truckLabel));
-  mainGroup.appendChild(headingDetails);
+  const headingDetails = [driverName, truckLabel].filter(Boolean);
+  headingDetails.forEach((detail) => {
+    mainGroup.appendChild(createHeadingSeparator());
+    mainGroup.appendChild(createHeadingDetail(detail));
+  });
 
   headingRow.appendChild(mainGroup);
 
-  if (haul.updated_at) {
+  const statusLabel = getStatusLabel(haul.status);
+  if (statusLabel) {
     const aside = document.createElement('div');
     aside.className = 'haul-card__heading-updated';
     const metaInfo = document.createElement('span');
     metaInfo.className = 'tag tag--muted';
-    metaInfo.textContent = `Обновлено ${formatDate(haul.updated_at)}`;
+    metaInfo.textContent = statusLabel;
     aside.appendChild(metaInfo);
     headingRow.appendChild(aside);
   }
@@ -2342,6 +2343,13 @@ function createHeadingDetail(text) {
   span.className = 'haul-card__heading-detail';
   const value = typeof text === 'string' ? text.trim() : text;
   span.textContent = value ? String(value) : '—';
+  return span;
+}
+
+function createHeadingSeparator() {
+  const span = document.createElement('span');
+  span.className = 'haul-card__heading-separator';
+  span.textContent = '—';
   return span;
 }
 
