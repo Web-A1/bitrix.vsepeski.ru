@@ -2280,8 +2280,8 @@ function createPrimaryInfoRow(haul) {
 function createLocationsSection(haul) {
   const row = document.createElement('div');
   row.className = 'haul-card__row haul-card__row--locations';
-  row.appendChild(createAddressInfoItem('Загрузка', haul.load, { fullWidth: true }));
-  row.appendChild(createAddressInfoItem('Выгрузка', haul.unload, { fullWidth: true }));
+  row.appendChild(createAddressInfoItem('Загрузка', haul.load));
+  row.appendChild(createAddressInfoItem('Выгрузка', haul.unload));
   return row;
 }
 

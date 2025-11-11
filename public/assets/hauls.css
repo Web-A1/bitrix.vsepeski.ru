@@ -792,6 +792,12 @@ body.mobile-driver .mobile-app {
   grid-template-columns: 1fr;
 }
 
+@media (min-width: 640px) {
+  .haul-card__row--locations {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .haul-card__info-item {
   display: flex;
   flex-direction: column;
