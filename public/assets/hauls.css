@@ -830,13 +830,24 @@ body.mobile-driver .mobile-app {
   min-height: 28px;
 }
 
+.haul-card__status-item::before,
 .haul-card__status-item::after {
   content: '';
   position: absolute;
   left: 12px;
-  top: 50%;
   width: 2px;
-  height: calc(50% + var(--status-gap));
+  background: var(--border);
+  transform: translateX(-50%);
+}
+
+.haul-card__status-item::before {
+  top: 0;
+  bottom: calc(50% + 4px);
+}
+
+.haul-card__status-item::after {
+  top: calc(50% + 4px);
+  bottom: calc(-1 * var(--status-gap));
   background: linear-gradient(
     to bottom,
     var(--accent) 0%,
@@ -844,11 +855,14 @@ body.mobile-driver .mobile-app {
     var(--border) var(--status-progress),
     var(--border) 100%
   );
-  transform: translate(-50%, 0);
+}
+
+.haul-card__status-item:first-child::before {
+  display: none;
 }
 
 .haul-card__status-item:last-child::after {
-  content: none;
+  display: none;
 }
 
 .haul-card__status-marker {
@@ -856,10 +870,8 @@ body.mobile-driver .mobile-app {
   height: 14px;
   border-radius: 50%;
   background: var(--border-strong);
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translate(-50%, -50%);
+  position: relative;
+  margin-right: 12px;
 }
 
 .haul-card__status-label {
