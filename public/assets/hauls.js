@@ -2417,9 +2417,6 @@ function createStatusTimeline(haul) {
     if (isCompleted) {
       item.classList.add('is-completed');
     }
-    const progress = isCompleted ? 100 : isActive ? 50 : 0;
-    item.style.setProperty('--status-progress', `${progress}%`);
-
     const marker = document.createElement('span');
     marker.className = 'haul-card__status-marker';
     const label = document.createElement('span');
