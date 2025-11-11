@@ -13,7 +13,7 @@
   --shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
   --font-size-base: 0.875rem;
   --font-size-label: 0.75rem;
-  --font-size-title: 1.5rem;
+  --font-size-title: 1.5625rem;
   --font-weight-regular: 400;
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
@@ -742,13 +742,13 @@ body.mobile-driver .mobile-app {
 
 .haul-card__heading .tag {
   margin-left: auto;
-  font-size: var(--font-size-base);
+  font-size: var(--font-size-label);
   font-weight: var(--font-weight-regular);
 }
 
 .haul-card__title {
   font-size: var(--font-size-title);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-medium);
   margin: 0;
 }
 
@@ -760,13 +760,16 @@ body.mobile-driver .mobile-app {
   border-radius: 999px;
   background: rgba(47, 107, 255, 0.12);
   color: var(--accent);
-  font-size: 0.78rem;
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-regular);
   white-space: nowrap;
 }
 
 .tag--muted {
   background: rgba(107, 114, 128, 0.15);
   color: var(--muted);
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-regular);
 }
 
 .haul-card__body {
@@ -778,6 +781,15 @@ body.mobile-driver .mobile-app {
 .haul-card__row {
   display: grid;
   gap: 12px;
+  grid-template-columns: 1fr;
+}
+
+.haul-card__row--primary {
+  grid-template-columns: 1fr;
+}
+
+.haul-card__row--locations {
+  grid-template-columns: 1fr;
 }
 
 .haul-card__info-item {
@@ -798,6 +810,14 @@ body.mobile-driver .mobile-app {
   font-size: var(--font-size-base);
   font-weight: var(--font-weight-semibold);
   color: var(--on-surface);
+}
+
+.haul-card__info-item--emphasized .haul-card__info-value {
+  font-size: 1.1rem;
+}
+
+.haul-card__info-item--full {
+  grid-column: 1 / -1;
 }
 
 .haul-card__info-link {
@@ -848,8 +868,8 @@ body.mobile-driver .mobile-app {
 }
 
 @media (min-width: 640px) {
-  .haul-card__row {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .haul-card__row--primary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -861,6 +881,12 @@ body.mobile-driver .mobile-app {
     gap: 16px;
   }
 
+}
+
+@media (min-width: 1024px) {
+  .haul-card__row--primary {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 .editor__header {

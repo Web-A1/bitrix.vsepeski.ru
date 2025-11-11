@@ -2224,7 +2224,7 @@ function createHaulCard(haul) {
   const body = document.createElement('div');
   body.className = 'haul-card__body';
   body.appendChild(createPrimaryInfoRow(haul));
-  body.appendChild(createSecondaryInfoRow(haul));
+  body.appendChild(createLocationsSection(haul));
 
   const footer = document.createElement('div');
   footer.className = 'haul-card__actions';
@@ -2271,39 +2271,39 @@ function createPrimaryInfoRow(haul) {
   row.appendChild(createInfoItem('Водитель', driverName, { emphasize: true }));
   row.appendChild(createInfoItem('Гос номер', truckLabel, { emphasize: true }));
   row.appendChild(createInfoItem('Материал', materialLabel, { emphasize: true }));
-
-  return row;
-}
-
-function createSecondaryInfoRow(haul) {
-  const row = document.createElement('div');
-  row.className = 'haul-card__row haul-card__row--secondary';
-
-  row.appendChild(createAddressInfoItem('Загрузка', haul.load));
-  row.appendChild(createAddressInfoItem('Выгрузка', haul.unload));
-
   const distanceValue = formatDistance(haul.leg_distance_km);
   row.appendChild(createInfoItem('Плечо', distanceValue ? `${distanceValue} км` : '—'));
 
   return row;
 }
 
-function createAddressInfoItem(label, data) {
+function createLocationsSection(haul) {
+  const row = document.createElement('div');
+  row.className = 'haul-card__row haul-card__row--locations';
+  row.appendChild(createAddressInfoItem('Загрузка', haul.load, { fullWidth: true }));
+  row.appendChild(createAddressInfoItem('Выгрузка', haul.unload, { fullWidth: true }));
+  return row;
+}
+
+function createAddressInfoItem(label, data, options = {}) {
   if (!data) {
-    return createInfoItem(label, '');
+    return createInfoItem(label, '', options);
   }
 
   const text = data.address_text || '';
   const url = data.address_url && data.address_text ? data.address_url : null;
-  return createInfoItem(label, text, { href: url });
+  return createInfoItem(label, text, { href: url, fullWidth: Boolean(options.fullWidth) });
 }
 
 function createInfoItem(label, value, options = {}) {
-  const { emphasize = false, href = null } = options;
+  const { emphasize = false, href = null, fullWidth = false } = options;
   const wrapper = document.createElement('div');
   wrapper.className = 'haul-card__info-item';
   if (emphasize) {
     wrapper.classList.add('haul-card__info-item--emphasized');
+  }
+  if (fullWidth) {
+    wrapper.classList.add('haul-card__info-item--full');
   }
 
   const labelEl = document.createElement('span');
