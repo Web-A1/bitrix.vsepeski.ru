@@ -2203,30 +2203,15 @@ function createHaulCard(haul) {
   const header = document.createElement('div');
   header.className = 'haul-card__header';
 
-  const headingWrapper = document.createElement('div');
   const title = document.createElement('h3');
   title.className = 'haul-card__title';
-  title.textContent = `Рейс №${formatSequence(haul)}`;
-
-  const meta = document.createElement('div');
-  meta.className = 'haul-card__meta';
-  const driverName = lookupDriver(haul.responsible_id) || 'Не назначен';
-  const truckLabel = lookupLabel(state.trucks, haul.truck_id, 'license_plate');
-  const materialLabel = lookupLabel(state.materials, haul.material_id, 'name');
-
-  meta.appendChild(createTag(driverName, false));
-  meta.appendChild(createTag(truckLabel, false));
-  meta.appendChild(createTag(materialLabel, true));
-
-  headingWrapper.appendChild(title);
-  headingWrapper.appendChild(meta);
-  header.appendChild(headingWrapper);
+  title.textContent = `#${formatSequence(haul)}`;
+  header.appendChild(title);
 
   const body = document.createElement('div');
   body.className = 'haul-card__body';
-  body.appendChild(createHaulMetrics(haul));
-  body.appendChild(createAddressSection('Загрузка', haul.load));
-  body.appendChild(createAddressSection('Выгрузка', haul.unload, true));
+  body.appendChild(createPrimaryInfoRow(haul));
+  body.appendChild(createSecondaryInfoRow(haul));
 
   const footer = document.createElement('div');
   footer.className = 'haul-card__actions';
@@ -2269,111 +2254,73 @@ function createHaulCard(haul) {
   return card;
 }
 
-function createAddressSection(title, data, isUnload = false) {
-  const section = document.createElement('div');
-  section.className = 'haul-card__section';
+function createPrimaryInfoRow(haul) {
+  const row = document.createElement('div');
+  row.className = 'haul-card__row haul-card__row--primary';
 
-  const heading = document.createElement('strong');
-  heading.textContent = title;
-  section.appendChild(heading);
+  const driverName = lookupDriver(haul.responsible_id) || 'Не назначен';
+  const truckLabel = lookupLabel(state.trucks, haul.truck_id, 'license_plate');
+  const materialLabel = lookupLabel(state.materials, haul.material_id, 'name');
 
-  const address = document.createElement('div');
-  address.className = 'haul-card__address';
-  if (data?.address_url && data?.address_text) {
-    const link = document.createElement('a');
-    link.href = data.address_url;
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
-    link.textContent = data.address_text;
-    link.className = 'haul-card__address-link';
-    address.appendChild(link);
-  } else {
-    address.textContent = data?.address_text || '—';
-  }
-  section.appendChild(address);
+  row.appendChild(createInfoItem('Водитель', driverName, { emphasize: true }));
+  row.appendChild(createInfoItem('Гос номер', truckLabel, { emphasize: true }));
+  row.appendChild(createInfoItem('Материал', materialLabel, { emphasize: true }));
 
-  const details = [];
-  if (data?.from_company_id) {
-    const fromLabel = isUnload
-      ? lookupCompanyName(state.carriers, data.from_company_id)
-      : lookupCompanyName(state.suppliers, data.from_company_id);
-    details.push(`От кого: ${fromLabel ?? data.from_company_id}`);
-  }
-  if (data?.to_company_id) {
-    const toLabel = !isUnload
-      ? lookupCompanyName(state.carriers, data.to_company_id)
-      : state.dealMeta?.company?.title;
-    details.push(`Кому: ${toLabel ?? data.to_company_id}`);
-  }
-  if (!isUnload && Number.isFinite(Number(data?.volume))) {
-    details.push(`Объём: ${Number(data.volume).toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} м³`);
-  }
-
-  if (details.length) {
-    const detailsEl = document.createElement('div');
-    detailsEl.className = 'haul-card__meta';
-    detailsEl.textContent = details.join(' · ');
-    section.appendChild(detailsEl);
-  }
-
-  if (isUnload && (data?.contact_name || data?.contact_phone)) {
-    const hasPhone = Boolean(data?.contact_phone);
-    const contact = document.createElement(hasPhone ? 'a' : 'div');
-    contact.className = 'haul-card__contact';
-    if (hasPhone) {
-      contact.href = formatPhoneHref(data.contact_phone);
-      contact.classList.add('haul-card__contact-link');
-    }
-    if (data.contact_name) {
-      const name = document.createElement('span');
-      name.textContent = data.contact_name;
-      contact.appendChild(name);
-    }
-    if (hasPhone) {
-      const phoneValue = document.createElement('span');
-      phoneValue.textContent = data.contact_phone;
-      contact.appendChild(phoneValue);
-    }
-    section.appendChild(contact);
-  }
-
-  return section;
+  return row;
 }
 
-function createHaulMetrics(haul) {
-  const metrics = document.createElement('div');
-  metrics.className = 'haul-card__metrics';
+function createSecondaryInfoRow(haul) {
+  const row = document.createElement('div');
+  row.className = 'haul-card__row haul-card__row--secondary';
 
-  metrics.appendChild(createMetricItem('Материал', lookupLabel(state.materials, haul.material_id, 'name')));
-  metrics.appendChild(createMetricItem('План, м³', formatVolume(haul.load?.volume) || '—'));
-  metrics.appendChild(createMetricItem('Факт, м³', formatVolume(haul.load?.actual_volume) || '—'));
-  metrics.appendChild(createMetricItem('Плечо, км', formatDistance(haul.leg_distance_km) || '—'));
+  row.appendChild(createAddressInfoItem('Загрузка', haul.load));
+  row.appendChild(createAddressInfoItem('Выгрузка', haul.unload));
 
-  return metrics;
+  const distanceValue = formatDistance(haul.leg_distance_km);
+  row.appendChild(createInfoItem('Плечо', distanceValue ? `${distanceValue} км` : '—'));
+
+  return row;
 }
 
-function createMetricItem(label, value) {
+function createAddressInfoItem(label, data) {
+  if (!data) {
+    return createInfoItem(label, '');
+  }
+
+  const text = data.address_text || '';
+  const url = data.address_url && data.address_text ? data.address_url : null;
+  return createInfoItem(label, text, { href: url });
+}
+
+function createInfoItem(label, value, options = {}) {
+  const { emphasize = false, href = null } = options;
   const wrapper = document.createElement('div');
-  wrapper.className = 'haul-card__metric';
+  wrapper.className = 'haul-card__info-item';
+  if (emphasize) {
+    wrapper.classList.add('haul-card__info-item--emphasized');
+  }
 
   const labelEl = document.createElement('span');
-  labelEl.className = 'haul-card__metric-label';
+  labelEl.className = 'haul-card__info-label';
   labelEl.textContent = label;
   wrapper.appendChild(labelEl);
 
-  const valueEl = document.createElement('span');
-  valueEl.className = 'haul-card__metric-value';
-  valueEl.textContent = value ?? '—';
+  const displayValue = typeof value === 'string' ? value.trim() : value;
+  const text = displayValue ? String(displayValue) : '—';
+  const hasLink = Boolean(href && text && text !== '—');
+
+  const valueEl = document.createElement(hasLink ? 'a' : 'span');
+  valueEl.className = 'haul-card__info-value';
+  if (hasLink) {
+    valueEl.href = href;
+    valueEl.target = '_blank';
+    valueEl.rel = 'noopener noreferrer';
+    valueEl.classList.add('haul-card__info-link');
+  }
+  valueEl.textContent = text;
   wrapper.appendChild(valueEl);
 
   return wrapper;
-}
-
-function createTag(text, muted) {
-  const span = document.createElement('span');
-  span.className = muted ? 'tag tag--muted' : 'tag';
-  span.textContent = text || '—';
-  return span;
 }
 
 function compareHauls(a, b) {

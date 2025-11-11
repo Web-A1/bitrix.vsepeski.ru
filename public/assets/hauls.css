@@ -715,22 +715,15 @@ body.mobile-driver .mobile-app {
 
 .haul-card__header {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
   align-items: flex-start;
-  gap: 16px;
+  gap: 8px;
 }
 
 .haul-card__title {
-  font-size: 1.05rem;
+  font-size: 1rem;
+  font-weight: 700;
   margin: 0;
-}
-
-.haul-card__meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  color: var(--muted);
-  font-size: 0.85rem;
 }
 
 .tag {
@@ -751,57 +744,45 @@ body.mobile-driver .mobile-app {
 }
 
 .haul-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.haul-card__row {
   display: grid;
   gap: 12px;
 }
 
-.haul-card__metrics {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 8px 12px;
-}
-
-.haul-card__metric {
+.haul-card__info-item {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  font-size: 0.8rem;
+  gap: 4px;
+}
+
+.haul-card__info-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   color: var(--muted);
 }
 
-.haul-card__metric-label {
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  font-weight: 500;
-  font-size: 0.75rem;
-}
-
-.haul-card__metric-value {
+.haul-card__info-value {
+  font-size: 1rem;
   font-weight: 600;
-  font-size: 0.95rem;
   color: var(--on-surface);
 }
 
-.haul-card__section {
-  display: grid;
-  gap: 6px;
+.haul-card__info-item--emphasized .haul-card__info-value {
+  font-size: 1.1rem;
 }
 
-.haul-card__section strong {
-  font-weight: 600;
-}
-
-.haul-card__address {
-  font-weight: 600;
-  font-size: 0.95rem;
-}
-
-.haul-card__address-link {
+.haul-card__info-link {
   color: var(--accent);
   text-decoration: none;
 }
 
-.haul-card__address-link:hover {
+.haul-card__info-link:hover {
   text-decoration: underline;
 }
 
@@ -812,23 +793,9 @@ body.mobile-driver .mobile-app {
   justify-content: flex-end;
 }
 
-.haul-card__contact,
-.haul-card__contact-link {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+.haul-card__actions .button {
+  padding: 6px 14px;
   font-size: 0.9rem;
-  align-items: center;
-}
-
-.haul-card__contact-link {
-  color: var(--accent);
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.haul-card__contact-link:hover {
-  text-decoration: underline;
 }
 
 .editor {
@@ -853,6 +820,29 @@ body.mobile-driver .mobile-app {
     border: none;
     box-shadow: none;
     padding-bottom: 24px;
+  }
+}
+
+@media (min-width: 640px) {
+  .haul-card__row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 768px) {
+  .haul-card__header {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 16px;
+  }
+
+  .haul-card__title {
+    font-size: 1.15rem;
+  }
+
+  .haul-card__info-item--emphasized .haul-card__info-value {
+    font-size: 1.2rem;
   }
 }
 
