@@ -737,13 +737,13 @@ body.mobile-driver .mobile-app {
 
 .haul-card__heading-detail {
   font-size: var(--font-size-base);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-regular);
   color: var(--on-surface);
   white-space: nowrap;
 }
 
 .haul-card__heading-link {
-  color: var(--accent);
+  color: var(--on-surface);
   text-decoration: none;
 }
 
