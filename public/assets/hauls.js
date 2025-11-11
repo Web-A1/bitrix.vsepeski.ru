@@ -2207,26 +2207,33 @@ function createHaulCard(haul) {
   const headingRow = document.createElement('div');
   headingRow.className = 'haul-card__heading';
 
+  const mainGroup = document.createElement('div');
+  mainGroup.className = 'haul-card__heading-main';
+
   const title = document.createElement('h3');
   title.className = 'haul-card__title';
   title.textContent = `#${formatSequence(haul)}`;
-  headingRow.appendChild(title);
+  mainGroup.appendChild(title);
 
+  const headingDetails = document.createElement('div');
+  headingDetails.className = 'haul-card__heading-details';
   const driverName = lookupDriver(haul.responsible_id) || 'Не назначен';
   const truckLabel = lookupLabel(state.trucks, haul.truck_id, 'license_plate');
-  const headingMeta = document.createElement('div');
-  headingMeta.className = 'haul-card__heading-meta';
-  headingMeta.appendChild(createHeadingDetail(driverName));
-  headingMeta.appendChild(createHeadingDetail(truckLabel));
+  headingDetails.appendChild(createHeadingDetail(driverName));
+  headingDetails.appendChild(createHeadingDetail(truckLabel));
+  mainGroup.appendChild(headingDetails);
+
+  headingRow.appendChild(mainGroup);
 
   if (haul.updated_at) {
+    const aside = document.createElement('div');
+    aside.className = 'haul-card__heading-updated';
     const metaInfo = document.createElement('span');
     metaInfo.className = 'tag tag--muted';
     metaInfo.textContent = `Обновлено ${formatDate(haul.updated_at)}`;
-    headingMeta.appendChild(metaInfo);
+    aside.appendChild(metaInfo);
+    headingRow.appendChild(aside);
   }
-
-  headingRow.appendChild(headingMeta);
   header.appendChild(headingRow);
 
   const body = document.createElement('div');
