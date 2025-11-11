@@ -72,11 +72,11 @@
 Запросы Bitrix на установку лишь ставят задания в `storage/bitrix/placement-jobs`. Чтобы обработать их, на сервере должен крутиться воркер — самый простой вариант cron:
 
 ```cron
-* * * * * cd ~/bitrix.vsepeski.ru/app && /usr/local/php/cgi/8.2/bin/php bin/process-placement-jobs >> storage/logs/placement-jobs.log 2>&1
+* * * * * cd ~/bitrix.vsepeski.ru/app && /usr/local/php/cgi/8.2/bin/php bin/process-placement-jobs
 ```
 
 - путь к `php`/проекту подставьте свой (для Beget — `/usr/local/php/cgi/8.2/bin/php`).
-- лог `storage/logs/placement-jobs.log` поможет отловить падения воркера.
+- отдельный лог `storage/logs/placement-jobs.log` ведётся автоматически и ротируется (можно править через `PLACEMENT_LOG_*`).
 - health-check `/health` следит за очередью: если `pending > 10` или появились `.failed` файлы, endpoint вернёт `status: degraded`.
 
 ## Key files map

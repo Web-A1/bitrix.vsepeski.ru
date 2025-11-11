@@ -6,11 +6,12 @@ declare(strict_types=1);
 use B24\Center\Infrastructure\Bitrix\Install\QueuedPlacementBindingDispatcher;
 use B24\Center\Infrastructure\Bitrix\Install\SyncPlacementBindingDispatcher;
 use B24\Center\Infrastructure\Logging\InstallLoggerFactory;
+use B24\Center\Infrastructure\Logging\PlacementJobLoggerFactory;
 
 $projectRoot = dirname(__DIR__);
 require $projectRoot . '/vendor/autoload.php';
 
-$logger = InstallLoggerFactory::create($projectRoot);
+$logger = PlacementJobLoggerFactory::create($projectRoot);
 $syncDispatcher = new SyncPlacementBindingDispatcher($logger);
 
 $queueDir = $projectRoot . '/storage/bitrix/placement-jobs';

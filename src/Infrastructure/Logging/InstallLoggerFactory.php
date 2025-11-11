@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace B24\Center\Infrastructure\Logging;
 
 use Monolog\Formatter\JsonFormatter;
-use Monolog\Handler\StreamHandler;
+use Monolog\Handler\RotatingFileHandler;
 use Monolog\Level;
 use Monolog\Logger;
 use Monolog\LogRecord;
@@ -36,7 +36,8 @@ final class InstallLoggerFactory
         }
 
         try {
-            $handler = new StreamHandler($targetPath, $level);
+            $maxFiles = (int) ($_ENV['INSTALL_LOG_MAX_FILES'] ?? 14);
+            $handler = new RotatingFileHandler($targetPath, $maxFiles, $level);
         } catch (\Throwable) {
             return new NullLogger();
         }
