@@ -15,7 +15,7 @@ const embeddedMode = detectEmbeddedMode();
 const driverKeyword = 'водител';
 let referenceDataPromise = null;
 let bx24DealLookupPromise = null;
-const portalBaseUrl = detectPortalBaseUrl();
+let portalBaseUrlCache = '';
 
 const state = {
   dealId: initialDealContext.id,
@@ -57,8 +57,28 @@ function detectPortalBaseUrl() {
   if (globalPortal) {
     return globalPortal;
   }
+  if (window.BX24 && typeof window.BX24.getAuth === 'function') {
+    try {
+      const auth = window.BX24.getAuth();
+      const domain = auth?.domain || auth?.DOMAIN;
+      if (typeof domain === 'string' && domain.trim()) {
+        const normalizedDomain = domain.replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+        return `https://${normalizedDomain}`;
+      }
+    } catch (error) {
+      console.warn('Не удалось определить портал из BX24 auth', error);
+    }
+  }
   const origin = window.location?.origin;
   return typeof origin === 'string' ? origin : '';
+}
+
+function getPortalBaseUrl() {
+  if (portalBaseUrlCache) {
+    return portalBaseUrlCache;
+  }
+  portalBaseUrlCache = detectPortalBaseUrl();
+  return portalBaseUrlCache;
 }
 
 function deriveRoleFromBitrixUser(user) {
@@ -2788,10 +2808,11 @@ function lookupDriver(id) {
 }
 
 function buildDriverProfileUrl(driverId) {
-  if (!portalBaseUrl || !driverId) {
+  const base = getPortalBaseUrl();
+  if (!base || !driverId) {
     return null;
   }
-  const normalizedBase = portalBaseUrl.replace(/\/$/, '');
+  const normalizedBase = base.replace(/\/$/, '');
   return `${normalizedBase}/company/personal/user/${driverId}/`;
 }
 
