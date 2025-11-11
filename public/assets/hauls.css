@@ -734,29 +734,23 @@ body.mobile-driver .mobile-app {
 .haul-card__heading {
   display: flex;
   width: 100%;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 16px;
   flex-wrap: wrap;
+}
+
+.haul-card__heading-detail {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  color: var(--on-surface);
+  white-space: nowrap;
 }
 
 .haul-card__heading .tag {
   margin-left: auto;
   font-size: var(--font-size-label);
   font-weight: var(--font-weight-regular);
-}
-
-.haul-card__header-details {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  width: 100%;
-}
-
-.haul-card__header-detail {
-  font-size: var(--font-size-base);
-  font-weight: var(--font-weight-medium);
-  color: var(--on-surface);
 }
 
 .haul-card__title {

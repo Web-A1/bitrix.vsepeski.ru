@@ -2212,6 +2212,11 @@ function createHaulCard(haul) {
   title.textContent = `#${formatSequence(haul)}`;
   headingRow.appendChild(title);
 
+  const driverName = lookupDriver(haul.responsible_id) || 'Не назначен';
+  const truckLabel = lookupLabel(state.trucks, haul.truck_id, 'license_plate');
+  headingRow.appendChild(createHeadingDetail(driverName));
+  headingRow.appendChild(createHeadingDetail(truckLabel));
+
   if (haul.updated_at) {
     const metaInfo = document.createElement('span');
     metaInfo.className = 'tag tag--muted';
@@ -2220,13 +2225,6 @@ function createHaulCard(haul) {
   }
 
   header.appendChild(headingRow);
-  const driverName = lookupDriver(haul.responsible_id) || 'Не назначен';
-  const truckLabel = lookupLabel(state.trucks, haul.truck_id, 'license_plate');
-  const headerDetails = document.createElement('div');
-  headerDetails.className = 'haul-card__header-details';
-  headerDetails.appendChild(createHeaderDetail(driverName));
-  headerDetails.appendChild(createHeaderDetail(truckLabel));
-  header.appendChild(headerDetails);
 
   const body = document.createElement('div');
   body.className = 'haul-card__body';
@@ -2273,7 +2271,7 @@ function createPrimaryInfoRow(haul) {
 
   const materialLabel = lookupLabel(state.materials, haul.material_id, 'name');
 
-  row.appendChild(createInfoItem('Материал', materialLabel, { emphasize: true }));
+  row.appendChild(createInfoItem('Материал', materialLabel));
   const distanceValue = formatDistance(haul.leg_distance_km);
   row.appendChild(createInfoItem('Плечо', distanceValue ? `${distanceValue} км` : '—'));
 
@@ -2329,9 +2327,9 @@ function createInfoItem(label, value, options = {}) {
   return wrapper;
 }
 
-function createHeaderDetail(text) {
+function createHeadingDetail(text) {
   const span = document.createElement('span');
-  span.className = 'haul-card__header-detail';
+  span.className = 'haul-card__heading-detail';
   const value = typeof text === 'string' ? text.trim() : text;
   span.textContent = value ? String(value) : '—';
   return span;
