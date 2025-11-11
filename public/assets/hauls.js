@@ -2243,47 +2243,23 @@ function createHaulCard(haul) {
   card.className = 'haul-card';
   card.dataset.haulId = haul.id;
 
-  const header = document.createElement('div');
-  header.className = 'haul-card__header';
-
-  const headingRow = document.createElement('div');
-  headingRow.className = 'haul-card__heading';
-
-  const mainGroup = document.createElement('div');
-  mainGroup.className = 'haul-card__heading-main';
-
-  const title = document.createElement('h3');
-  title.className = 'haul-card__title';
-  title.textContent = `#${formatSequence(haul)}`;
-  mainGroup.appendChild(title);
-
-  const driverName = lookupDriver(haul.responsible_id) || 'Не назначен';
-  const truckLabel = lookupLabel(state.trucks, haul.truck_id, 'license_plate');
-  const headingDetails = [
-    { text: driverName, href: buildDriverProfileUrl(haul.responsible_id) },
-    { text: truckLabel },
-  ].filter((detail) => detail.text);
-  headingDetails.forEach((detail) => {
-    mainGroup.appendChild(createHeadingSeparator());
-    mainGroup.appendChild(createHeadingDetail(detail.text, { href: detail.href }));
-  });
-
-  headingRow.appendChild(mainGroup);
-  header.appendChild(headingRow);
-
   const layout = document.createElement('div');
   layout.className = 'haul-card__layout';
 
   const content = document.createElement('div');
   content.className = 'haul-card__content';
+  const headingSection = createHeadingSection(haul);
+  content.appendChild(headingSection);
   content.appendChild(createPrimaryInfoRow(haul));
   content.appendChild(createLocationsSection(haul));
-  content.appendChild(createActionsRow(haul));
+  const actionsRow = createActionsRow(haul);
+  content.appendChild(actionsRow);
+
+  const statusColumn = createStatusTimeline(haul);
 
   layout.appendChild(content);
-  layout.appendChild(createStatusTimeline(haul));
+  layout.appendChild(statusColumn);
 
-  card.appendChild(header);
   card.appendChild(layout);
   return card;
 }
@@ -2352,6 +2328,33 @@ function createInfoItem(label, value, options = {}) {
   return wrapper;
 }
 
+function createHeadingSection(haul) {
+  const section = document.createElement('div');
+  section.className = 'haul-card__header';
+
+  const headingRow = document.createElement('div');
+  headingRow.className = 'haul-card__heading';
+
+  const title = document.createElement('h3');
+  title.className = 'haul-card__title';
+  title.textContent = `#${formatSequence(haul)}`;
+  headingRow.appendChild(title);
+
+  const driverName = lookupDriver(haul.responsible_id) || 'Не назначен';
+  const truckLabel = lookupLabel(state.trucks, haul.truck_id, 'license_plate');
+  const headingDetails = [
+    { text: driverName, href: buildDriverProfileUrl(haul.responsible_id) },
+    { text: truckLabel },
+  ].filter((detail) => detail.text);
+  headingDetails.forEach((detail) => {
+    headingRow.appendChild(createHeadingSeparator());
+    headingRow.appendChild(createHeadingDetail(detail.text, { href: detail.href }));
+  });
+
+  section.appendChild(headingRow);
+  return section;
+}
+
 function createHeadingDetail(text, options = {}) {
   const { href = null } = options;
   const value = typeof text === 'string' ? text.trim() : text;
@@ -2397,22 +2400,26 @@ function createActionButton(label, action, haulId) {
 function createStatusTimeline(haul) {
   const wrapper = document.createElement('aside');
   wrapper.className = 'haul-card__status';
-
-  const title = document.createElement('div');
-  title.className = 'haul-card__status-title';
-  title.textContent = 'Статус';
-  wrapper.appendChild(title);
-
   const list = document.createElement('ol');
   list.className = 'haul-card__status-list';
   const activeValue = getStatusValue(haul.status);
 
-  statusTimelineSteps.forEach((step) => {
+  statusTimelineSteps.forEach((step, index) => {
     const item = document.createElement('li');
     item.className = 'haul-card__status-item';
-    if (step.value === activeValue) {
+    const value = step.value;
+    const statusValue = getStatusValue(haul.status);
+    const isCompleted = statusValue !== null && value < statusValue;
+    const isActive = statusValue !== null && value === statusValue;
+    if (isActive) {
       item.classList.add('is-active');
     }
+    if (isCompleted) {
+      item.classList.add('is-completed');
+    }
+    const progress = isCompleted ? 100 : isActive ? 50 : 0;
+    item.style.setProperty('--status-progress', `${progress}%`);
+
     const marker = document.createElement('span');
     marker.className = 'haul-card__status-marker';
     const label = document.createElement('span');
