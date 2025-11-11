@@ -2220,6 +2220,13 @@ function createHaulCard(haul) {
   }
 
   header.appendChild(headingRow);
+  const driverName = lookupDriver(haul.responsible_id) || 'Не назначен';
+  const truckLabel = lookupLabel(state.trucks, haul.truck_id, 'license_plate');
+  const headerDetails = document.createElement('div');
+  headerDetails.className = 'haul-card__header-details';
+  headerDetails.appendChild(createHeaderDetail(driverName));
+  headerDetails.appendChild(createHeaderDetail(truckLabel));
+  header.appendChild(headerDetails);
 
   const body = document.createElement('div');
   body.className = 'haul-card__body';
@@ -2264,12 +2271,8 @@ function createPrimaryInfoRow(haul) {
   const row = document.createElement('div');
   row.className = 'haul-card__row haul-card__row--primary';
 
-  const driverName = lookupDriver(haul.responsible_id) || 'Не назначен';
-  const truckLabel = lookupLabel(state.trucks, haul.truck_id, 'license_plate');
   const materialLabel = lookupLabel(state.materials, haul.material_id, 'name');
 
-  row.appendChild(createInfoItem('Водитель', driverName, { emphasize: true }));
-  row.appendChild(createInfoItem('Гос номер', truckLabel, { emphasize: true }));
   row.appendChild(createInfoItem('Материал', materialLabel, { emphasize: true }));
   const distanceValue = formatDistance(haul.leg_distance_km);
   row.appendChild(createInfoItem('Плечо', distanceValue ? `${distanceValue} км` : '—'));
@@ -2285,25 +2288,22 @@ function createLocationsSection(haul) {
   return row;
 }
 
-function createAddressInfoItem(label, data, options = {}) {
+function createAddressInfoItem(label, data) {
   if (!data) {
-    return createInfoItem(label, '', options);
+    return createInfoItem(label, '');
   }
 
   const text = data.address_text || '';
   const url = data.address_url && data.address_text ? data.address_url : null;
-  return createInfoItem(label, text, { href: url, fullWidth: Boolean(options.fullWidth) });
+  return createInfoItem(label, text, { href: url });
 }
 
 function createInfoItem(label, value, options = {}) {
-  const { emphasize = false, href = null, fullWidth = false } = options;
+  const { emphasize = false, href = null } = options;
   const wrapper = document.createElement('div');
   wrapper.className = 'haul-card__info-item';
   if (emphasize) {
     wrapper.classList.add('haul-card__info-item--emphasized');
-  }
-  if (fullWidth) {
-    wrapper.classList.add('haul-card__info-item--full');
   }
 
   const labelEl = document.createElement('span');
@@ -2327,6 +2327,14 @@ function createInfoItem(label, value, options = {}) {
   wrapper.appendChild(valueEl);
 
   return wrapper;
+}
+
+function createHeaderDetail(text) {
+  const span = document.createElement('span');
+  span.className = 'haul-card__header-detail';
+  const value = typeof text === 'string' ? text.trim() : text;
+  span.textContent = value ? String(value) : '—';
+  return span;
 }
 
 function compareHauls(a, b) {

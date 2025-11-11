@@ -746,6 +746,19 @@ body.mobile-driver .mobile-app {
   font-weight: var(--font-weight-regular);
 }
 
+.haul-card__header-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  width: 100%;
+}
+
+.haul-card__header-detail {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  color: var(--on-surface);
+}
+
 .haul-card__title {
   font-size: var(--font-size-title);
   font-weight: var(--font-weight-medium);
@@ -822,10 +835,6 @@ body.mobile-driver .mobile-app {
   font-size: 1.1rem;
 }
 
-.haul-card__info-item--full {
-  grid-column: 1 / -1;
-}
-
 .haul-card__info-link {
   color: var(--accent);
   text-decoration: none;
@@ -889,11 +898,6 @@ body.mobile-driver .mobile-app {
 
 }
 
-@media (min-width: 1024px) {
-  .haul-card__row--primary {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
 
 .editor__header {
   padding: 24px 24px 20px;
