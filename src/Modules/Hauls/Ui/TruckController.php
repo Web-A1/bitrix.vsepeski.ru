@@ -162,6 +162,7 @@ final class TruckController
                 'id' => (string) $row['id'],
                 'deal_id' => (int) $row['deal_id'],
                 'sequence' => (int) $row['sequence'],
+                'deleted_at' => $row['deleted_at'],
             ],
             $this->hauls->listUsageByTruck($truckId)
         );

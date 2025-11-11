@@ -143,6 +143,7 @@ final class MaterialController
                 'id' => (string) $row['id'],
                 'deal_id' => (int) $row['deal_id'],
                 'sequence' => (int) $row['sequence'],
+                'deleted_at' => $row['deleted_at'],
             ],
             $this->hauls->listUsageByMaterial($materialId)
         );
