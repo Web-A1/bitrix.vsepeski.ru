@@ -763,10 +763,11 @@ body.mobile-driver .mobile-app {
 }
 
 .haul-card__info-label {
-  font-size: 1rem;
+  font-size: 0.6rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--muted);
+  font-weight: 400;
 }
 
 .haul-card__info-value {
