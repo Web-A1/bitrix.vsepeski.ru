@@ -68,6 +68,17 @@
 - Коммит/пуш: `bin/quick-push.sh [note]` (генерирует сообщение по git diff).
 - Тесты: `composer test` (PHPUnit 10) — см. `tests/Unit/InstallRequestHandlerTest.php` для примера, запускаем `./vendor/bin/phpunit`.
 
+### Фоновый воркер для привязок
+Запросы Bitrix на установку лишь ставят задания в `storage/bitrix/placement-jobs`. Чтобы обработать их, на сервере должен крутиться воркер — самый простой вариант cron:
+
+```cron
+* * * * * cd ~/bitrix.vsepeski.ru/app && /usr/local/php/cgi/8.2/bin/php bin/process-placement-jobs >> storage/logs/placement-jobs.log 2>&1
+```
+
+- путь к `php`/проекту подставьте свой (для Beget — `/usr/local/php/cgi/8.2/bin/php`).
+- лог `storage/logs/placement-jobs.log` поможет отловить падения воркера.
+- health-check `/health` следит за очередью: если `pending > 10` или появились `.failed` файлы, endpoint вернёт `status: degraded`.
+
 ## Key files map
 - `public/index.php`, `src/Infrastructure/Http/{Kernel,Request,Response}.php` — HTTP слой.
 - `src/Modules/Hauls/Application/Services/HaulService.php` — CRUD бизнес-логика.
