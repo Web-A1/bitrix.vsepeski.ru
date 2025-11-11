@@ -711,6 +711,8 @@ body.mobile-driver .mobile-app {
   flex-direction: column;
   gap: 16px;
   border: 1px solid var(--border);
+  font-size: 1rem;
+  font-weight: 600;
 }
 
 .haul-card__header {
@@ -721,7 +723,7 @@ body.mobile-driver .mobile-app {
 }
 
 .haul-card__title {
-  font-size: 1rem;
+  font-size: 1.5rem;
   font-weight: 700;
   margin: 0;
 }
@@ -761,7 +763,7 @@ body.mobile-driver .mobile-app {
 }
 
 .haul-card__info-label {
-  font-size: 0.72rem;
+  font-size: 1rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--muted);
@@ -771,10 +773,6 @@ body.mobile-driver .mobile-app {
   font-size: 1rem;
   font-weight: 600;
   color: var(--on-surface);
-}
-
-.haul-card__info-item--emphasized .haul-card__info-value {
-  font-size: 1.1rem;
 }
 
 .haul-card__info-link {
@@ -837,13 +835,6 @@ body.mobile-driver .mobile-app {
     gap: 16px;
   }
 
-  .haul-card__title {
-    font-size: 1.15rem;
-  }
-
-  .haul-card__info-item--emphasized .haul-card__info-value {
-    font-size: 1.2rem;
-  }
 }
 
 .editor__header {
