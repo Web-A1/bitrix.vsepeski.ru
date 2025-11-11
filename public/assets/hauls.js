@@ -385,6 +385,18 @@ const elements = {
   trucksAlert: document.querySelector('[data-directory-alert="trucks"]'),
 };
 
+elements.manageTargetButtonRecords = elements.manageTargetButtons.map((button) => ({
+  button,
+  parent: button?.parentElement ?? null,
+  nextSibling: button?.nextSibling ?? null,
+}));
+
+elements.manageRefreshButtonRecords = elements.manageRefreshButtons.map((button) => ({
+  button,
+  parent: button?.parentElement ?? null,
+  nextSibling: button?.nextSibling ?? null,
+}));
+
 const mobileElements = {
   container: document.getElementById('mobile-app'),
   loginSection: document.getElementById('mobile-login'),
@@ -2352,26 +2364,66 @@ function updateDirectoryManagerVisibility() {
 
   if (elements.directoryManager) {
     elements.directoryManager.hidden = !allowed;
+    elements.directoryManager.toggleAttribute('aria-hidden', !allowed);
+    elements.directoryManager.toggleAttribute('inert', !allowed);
     if (!allowed) {
       elements.directoryManager.open = false;
+    } else {
+      elements.directoryManager.removeAttribute('aria-hidden');
+      elements.directoryManager.removeAttribute('inert');
     }
   }
 
-  (elements.manageTargetButtons || []).forEach((button) => {
-    if (!button) {
-      return;
-    }
-    button.hidden = !allowed;
-    button.setAttribute('aria-hidden', String(!allowed));
-  });
+  const buttonRecords = [
+    ...(elements.manageTargetButtonRecords || []),
+    ...(elements.manageRefreshButtonRecords || []),
+  ];
 
-  (elements.manageRefreshButtons || []).forEach((button) => {
+  buttonRecords.forEach((record) => {
+    const button = record.button;
     if (!button) {
       return;
     }
-    button.hidden = !allowed;
-    button.disabled = !allowed;
-    button.setAttribute('aria-hidden', String(!allowed));
+
+    if (allowed) {
+      if (!button.isConnected && record.parent) {
+        const reference =
+          record.nextSibling && record.nextSibling.parentNode === record.parent
+            ? record.nextSibling
+            : null;
+        record.parent.insertBefore(button, reference);
+      }
+      button.hidden = false;
+      button.removeAttribute('aria-hidden');
+      button.removeAttribute('inert');
+      if (button.dataset.disabledOriginal === 'true') {
+        button.disabled = true;
+      } else if (button.hasAttribute('data-manage-refresh')) {
+        button.disabled = false;
+      }
+      if (button.tabIndex === -1) {
+        button.removeAttribute('tabindex');
+      }
+      return;
+    }
+
+    if (document.activeElement === button) {
+      button.blur();
+    }
+
+    button.hidden = true;
+    button.setAttribute('aria-hidden', 'true');
+    button.setAttribute('inert', '');
+    button.tabIndex = -1;
+
+    if (button.hasAttribute('data-manage-refresh')) {
+      button.dataset.disabledOriginal = String(button.disabled);
+      button.disabled = true;
+    }
+
+    if (button.isConnected && record.parent) {
+      record.parent.removeChild(button);
+    }
   });
 }
 
