@@ -18,6 +18,7 @@
   --font-weight-semibold: 600;
   --font-weight-bold: 700;
   --heading-gap: 16px;
+  --status-gap: 16px;
 }
 
 *,
@@ -804,7 +805,7 @@ body.mobile-driver .mobile-app {
 .haul-card__status {
   display: flex;
   flex-direction: column;
-  border-left: 1px solid var(--border);
+  border-left: none;
   padding-left: 20px;
 }
 
@@ -814,29 +815,28 @@ body.mobile-driver .mobile-app {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--status-gap);
   flex: 1;
 }
 
 .haul-card__status-item {
   --status-progress: 0%;
   position: relative;
-  padding-left: 28px;
+  padding-left: 36px;
   color: var(--muted);
   font-size: var(--font-size-label);
   display: flex;
   align-items: center;
-  min-height: 26px;
-  gap: 10px;
+  min-height: 28px;
 }
 
 .haul-card__status-item::after {
   content: '';
   position: absolute;
-  left: 13px;
-  top: 20px;
+  left: 12px;
+  top: 50%;
   width: 2px;
-  height: calc(100% - 20px);
+  height: calc(50% + var(--status-gap));
   background: linear-gradient(
     to bottom,
     var(--accent) 0%,
@@ -844,6 +844,7 @@ body.mobile-driver .mobile-app {
     var(--border) var(--status-progress),
     var(--border) 100%
   );
+  transform: translate(-50%, 0);
 }
 
 .haul-card__status-item:last-child::after {
@@ -855,7 +856,10 @@ body.mobile-driver .mobile-app {
   height: 14px;
   border-radius: 50%;
   background: var(--border-strong);
-  flex-shrink: 0;
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translate(-50%, -50%);
 }
 
 .haul-card__status-label {
@@ -948,7 +952,7 @@ body.mobile-driver .mobile-app {
 .haul-card__actions .button {
   padding: 6px 14px;
   font-size: var(--font-size-base);
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--font-weight-regular);
 }
 
 .editor {
