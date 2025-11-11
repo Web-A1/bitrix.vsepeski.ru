@@ -2278,11 +2278,25 @@ async function resolveActorFromBitrix() {
       id: userId ? Number(userId) : null,
       name: nameParts.length ? nameParts.join(' ') : (data.EMAIL ?? null),
     };
-    const role = deriveRoleFromBitrixUser(data);
+    let role = deriveRoleFromBitrixUser(data);
+    if (isBxAdmin()) {
+      role = 'admin';
+    }
     applyRole(role, context);
   } catch (error) {
     console.warn('Не удалось определить пользователя Bitrix24', error);
   }
+}
+
+function isBxAdmin() {
+  try {
+    if (window.BX24 && typeof window.BX24.isAdmin === 'function') {
+      return Boolean(window.BX24.isAdmin());
+    }
+  } catch (error) {
+    console.warn('BX24.isAdmin недоступен', error);
+  }
+  return false;
 }
 
 function renderReferenceSelects() {
