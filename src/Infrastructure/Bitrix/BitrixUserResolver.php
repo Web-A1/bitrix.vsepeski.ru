@@ -32,7 +32,32 @@ class BitrixUserResolver
             throw new RuntimeException('Bitrix auth token is empty.');
         }
 
-        $endpoint = sprintf('%s/rest/user.current.json?auth=%s', $this->baseUrl, urlencode($authToken));
+        $query = http_build_query(
+            [
+                'auth' => $authToken,
+                'select' => [
+                    'ID',
+                    'NAME',
+                    'LAST_NAME',
+                    'SECOND_NAME',
+                    'EMAIL',
+                    'LOGIN',
+                    'PERSONAL_PROFESSION',
+                    'WORK_POSITION',
+                    'POSITION',
+                    'ADMIN',
+                    'IS_ADMIN',
+                    'IS_ADMINISTRATOR',
+                    'IS_SUPER_ADMIN',
+                    'IS_PORTAL_ADMIN',
+                    'RIGHTS',
+                ],
+            ],
+            '',
+            '&',
+            PHP_QUERY_RFC3986
+        );
+        $endpoint = sprintf('%s/rest/user.current.json?%s', $this->baseUrl, $query);
         $context = stream_context_create([
             'http' => [
                 'method' => 'GET',
