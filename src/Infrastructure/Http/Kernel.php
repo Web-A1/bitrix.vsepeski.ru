@@ -215,7 +215,8 @@ class Kernel
 
         $haulController = new HaulController(
             $this->container->get(HaulService::class),
-            $actorResolver
+            $actorResolver,
+            $this->container->get(DealInfoService::class)
         );
 
         /** @var HaulRepository $haulRepository */
@@ -575,14 +576,20 @@ class Kernel
             return 'admin';
         }
 
-        $candidates = [
+        $positions = [
             $bitrixUser['WORK_POSITION'] ?? null,
             $bitrixUser['POSITION'] ?? null,
             $bitrixUser['work_position'] ?? null,
             $bitrixUser['position'] ?? null,
         ];
 
-        foreach ($candidates as $value) {
+        foreach ($positions as $value) {
+            if ($this->containsDispatcherKeyword($value)) {
+                return 'dispatcher';
+            }
+        }
+
+        foreach ($positions as $value) {
             if ($this->containsDriverKeyword($value)) {
                 return 'driver';
             }
@@ -655,3 +662,11 @@ class Kernel
         return false;
     }
 }
+    private function containsDispatcherKeyword(mixed $value): bool
+    {
+        if (!is_string($value)) {
+            return false;
+        }
+
+        return str_contains(mb_strtolower($value), 'диспетчер');
+    }

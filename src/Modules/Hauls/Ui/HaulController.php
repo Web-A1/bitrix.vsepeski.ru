@@ -9,14 +9,21 @@ use B24\Center\Infrastructure\Http\Request;
 use B24\Center\Infrastructure\Http\Response;
 use B24\Center\Modules\Hauls\Application\DTO\ActorContext;
 use B24\Center\Modules\Hauls\Application\Services\HaulService;
+use B24\Center\Modules\Hauls\Application\Services\DealInfoService;
 use B24\Center\Modules\Hauls\Domain\HaulStatus;
 use RuntimeException;
 
 final class HaulController
 {
+    private const DISPATCHER_IDS = [22];
+
+    /** @var array<int,array<string,mixed>> */
+    private array $dealCache = [];
+
     public function __construct(
         private readonly HaulService $service,
         private readonly ActorContextResolver $actorResolver,
+        private readonly DealInfoService $dealInfoService,
     ) {
     }
 
@@ -54,8 +61,14 @@ final class HaulController
             return Response::json(['error' => $validation], 422);
         }
 
+        try {
+            $deal = $this->loadDeal($dealId);
+        } catch (RuntimeException $exception) {
+            return Response::json(['error' => $exception->getMessage()], 422);
+        }
+
         $actor = $this->resolveActor();
-        if (!$this->isAdmin($actor)) {
+        if (!$this->canManageDeal($deal, $actor)) {
             return Response::json(['error' => 'Недостаточно прав для создания рейсов.'], 403);
         }
         $created = $this->service->create($dealId, $payload, $actor);
@@ -73,7 +86,20 @@ final class HaulController
         }
 
         $actor = $this->resolveActor();
-        if (!$this->isAdmin($actor)) {
+
+        try {
+            $existing = $this->service->get($haulId);
+        } catch (RuntimeException $exception) {
+            return Response::json(['error' => $exception->getMessage()], 404);
+        }
+
+        try {
+            $deal = $this->loadDeal((int) $existing['deal_id']);
+        } catch (RuntimeException $exception) {
+            return Response::json(['error' => $exception->getMessage()], 422);
+        }
+
+        if (!$this->canManageDeal($deal, $actor)) {
             return Response::json(['error' => 'Недостаточно прав для изменения рейса.'], 403);
         }
 
@@ -94,6 +120,24 @@ final class HaulController
         }
         $contextActor = $actor ?? $this->resolveActor();
 
+        if ($actor === null) {
+            try {
+                $existing = $this->service->get($haulId);
+            } catch (RuntimeException $exception) {
+                return Response::json(['error' => $exception->getMessage()], 404);
+            }
+
+            try {
+                $deal = $this->loadDeal((int) $existing['deal_id']);
+            } catch (RuntimeException $exception) {
+                return Response::json(['error' => $exception->getMessage()], 422);
+            }
+
+            if (!$this->canManageDeal($deal, $contextActor)) {
+                return Response::json(['error' => 'Недостаточно прав для изменения рейса.'], 403);
+            }
+        }
+
         try {
             $updated = $this->service->transitionStatus(
                 $haulId,
@@ -113,10 +157,23 @@ final class HaulController
         $actor = $this->resolveActor();
 
         try {
-            $this->service->delete($haulId, $actor);
+            $existing = $this->service->get($haulId);
         } catch (RuntimeException $exception) {
-            return Response::json(['error' => $exception->getMessage()], 403);
+            // Нечего удалять
+            return Response::noContent();
         }
+
+        try {
+            $deal = $this->loadDeal((int) $existing['deal_id']);
+        } catch (RuntimeException $exception) {
+            return Response::json(['error' => $exception->getMessage()], 422);
+        }
+
+        if (!$this->canManageDeal($deal, $actor)) {
+            return Response::json(['error' => 'Недостаточно прав для удаления рейса.'], 403);
+        }
+
+        $this->service->delete($haulId, $actor);
 
         return Response::noContent();
     }
@@ -152,5 +209,46 @@ final class HaulController
     private function isAdmin(ActorContext $actor): bool
     {
         return strtolower($actor->role) === 'admin';
+    }
+
+    /**
+     * @param array<string,mixed> $deal
+     */
+    private function canManageDeal(array $deal, ActorContext $actor): bool
+    {
+        if ($this->isAdmin($actor) || $this->isDispatcher($actor)) {
+            return true;
+        }
+
+        $responsible = $deal['responsible'] ?? null;
+        $responsibleId = is_array($responsible) && isset($responsible['id'])
+            ? (int) $responsible['id']
+            : null;
+        if ($responsibleId === null || $actor->id === null) {
+            return false;
+        }
+
+        return $responsibleId === $actor->id;
+    }
+
+    private function isDispatcher(ActorContext $actor): bool
+    {
+        if ($actor->id !== null && in_array($actor->id, self::DISPATCHER_IDS, true)) {
+            return true;
+        }
+
+        return strtolower($actor->role) === 'dispatcher';
+    }
+
+    private function loadDeal(int $dealId): array
+    {
+        if (isset($this->dealCache[$dealId])) {
+            return $this->dealCache[$dealId];
+        }
+
+        $deal = $this->dealInfoService->get($dealId);
+        $this->dealCache[$dealId] = $deal;
+
+        return $deal;
     }
 }

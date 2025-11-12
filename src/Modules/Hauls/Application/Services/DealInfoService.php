@@ -20,7 +20,8 @@ final class DealInfoService
      *     stage?:string|null,
      *     category_id?:int|null,
      *     company?:array{id:int,title:string}|null,
-     *     contact?:array{id:int,name:string,phone:?string}|null
+     *     contact?:array{id:int,name:string,phone:?string}|null,
+     *     responsible?:array{id:int,name?:string}|null
      * }
      */
     public function get(int $dealId): array
@@ -43,6 +44,10 @@ final class DealInfoService
                 'CONTACT_LAST_NAME',
                 'CONTACT_SECOND_NAME',
                 'CONTACT_PHONE',
+                'ASSIGNED_BY_ID',
+                'ASSIGNED_BY_NAME',
+                'ASSIGNED_BY_LAST_NAME',
+                'ASSIGNED_BY_SECOND_NAME',
             ],
         ]);
         $deal = $response['result'] ?? $response['deal'] ?? null;
@@ -72,6 +77,7 @@ final class DealInfoService
                     'phone' => $this->extractContactPhone($deal),
                 ]
                 : null,
+            'responsible' => $this->extractResponsible($deal),
         ];
     }
 
@@ -102,5 +108,35 @@ final class DealInfoService
         }
 
         return null;
+    }
+
+    /**
+     * @param array<string,mixed> $deal
+     * @return array{id:int,name?:string}|null
+     */
+    private function extractResponsible(array $deal): ?array
+    {
+        if (!isset($deal['ASSIGNED_BY_ID'])) {
+            return null;
+        }
+
+        $id = (int) $deal['ASSIGNED_BY_ID'];
+        if ($id <= 0) {
+            return null;
+        }
+
+        $nameParts = [
+            $deal['ASSIGNED_BY_LAST_NAME'] ?? null,
+            $deal['ASSIGNED_BY_NAME'] ?? null,
+            $deal['ASSIGNED_BY_SECOND_NAME'] ?? null,
+        ];
+        $name = trim(implode(' ', array_filter(array_map(
+            static fn ($value) => is_string($value) ? trim($value) : '',
+            $nameParts
+        ))));
+
+        return $name !== ''
+            ? ['id' => $id, 'name' => $name]
+            : ['id' => $id];
     }
 }

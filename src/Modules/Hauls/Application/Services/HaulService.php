@@ -144,10 +144,6 @@ final class HaulService
             return;
         }
 
-        if (!$this->canDelete($existing, $actor)) {
-            throw new RuntimeException('Недостаточно прав для удаления рейса.');
-        }
-
         $this->repository->delete($existing->id());
     }
 
@@ -319,17 +315,6 @@ final class HaulService
         }
 
         return $first === $second;
-    }
-
-    private function canDelete(Haul $haul, ActorContext $actor): bool
-    {
-        if (strtolower($actor->role) === 'admin') {
-            return true;
-        }
-
-        $responsibleId = $haul->responsibleId();
-
-        return $actor->id !== null && $responsibleId !== null && $actor->id === $responsibleId;
     }
 
     private function assertRequiredFieldsForStatus(HaulData $data): void

@@ -52,7 +52,7 @@ final class ActorContextResolver
         $normalized = strtolower(trim($role));
 
         return match ($normalized) {
-            'admin', 'driver', 'manager' => $normalized,
+            'admin', 'driver', 'dispatcher', 'manager' => $normalized,
             default => null,
         };
     }
