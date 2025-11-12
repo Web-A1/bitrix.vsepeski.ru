@@ -16,8 +16,8 @@ final class Haul
         private readonly string $id,
         private readonly int $dealId,
         private ?int $responsibleId,
-        private readonly string $truckId,
-        private readonly string $materialId,
+        private string $truckId,
+        private string $materialId,
         private int $sequence,
         private int $status,
         private ?string $generalNotes,
@@ -67,9 +67,19 @@ final class Haul
         return $this->truckId;
     }
 
+    public function assignTruck(string $truckId): void
+    {
+        $this->truckId = $truckId;
+    }
+
     public function materialId(): string
     {
         return $this->materialId;
+    }
+
+    public function assignMaterial(string $materialId): void
+    {
+        $this->materialId = $materialId;
     }
 
     public function sequence(): int

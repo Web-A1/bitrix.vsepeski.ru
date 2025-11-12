@@ -98,6 +98,12 @@ final class HaulService
         $previousState = $this->captureState($existing);
 
         $existing->assignResponsible($haulData->responsibleId);
+        if ($existing->truckId() !== $haulData->truckId) {
+            $existing->assignTruck($haulData->truckId);
+        }
+        if ($existing->materialId() !== $haulData->materialId) {
+            $existing->assignMaterial($haulData->materialId);
+        }
         $existing->rewriteSequence($haulData->sequence);
         $previousStatus = $existing->status();
         $nextStatus = HaulStatus::sanitize($haulData->status);
