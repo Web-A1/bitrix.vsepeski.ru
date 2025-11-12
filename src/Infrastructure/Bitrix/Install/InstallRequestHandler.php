@@ -42,7 +42,7 @@ final class InstallRequestHandler
     ): InstallResult {
         $auth = $this->extractAuthData($payload);
         $hasTokens = $this->hasTokens($auth);
-        $isPlacementLaunch = isset($payload['PLACEMENT']) || isset($payload['placement']);
+        $isPlacementLaunch = $this->isPlacementLaunch($payload, $query, $request);
         $isTokenDelivery = strtoupper($requestMethod) === 'POST' && $hasTokens;
         $eventName = $this->extractEventName($payload);
         $isInstallEvent = $this->isInstallEvent($eventName);
@@ -122,6 +122,28 @@ final class InstallRequestHandler
             'result' => false,
             'error' => 'unexpected placement renderer response',
         ], 500);
+    }
+
+    /**
+     * @param array<string,mixed> $payload
+     * @param array<string,mixed> $query
+     * @param array<string,mixed> $request
+     */
+    private function isPlacementLaunch(array $payload, array $query, array $request): bool
+    {
+        if (isset($payload['PLACEMENT']) || isset($payload['placement'])) {
+            return true;
+        }
+
+        if (isset($query['PLACEMENT']) || isset($query['placement'])) {
+            return true;
+        }
+
+        if (isset($request['PLACEMENT']) || isset($request['placement'])) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
