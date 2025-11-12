@@ -10,6 +10,7 @@ use B24\Center\Infrastructure\Http\Response;
 use B24\Center\Infrastructure\Auth\ActorContextResolver;
 use B24\Center\Infrastructure\Auth\SessionAuthManager;
 use B24\Center\Infrastructure\Auth\LocalDriverAuthenticator;
+use B24\Center\Infrastructure\Bitrix\BitrixUserResolver;
 use B24\Center\Modules\Hauls\Application\Services\HaulService;
 use B24\Center\Modules\Hauls\Application\DTO\ActorContext;
 use B24\Center\Modules\Hauls\Infrastructure\HaulRepository;
@@ -152,6 +153,64 @@ class Kernel
             $authManager->logout();
 
             return Response::noContent();
+        }
+
+        if ($path === '/api/auth/bitrix') {
+            if ($method !== 'POST') {
+                return $this->methodNotAllowed(['POST']);
+            }
+
+            $payload = $request->body();
+            $authId = isset($payload['auth_id']) ? trim((string) $payload['auth_id']) : '';
+            if ($authId === '' && isset($payload['auth'])) {
+                $authId = trim((string) $payload['auth']);
+            }
+            $memberId = isset($payload['member_id']) ? trim((string) $payload['member_id']) : '';
+            if ($memberId === '' && isset($payload['MEMBER_ID'])) {
+                $memberId = trim((string) $payload['MEMBER_ID']);
+            }
+
+            if ($authId === '' || $memberId === '') {
+                return Response::json(['error' => 'Поля auth_id и member_id обязательны.'], 422);
+            }
+
+            $installData = $this->bitrixInstallationData();
+            $expectedMemberId = isset($installData['member_id']) ? (string) $installData['member_id'] : null;
+            if ($expectedMemberId !== null && $expectedMemberId !== $memberId) {
+                return Response::json(['error' => 'Портал не авторизован для этого приложения.'], 403);
+            }
+
+            $domain = isset($payload['domain']) ? (string) $payload['domain'] : null;
+            if ($domain === null && isset($payload['DOMAIN'])) {
+                $domain = (string) $payload['DOMAIN'];
+            }
+            if ($domain !== null) {
+                $normalizedDomain = $this->normalizePortalDomain($domain);
+                $expectedDomain = $this->normalizePortalDomain($installData['domain'] ?? null)
+                    ?? $this->bitrixPortalHost();
+                if ($expectedDomain !== null && $normalizedDomain !== null && $normalizedDomain !== $expectedDomain) {
+                    return Response::json(['error' => 'Неизвестный портал.'], 403);
+                }
+            }
+
+            /** @var BitrixUserResolver $bitrixUserResolver */
+            $bitrixUserResolver = $this->container->get(BitrixUserResolver::class);
+
+            try {
+                $userPayload = $bitrixUserResolver->resolve($authId);
+            } catch (RuntimeException $exception) {
+                return Response::json(['error' => $exception->getMessage()], 401);
+            }
+
+            try {
+                $sessionUser = $this->prepareBitrixSessionPayload($userPayload);
+            } catch (RuntimeException $exception) {
+                return Response::json(['error' => $exception->getMessage()], 500);
+            }
+
+            $authManager->login($sessionUser);
+
+            return Response::json(['data' => $authManager->user()]);
         }
 
         $haulController = new HaulController(
@@ -377,5 +436,222 @@ class Kernel
         }
 
         return $root;
+    }
+
+    /**
+     * @return array<string,mixed>|null
+     */
+    private function bitrixInstallationData(): ?array
+    {
+        static $cached = null;
+        if ($cached !== null) {
+            return $cached;
+        }
+
+        $path = $this->bitrixOauthPath();
+        if (!is_file($path)) {
+            $cached = null;
+
+            return null;
+        }
+
+        $contents = file_get_contents($path);
+        if ($contents === false) {
+            $cached = null;
+
+            return null;
+        }
+
+        $decoded = json_decode($contents, true);
+        $cached = is_array($decoded) ? $decoded : null;
+
+        return $cached;
+    }
+
+    private function bitrixOauthPath(): string
+    {
+        $override = $_ENV['BITRIX_OAUTH_PATH'] ?? null;
+        if (is_string($override) && $override !== '') {
+            return $override;
+        }
+
+        return $this->projectRoot() . '/storage/bitrix/oauth.json';
+    }
+
+    private function normalizePortalDomain(?string $domain): ?string
+    {
+        if ($domain === null) {
+            return null;
+        }
+
+        $domain = trim($domain);
+        if ($domain === '') {
+            return null;
+        }
+
+        if (str_starts_with($domain, 'http://') || str_starts_with($domain, 'https://')) {
+            $parsed = parse_url($domain, PHP_URL_HOST);
+            if (is_string($parsed) && $parsed !== '') {
+                $domain = $parsed;
+            }
+        }
+
+        $domain = strtolower(rtrim($domain, '/'));
+
+        return $domain === '' ? null : $domain;
+    }
+
+    private function bitrixPortalHost(): ?string
+    {
+        $portalUrl = $_ENV['BITRIX_PORTAL_URL'] ?? null;
+        if (!is_string($portalUrl) || trim($portalUrl) === '') {
+            return null;
+        }
+
+        $host = parse_url($portalUrl, PHP_URL_HOST);
+        if (is_string($host) && $host !== '') {
+            return strtolower($host);
+        }
+
+        $normalized = $this->normalizePortalDomain($portalUrl);
+
+        return $normalized;
+    }
+
+    /**
+     * @param array<string,mixed> $bitrixUser
+     * @return array<string,mixed>
+     */
+    private function prepareBitrixSessionPayload(array $bitrixUser): array
+    {
+        $userId = (int) ($bitrixUser['ID'] ?? $bitrixUser['id'] ?? 0);
+        if ($userId <= 0) {
+            throw new RuntimeException('Bitrix24 не вернул идентификатор пользователя.');
+        }
+
+        $login = (string) ($bitrixUser['LOGIN'] ?? $bitrixUser['login'] ?? '');
+        if ($login === '') {
+            $login = (string) ($bitrixUser['EMAIL'] ?? ('bitrix-user-' . $userId));
+        }
+
+        $nameParts = [];
+        foreach (['LAST_NAME', 'NAME', 'SECOND_NAME'] as $key) {
+            $value = $bitrixUser[$key] ?? $bitrixUser[strtolower($key)] ?? null;
+            if (is_string($value) && trim($value) !== '') {
+                $nameParts[] = trim($value);
+            }
+        }
+
+        $displayName = trim(implode(' ', $nameParts));
+        if ($displayName === '') {
+            $displayName = (string) ($bitrixUser['EMAIL'] ?? $login);
+        }
+
+        return [
+            'id' => $userId,
+            'name' => $displayName,
+            'login' => $login,
+            'email' => isset($bitrixUser['EMAIL']) ? (string) $bitrixUser['EMAIL'] : null,
+            'role' => $this->deriveBitrixRole($bitrixUser),
+            'ADMIN' => $bitrixUser['ADMIN'] ?? null,
+            'IS_ADMIN' => $bitrixUser['IS_ADMIN'] ?? null,
+            'is_admin' => $bitrixUser['is_admin'] ?? null,
+            'IS_ADMINISTRATOR' => $bitrixUser['IS_ADMINISTRATOR'] ?? null,
+            'is_administrator' => $bitrixUser['is_administrator'] ?? null,
+            'IS_SUPER_ADMIN' => $bitrixUser['IS_SUPER_ADMIN'] ?? null,
+            'is_super_admin' => $bitrixUser['is_super_admin'] ?? null,
+            'IS_PORTAL_ADMIN' => $bitrixUser['IS_PORTAL_ADMIN'] ?? null,
+            'is_portal_admin' => $bitrixUser['is_portal_admin'] ?? null,
+            'RIGHTS' => $bitrixUser['RIGHTS'] ?? null,
+        ];
+    }
+
+    /**
+     * @param array<string,mixed> $bitrixUser
+     */
+    private function deriveBitrixRole(array $bitrixUser): string
+    {
+        if ($this->isBitrixAdmin($bitrixUser)) {
+            return 'admin';
+        }
+
+        $candidates = [
+            $bitrixUser['WORK_POSITION'] ?? null,
+            $bitrixUser['POSITION'] ?? null,
+            $bitrixUser['work_position'] ?? null,
+            $bitrixUser['position'] ?? null,
+        ];
+
+        foreach ($candidates as $value) {
+            if ($this->containsDriverKeyword($value)) {
+                return 'driver';
+            }
+        }
+
+        return 'manager';
+    }
+
+    /**
+     * @param array<string,mixed> $bitrixUser
+     */
+    private function isBitrixAdmin(array $bitrixUser): bool
+    {
+        $flags = [
+            $bitrixUser['ADMIN'] ?? null,
+            $bitrixUser['admin'] ?? null,
+            $bitrixUser['IS_ADMIN'] ?? null,
+            $bitrixUser['is_admin'] ?? null,
+            $bitrixUser['IS_ADMINISTRATOR'] ?? null,
+            $bitrixUser['is_administrator'] ?? null,
+            $bitrixUser['IS_SUPER_ADMIN'] ?? null,
+            $bitrixUser['is_super_admin'] ?? null,
+            $bitrixUser['IS_PORTAL_ADMIN'] ?? null,
+            $bitrixUser['is_portal_admin'] ?? null,
+        ];
+
+        $rights = $bitrixUser['RIGHTS'] ?? null;
+        if (is_array($rights)) {
+            $lowerRights = array_map(
+                static fn ($value): string => is_string($value) ? strtolower($value) : '',
+                $rights
+            );
+            $flags[] = in_array('admin', $lowerRights, true);
+        }
+
+        foreach ($flags as $flag) {
+            if ($this->isTruthyFlag($flag)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function containsDriverKeyword(mixed $value): bool
+    {
+        if (!is_string($value)) {
+            return false;
+        }
+
+        return str_contains(mb_strtolower($value, 'UTF-8'), 'водител');
+    }
+
+    private function isTruthyFlag(mixed $value): bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if (is_int($value)) {
+            return $value === 1;
+        }
+
+        if (is_string($value)) {
+            $normalized = strtolower(trim($value));
+
+            return in_array($normalized, ['y', 'yes', '1', 'true', 'admin'], true);
+        }
+
+        return false;
     }
 }

@@ -16,6 +16,7 @@ const driverKeyword = 'водител';
 let referenceDataPromise = null;
 let bx24DealLookupPromise = null;
 let portalBaseUrlCache = '';
+let serverSessionSynced = false;
 
 const state = {
   dealId: initialDealContext.id,
@@ -259,6 +260,64 @@ function detectRoleOverride() {
   }
 
   return null;
+}
+
+async function ensureServerSessionFromBitrixAuth(force = false) {
+  if (!state.embedded) {
+    return;
+  }
+  if (serverSessionSynced && !force) {
+    return;
+  }
+
+  const bx24 = await waitForBx24();
+  if (!bx24 || typeof bx24.getAuth !== 'function') {
+    return;
+  }
+
+  let auth = null;
+  try {
+    auth = bx24.getAuth();
+  } catch (error) {
+    console.warn('BX24.getAuth недоступен', error);
+    return;
+  }
+
+  const authId = extractBxAuthField(auth, ['auth_id', 'AUTH_ID', 'access_token', 'ACCESS_TOKEN', 'auth', 'AUTH']);
+  const memberId = extractBxAuthField(auth, ['member_id', 'MEMBER_ID']);
+
+  if (!authId || !memberId) {
+    return;
+  }
+
+  const domain = extractBxAuthField(auth, ['domain', 'DOMAIN']);
+
+  try {
+    await request('/api/auth/bitrix', {
+      method: 'POST',
+      body: {
+        auth_id: authId,
+        member_id: memberId,
+        domain: domain || undefined,
+      },
+    });
+    serverSessionSynced = true;
+  } catch (error) {
+    serverSessionSynced = false;
+    console.warn('Не удалось синхронизировать серверную сессию', error);
+  }
+}
+
+function extractBxAuthField(auth, candidates) {
+  if (!auth || typeof auth !== 'object') {
+    return '';
+  }
+  for (const key of candidates) {
+    if (key in auth && auth[key]) {
+      return String(auth[key]).trim();
+    }
+  }
+  return '';
 }
 
 function extractRoleFromObject(subject) {
@@ -687,6 +746,7 @@ async function initEmbedded() {
   configureEmbedding();
   attachEventHandlers();
   setupDirectoryManager();
+  await ensureServerSessionFromBitrixAuth();
   const actorPromise = resolveActorFromBitrix();
   referenceDataPromise = loadReferenceData().catch((error) => {
     console.error('Не удалось загрузить справочники', error);

@@ -64,13 +64,20 @@ final class ActorContextResolver
     {
         $candidates = [
             $user['admin'] ?? null,
+            $user['ADMIN'] ?? null,
             $user['is_admin'] ?? null,
+            $user['IS_ADMIN'] ?? null,
             $user['isAdmin'] ?? null,
+            $user['ISADMIN'] ?? null,
             $user['is_administrator'] ?? null,
+            $user['IS_ADMINISTRATOR'] ?? null,
             $user['isAdministrator'] ?? null,
             $user['is_super_admin'] ?? null,
+            $user['IS_SUPER_ADMIN'] ?? null,
             $user['isSuperAdmin'] ?? null,
+            $user['IS_SUPERADMIN'] ?? null,
             $user['is_portal_admin'] ?? null,
+            $user['IS_PORTAL_ADMIN'] ?? null,
             $user['isPortalAdmin'] ?? null,
         ];
 

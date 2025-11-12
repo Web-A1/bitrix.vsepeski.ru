@@ -10,6 +10,7 @@ use B24\Center\Infrastructure\Http\Kernel;
 use B24\Center\Infrastructure\Persistence\Database\DatabaseServiceProvider;
 use B24\Center\Modules\Hauls\HaulsServiceProvider;
 use B24\Center\Modules\Hauls\Infrastructure\DriverAccountRepository;
+use B24\Center\Infrastructure\Bitrix\BitrixUserResolver;
 use Dotenv\Dotenv;
 
 $rootPath = dirname(__DIR__);
@@ -37,6 +38,12 @@ $app->singleton(LocalDriverAuthenticator::class, static function (Application $c
     $repository = $container->get(DriverAccountRepository::class);
 
     return new LocalDriverAuthenticator($repository);
+});
+$app->singleton(BitrixUserResolver::class, static function (): BitrixUserResolver {
+    $config = require dirname(__DIR__) . '/config/bitrix.php';
+    $portalUrl = $config['portal_url'] ?? '';
+
+    return new BitrixUserResolver($portalUrl);
 });
 $app->singleton(Kernel::class, static fn (Application $container) => new Kernel($container));
 
