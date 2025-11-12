@@ -11,6 +11,7 @@ use B24\Center\Modules\Hauls\Application\DTO\ActorContext;
 use B24\Center\Modules\Hauls\Application\Services\HaulService;
 use B24\Center\Modules\Hauls\Application\Services\DealInfoService;
 use B24\Center\Modules\Hauls\Domain\HaulStatus;
+use DateTimeImmutable;
 use RuntimeException;
 
 final class HaulController
@@ -69,6 +70,7 @@ final class HaulController
 
         $actor = $this->resolveActor();
         if (!$this->canManageDeal($deal, $actor)) {
+            $this->logAccessDenied('store', $actor, ['deal_id' => $dealId]);
             return Response::json(['error' => 'Недостаточно прав для создания рейсов.'], 403);
         }
         $created = $this->service->create($dealId, $payload, $actor);
@@ -100,6 +102,7 @@ final class HaulController
         }
 
         if (!$this->canManageDeal($deal, $actor)) {
+            $this->logAccessDenied('update', $actor, ['deal_id' => $existing['deal_id'] ?? null, 'haul_id' => $haulId]);
             return Response::json(['error' => 'Недостаточно прав для изменения рейса.'], 403);
         }
 
@@ -134,6 +137,7 @@ final class HaulController
             }
 
             if (!$this->canManageDeal($deal, $contextActor)) {
+                $this->logAccessDenied('transition', $contextActor, ['deal_id' => $existing['deal_id'] ?? null, 'haul_id' => $haulId]);
                 return Response::json(['error' => 'Недостаточно прав для изменения рейса.'], 403);
             }
         }
@@ -170,6 +174,7 @@ final class HaulController
         }
 
         if (!$this->canManageDeal($deal, $actor)) {
+            $this->logAccessDenied('destroy', $actor, ['deal_id' => $existing['deal_id'] ?? null, 'haul_id' => $haulId]);
             return Response::json(['error' => 'Недостаточно прав для удаления рейса.'], 403);
         }
 
@@ -250,5 +255,25 @@ final class HaulController
         $this->dealCache[$dealId] = $deal;
 
         return $deal;
+    }
+
+    private function logAccessDenied(string $action, ActorContext $actor, array $context = []): void
+    {
+        $entry = [
+            'timestamp' => (new DateTimeImmutable())->format(DATE_ATOM),
+            'action' => $action,
+            'actor' => [
+                'id' => $actor->id,
+                'name' => $actor->name,
+                'role' => $actor->role,
+            ],
+            'context' => $context,
+        ];
+
+        $root = dirname(__DIR__, 4);
+        $path = $root . '/storage/logs/hauls-access.log';
+        $line = json_encode($entry, JSON_UNESCAPED_UNICODE) . PHP_EOL;
+
+        @file_put_contents($path, $line, FILE_APPEND);
     }
 }
