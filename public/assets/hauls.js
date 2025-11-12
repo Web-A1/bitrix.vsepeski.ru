@@ -48,6 +48,7 @@ const state = {
     trucks: null,
   },
   editorStatus: 0,
+  pendingFitOptions: null,
 };
 
 function detectDefaultRole(isEmbedded) {
@@ -706,7 +707,7 @@ async function initEmbedded() {
     renderList();
   }
   setAppReady(true);
-  scheduleFitWindow();
+  scheduleFitWindow(200, { waitForLayout: true });
 }
 
 async function initMobile() {
@@ -1844,7 +1845,7 @@ async function applyView(view, haulId, options = {}) {
   if (view === views.LIST) {
     resetScrollPosition();
     renderList();
-    scheduleFitWindow();
+    scheduleFitWindow(200, { waitForLayout: true });
     return;
   }
 
@@ -3283,7 +3284,7 @@ async function loadHauls() {
     state.loading = false;
     renderList();
     updateDealMeta();
-    scheduleFitWindow();
+    scheduleFitWindow(200, { waitForLayout: true });
   }
 }
 
@@ -3966,7 +3967,7 @@ function upsertHaul(haul) {
   }
 
   renderList();
-  scheduleFitWindow();
+  scheduleFitWindow(200, { waitForLayout: true });
 }
 
 async function deleteHaul(haulId) {
@@ -3982,7 +3983,7 @@ async function deleteHaul(haulId) {
     } else {
       renderList();
       updateDealMeta();
-      scheduleFitWindow();
+      scheduleFitWindow(200, { waitForLayout: true });
     }
   } catch (error) {
     handleApiError(error, { message: 'Не удалось удалить рейс, попробуйте ещё раз' });
@@ -4028,21 +4029,7 @@ function openEditor(metaText = '') {
   elements.editorPanel?.setAttribute('aria-hidden', 'false');
   elements.editorPanel?.removeAttribute('hidden');
   elements.mainSection?.setAttribute('hidden', '');
-
-  if (state.embedded && window.BX24) {
-    const canResize = typeof window.BX24.resizeWindow === 'function';
-    const viewport = typeof window.BX24.getViewportSize === 'function' ? window.BX24.getViewportSize() : null;
-
-    if (canResize && viewport && typeof viewport.height === 'number') {
-      const targetWidth = typeof viewport.width === 'number' ? viewport.width : document.documentElement.clientWidth;
-      const targetHeight = viewport.height || window.innerHeight;
-      window.BX24.resizeWindow(targetWidth, targetHeight);
-    } else if (typeof window.BX24.fitWindow === 'function') {
-      window.BX24.fitWindow();
-    }
-  }
-
-  scheduleFitWindow();
+  scheduleFitWindow(200, { waitForLayout: true });
 }
 
 function closeEditor() {
@@ -4053,7 +4040,7 @@ function closeEditor() {
   elements.haulForm?.reset();
   clearFormError();
   resetScrollPosition();
-  scheduleFitWindow();
+  scheduleFitWindow(200, { waitForLayout: true });
 }
 
 function updatePanelsVisibility(view) {
@@ -4162,41 +4149,58 @@ function formatDate(input) {
   }).format(date);
 }
 
-function scheduleFitWindow(delay = 120) {
+function scheduleFitWindow(delay = 120, options = {}) {
   if (!state.embedded) return;
+  state.pendingFitOptions = options;
   if (fitTimer) {
     clearTimeout(fitTimer);
   }
-  fitTimer = setTimeout(fitWindow, delay);
+  fitTimer = setTimeout(() => {
+    const pending = state.pendingFitOptions || {};
+    state.pendingFitOptions = null;
+    if (pending.waitForLayout) {
+      requestAnimationFrame(() => requestAnimationFrame(() => fitWindow(pending)));
+    } else {
+      fitWindow(pending);
+    }
+  }, delay);
 }
 
-function fitWindow() {
+function fitWindow(options = {}) {
   if (!state.embedded || !window.BX24) {
     return;
+  }
+
+  const width = document.documentElement?.clientWidth || window.innerWidth || 1024;
+  const height = typeof options.height === 'number'
+    ? options.height
+    : measureContentHeight();
+
+  if (typeof window.BX24.resizeWindow === 'function') {
+    try {
+      window.BX24.resizeWindow(width, height);
+      return;
+    } catch (error) {
+      console.warn('BX24.resizeWindow failed', error);
+    }
   }
 
   if (typeof window.BX24.fitWindow === 'function') {
     try {
       window.BX24.fitWindow();
-      return;
     } catch (error) {
       console.warn('BX24.fitWindow failed', error);
     }
   }
+}
 
-  if (typeof window.BX24.resizeWindow === 'function') {
-    const width = document.documentElement?.clientWidth || window.innerWidth || 1024;
-    const height = Math.max(
-      document.body?.scrollHeight || 0,
-      document.documentElement?.scrollHeight || 0,
-      window.innerHeight || 0,
-    );
-    try {
-      window.BX24.resizeWindow(width, height);
-    } catch (error) {
-      console.warn('BX24.resizeWindow failed', error);
-    }
-  }
+function measureContentHeight() {
+  const bodyHeight = document.body?.scrollHeight || 0;
+  const docHeight = document.documentElement?.scrollHeight || 0;
+  const appHeight = elements.app?.scrollHeight || 0;
+  const viewport = window.innerHeight || 0;
+
+  return Math.max(bodyHeight, docHeight, appHeight, viewport);
 }
 
 function resetScrollPosition() {
