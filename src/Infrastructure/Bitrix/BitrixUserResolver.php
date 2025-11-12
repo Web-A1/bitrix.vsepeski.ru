@@ -91,7 +91,7 @@ class BitrixUserResolver
     {
         $query = http_build_query(['auth' => $authToken], '', '&', PHP_QUERY_RFC3986);
         try {
-            $decoded = $this->performRequest('user.admin.get', $query);
+            $decoded = $this->performRequest('user.admin', $query);
         } catch (RuntimeException) {
             return false;
         }
