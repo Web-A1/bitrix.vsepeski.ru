@@ -3768,22 +3768,30 @@ function isPreparationStageActive() {
   return value === haulStatusValues.PREPARATION;
 }
 
+function setButtonVisibility(button, visible) {
+  if (!button) {
+    return;
+  }
+  button.hidden = !visible;
+  button.style.display = visible ? '' : 'none';
+}
+
 function updateFooterButtonsState() {
   const disable = Boolean(state.saving);
   const showPreparationActions = isPreparationStageActive();
 
+  setButtonVisibility(elements.saveDraftButton, showPreparationActions);
   if (elements.saveDraftButton) {
-    elements.saveDraftButton.hidden = !showPreparationActions;
     elements.saveDraftButton.disabled = disable || !showPreparationActions;
   }
 
+  setButtonVisibility(elements.finalizeHaulButton, showPreparationActions);
   if (elements.finalizeHaulButton) {
-    elements.finalizeHaulButton.hidden = !showPreparationActions;
     elements.finalizeHaulButton.disabled = disable || !showPreparationActions;
   }
 
+  setButtonVisibility(elements.submitHaul, !showPreparationActions);
   if (elements.submitHaul) {
-    elements.submitHaul.hidden = showPreparationActions;
     elements.submitHaul.disabled = disable || showPreparationActions;
   }
 
