@@ -49,6 +49,7 @@ final class HaulService
         $haulData = HaulData::fromArray($payload, $dealId, (int) $sequence);
 
         $status = HaulStatus::sanitize($haulData->status);
+        $this->assertRequiredFieldsForStatus($haulData);
 
         $entity = $this->repository->create([
             'deal_id' => $haulData->dealId,
@@ -96,6 +97,7 @@ final class HaulService
         $sequence = $payload['sequence'] ?? $existing->sequence();
         $haulData = HaulData::fromArray($payload, $existing->dealId(), (int) $sequence);
         $previousState = $this->captureState($existing);
+        $this->assertRequiredFieldsForStatus($haulData);
 
         $existing->assignResponsible($haulData->responsibleId);
         if ($existing->truckId() !== $haulData->truckId) {
@@ -173,6 +175,15 @@ final class HaulService
 
         if (!HaulStatus::canTransition($currentStatus, $nextStatus, $actor->role)) {
             throw new RuntimeException('Недопустимый переход статуса.');
+        }
+
+        if ($nextStatus > HaulStatus::PREPARATION) {
+            $missing = $this->missingRequiredFieldsForEntity($haul);
+            if ($missing !== []) {
+                throw new RuntimeException(
+                    sprintf('Для смены статуса заполните поля: %s.', implode(', ', $missing))
+                );
+            }
         }
 
         if (array_key_exists('load_actual_volume', $context)) {
@@ -304,5 +315,54 @@ final class HaulService
         }
 
         return $first === $second;
+    }
+
+    private function assertRequiredFieldsForStatus(HaulData $data): void
+    {
+        if ($data->status <= HaulStatus::PREPARATION) {
+            return;
+        }
+
+        $missing = [];
+        if (!$data->truckId) {
+            $missing[] = 'truck_id';
+        }
+        if (!$data->materialId) {
+            $missing[] = 'material_id';
+        }
+        if (!$data->loadAddressText) {
+            $missing[] = 'load_address_text';
+        }
+        if (!$data->unloadAddressText) {
+            $missing[] = 'unload_address_text';
+        }
+
+        if ($missing !== []) {
+            throw new RuntimeException(
+                sprintf('Для выбранного статуса заполните поля: %s.', implode(', ', $missing))
+            );
+        }
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function missingRequiredFieldsForEntity(Haul $haul): array
+    {
+        $missing = [];
+        if (!$haul->truckId()) {
+            $missing[] = 'truck_id';
+        }
+        if (!$haul->materialId()) {
+            $missing[] = 'material_id';
+        }
+        if (!$haul->loadAddressText()) {
+            $missing[] = 'load_address_text';
+        }
+        if (!$haul->unloadAddressText()) {
+            $missing[] = 'unload_address_text';
+        }
+
+        return $missing;
     }
 }

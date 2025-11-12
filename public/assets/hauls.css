@@ -1274,6 +1274,102 @@ body.mobile-driver .mobile-app {
   box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
 }
 
+.editor-status {
+  padding: 12px clamp(24px, 5vw, 48px) 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.editor-status__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+}
+
+.editor-status__item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding-top: 12px;
+}
+
+.editor-status__item::before {
+  content: '';
+  position: absolute;
+  top: 20px;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--border);
+  z-index: 0;
+}
+
+.editor-status__item.is-first::before {
+  left: 50%;
+}
+
+.editor-status__item.is-last::before {
+  right: 50%;
+}
+
+.editor-status__marker {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--border);
+  position: relative;
+  z-index: 1;
+  margin-bottom: 6px;
+}
+
+.editor-status__label {
+  font-size: 0.85rem;
+  line-height: 1.2;
+}
+
+.editor-status__item.is-completed {
+  color: var(--on-surface);
+}
+
+.editor-status__item.is-completed::before,
+.editor-status__item.is-completed .editor-status__marker {
+  background: var(--accent);
+}
+
+.editor-status__item.is-active {
+  color: var(--on-surface);
+  font-weight: var(--font-weight-semibold);
+}
+
+.editor-status__item.is-active::before,
+.editor-status__item.is-active .editor-status__marker {
+  background: var(--accent);
+}
+
+.editor-status__item.is-active .editor-status__marker {
+  box-shadow: 0 0 0 6px rgba(47, 107, 255, 0.25);
+}
+
+.editor-status--loading .editor-status__item {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.editor-status--readonly .editor-status__item {
+  cursor: default;
+  pointer-events: none;
+  opacity: 0.8;
+}
+
 .editor__header-info {
   display: flex;
   flex-direction: column;
@@ -1439,6 +1535,7 @@ textarea:focus {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .editor__footer-actions .button {

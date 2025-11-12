@@ -9,12 +9,12 @@ final class HaulData
     public function __construct(
         public readonly int $dealId,
         public readonly ?int $responsibleId,
-        public readonly string $truckId,
-        public readonly string $materialId,
+        public readonly ?string $truckId,
+        public readonly ?string $materialId,
         public readonly int $sequence,
         public readonly int $status,
         public readonly ?string $generalNotes,
-        public readonly string $loadAddressText,
+        public readonly ?string $loadAddressText,
         public readonly ?string $loadAddressUrl,
         public readonly ?int $loadFromCompanyId,
         public readonly ?int $loadToCompanyId,
@@ -22,7 +22,7 @@ final class HaulData
         public readonly ?float $loadActualVolume,
         public readonly ?float $legDistanceKm,
         /** @var list<int|string> */ public readonly array $loadDocuments,
-        public readonly string $unloadAddressText,
+        public readonly ?string $unloadAddressText,
         public readonly ?string $unloadAddressUrl,
         public readonly ?int $unloadFromCompanyId,
         public readonly ?int $unloadToCompanyId,
@@ -41,12 +41,12 @@ final class HaulData
         return new self(
             dealId: $dealId,
             responsibleId: isset($payload['responsible_id']) ? (int) $payload['responsible_id'] : null,
-            truckId: (string) $payload['truck_id'],
-            materialId: (string) $payload['material_id'],
+            truckId: self::nullableString($payload['truck_id'] ?? null),
+            materialId: self::nullableString($payload['material_id'] ?? null),
             sequence: $sequence,
             status: isset($payload['status']) ? (int) $payload['status'] : 0,
             generalNotes: isset($payload['general_notes']) ? (string) $payload['general_notes'] : null,
-            loadAddressText: (string) $payload['load_address_text'],
+            loadAddressText: self::nullableString($payload['load_address_text'] ?? null),
             loadAddressUrl: isset($payload['load_address_url']) ? (string) $payload['load_address_url'] : null,
             loadFromCompanyId: isset($payload['load_from_company_id']) ? (int) $payload['load_from_company_id'] : null,
             loadToCompanyId: isset($payload['load_to_company_id']) ? (int) $payload['load_to_company_id'] : null,
@@ -54,7 +54,7 @@ final class HaulData
             loadActualVolume: isset($payload['load_actual_volume']) ? (float) $payload['load_actual_volume'] : null,
             legDistanceKm: isset($payload['leg_distance_km']) ? (float) $payload['leg_distance_km'] : null,
             loadDocuments: self::normalizeDocuments($payload['load_documents'] ?? []),
-            unloadAddressText: (string) $payload['unload_address_text'],
+            unloadAddressText: self::nullableString($payload['unload_address_text'] ?? null),
             unloadAddressUrl: isset($payload['unload_address_url']) ? (string) $payload['unload_address_url'] : null,
             unloadFromCompanyId: isset($payload['unload_from_company_id']) ? (int) $payload['unload_from_company_id'] : null,
             unloadToCompanyId: isset($payload['unload_to_company_id']) ? (int) $payload['unload_to_company_id'] : null,
@@ -63,6 +63,15 @@ final class HaulData
             unloadAcceptanceTime: isset($payload['unload_acceptance_time']) ? (string) $payload['unload_acceptance_time'] : null,
             unloadDocuments: self::normalizeDocuments($payload['unload_documents'] ?? []),
         );
+    }
+
+    private static function nullableString(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return (string) $value;
     }
 
     /**

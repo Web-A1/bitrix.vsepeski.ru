@@ -16,12 +16,12 @@ final class Haul
         private readonly string $id,
         private readonly int $dealId,
         private ?int $responsibleId,
-        private string $truckId,
-        private string $materialId,
+        private ?string $truckId,
+        private ?string $materialId,
         private int $sequence,
         private int $status,
         private ?string $generalNotes,
-        private string $loadAddressText,
+        private ?string $loadAddressText,
         private ?string $loadAddressUrl,
         private ?int $loadFromCompanyId,
         private ?int $loadToCompanyId,
@@ -29,7 +29,7 @@ final class Haul
         private ?float $loadActualVolume,
         private ?float $legDistanceKm,
         private array $loadDocuments,
-        private string $unloadAddressText,
+        private ?string $unloadAddressText,
         private ?string $unloadAddressUrl,
         private ?int $unloadFromCompanyId,
         private ?int $unloadToCompanyId,
@@ -62,22 +62,22 @@ final class Haul
         $this->responsibleId = $responsibleId;
     }
 
-    public function truckId(): string
+    public function truckId(): ?string
     {
         return $this->truckId;
     }
 
-    public function assignTruck(string $truckId): void
+    public function assignTruck(?string $truckId): void
     {
         $this->truckId = $truckId;
     }
 
-    public function materialId(): string
+    public function materialId(): ?string
     {
         return $this->materialId;
     }
 
-    public function assignMaterial(string $materialId): void
+    public function assignMaterial(?string $materialId): void
     {
         $this->materialId = $materialId;
     }
@@ -112,7 +112,7 @@ final class Haul
         $this->generalNotes = $notes;
     }
 
-    public function loadAddressText(): string
+    public function loadAddressText(): ?string
     {
         return $this->loadAddressText;
     }
@@ -122,7 +122,7 @@ final class Haul
         return $this->loadAddressUrl;
     }
 
-    public function updateLoadAddress(string $text, ?string $url): void
+    public function updateLoadAddress(?string $text, ?string $url): void
     {
         $this->loadAddressText = $text;
         $this->loadAddressUrl = $url;
@@ -190,7 +190,7 @@ final class Haul
         $this->loadDocuments = $documents;
     }
 
-    public function unloadAddressText(): string
+    public function unloadAddressText(): ?string
     {
         return $this->unloadAddressText;
     }
@@ -200,7 +200,7 @@ final class Haul
         return $this->unloadAddressUrl;
     }
 
-    public function updateUnloadAddress(string $text, ?string $url): void
+    public function updateUnloadAddress(?string $text, ?string $url): void
     {
         $this->unloadAddressText = $text;
         $this->unloadAddressUrl = $url;

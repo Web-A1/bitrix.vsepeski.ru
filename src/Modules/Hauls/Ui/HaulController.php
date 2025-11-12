@@ -8,6 +8,7 @@ use B24\Center\Infrastructure\Http\Request;
 use B24\Center\Infrastructure\Http\Response;
 use B24\Center\Modules\Hauls\Application\DTO\ActorContext;
 use B24\Center\Modules\Hauls\Application\Services\HaulService;
+use B24\Center\Modules\Hauls\Domain\HaulStatus;
 use RuntimeException;
 
 final class HaulController
@@ -44,7 +45,7 @@ final class HaulController
     public function store(int $dealId, Request $request): Response
     {
         $payload = $request->body();
-        $validation = $this->validatePayload($payload);
+        $validation = $this->validatePayload($payload, false);
 
         if ($validation !== null) {
             return Response::json(['error' => $validation], 422);
@@ -105,11 +106,15 @@ final class HaulController
         return Response::noContent();
     }
 
-    private function validatePayload(array $payload, bool $requireAll = true): ?string
+    private function validatePayload(array $payload, bool $forceRequired = true): ?string
     {
         $required = ['truck_id', 'material_id', 'load_address_text', 'unload_address_text'];
+        $statusValue = isset($payload['status'])
+            ? HaulStatus::sanitize((int) $payload['status'])
+            : HaulStatus::PREPARATION;
+        $shouldRequire = $forceRequired || $statusValue > HaulStatus::PREPARATION;
 
-        if ($requireAll) {
+        if ($shouldRequire) {
             foreach ($required as $field) {
                 if (!isset($payload[$field]) || $payload[$field] === '') {
                     return sprintf('Field "%s" is required.', $field);

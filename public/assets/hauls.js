@@ -47,6 +47,7 @@ const state = {
     materials: null,
     trucks: null,
   },
+  editorStatus: 0,
 };
 
 function detectDefaultRole(isEmbedded) {
@@ -373,7 +374,10 @@ const elements = {
   closeEditor: document.getElementById('close-editor'),
   cancelEditor: document.getElementById('cancel-editor'),
   submitHaul: document.getElementById('submit-haul'),
+  saveDraftButton: document.getElementById('save-draft-button'),
+  finalizeHaulButton: document.getElementById('finalize-haul-button'),
   directoryManager: document.getElementById('directory-manager'),
+  editorStatus: document.getElementById('editor-status'),
   materialsList: document.getElementById('materials-list'),
   materialsForm: document.getElementById('materials-form'),
   trucksList: document.getElementById('trucks-list'),
@@ -649,6 +653,16 @@ const statusTimelineSteps = [0, 1, 2, 3, 4].map((value) => ({
   value,
   label: mobileStatusLabels[value] ?? '—',
 }));
+
+state.editorStatus = statusTimelineSteps[0]?.value ?? 0;
+
+const haulStatusValues = {
+  PREPARATION: statusTimelineSteps[0]?.value ?? 0,
+  IN_PROGRESS: statusTimelineSteps[1]?.value ?? 1,
+  LOADED: statusTimelineSteps[2]?.value ?? 2,
+  UNLOADED: statusTimelineSteps[3]?.value ?? 3,
+  VERIFIED: statusTimelineSteps[4]?.value ?? 4,
+};
 
 const driverVisibleStatuses = new Set([1, 2, 3]);
 
@@ -1707,6 +1721,10 @@ function attachEventHandlers() {
   });
 
   elements.haulForm?.addEventListener('submit', onSubmitForm);
+  elements.saveDraftButton?.addEventListener('click', () => handleCreateSubmit('draft'));
+  elements.finalizeHaulButton?.addEventListener('click', () => handleCreateSubmit('finalize'));
+  elements.editorStatus?.addEventListener('click', handleEditorStatusClick);
+  elements.editorStatus?.addEventListener('keydown', handleEditorStatusKeydown);
 
   elements.haulsList?.addEventListener('click', (event) => {
     const copyButton = event.target.closest('[data-action="copy"]');
@@ -3544,9 +3562,12 @@ function prepareCreateForm() {
    setSelectValue(elements.supplierSelect, '');
    setSelectValue(elements.carrierSelect, '');
   clearFormError();
+  state.editorStatus = haulStatusValues.PREPARATION;
   elements.submitHaul.textContent = 'Сохранить';
   syncUnloadFromCompany();
   syncUnloadToCompany();
+  renderEditorStatusTimeline();
+  updateFooterButtonsState();
 }
 
 function prepareEditForm(haul) {
@@ -3555,7 +3576,10 @@ function prepareEditForm(haul) {
   clearFormError();
   applyTemplateToForm(haul, { includeStatus: true });
 
+  state.editorStatus = getStatusValue(haul.status) ?? haulStatusValues.PREPARATION;
   elements.submitHaul.textContent = 'Обновить';
+  renderEditorStatusTimeline();
+  updateFooterButtonsState();
 }
 
 function applyTemplateToForm(haul, options = {}) {
@@ -3570,12 +3594,6 @@ function applyTemplateToForm(haul, options = {}) {
   setSelectValue(elements.materialSelect, haul.material_id);
   setSelectValue(elements.supplierSelect, haul.load?.from_company_id);
   setSelectValue(elements.carrierSelect, haul.load?.to_company_id);
-
-  if (includeStatus) {
-    setFieldValue('status', haul.status?.value ?? haul.status ?? 0);
-  } else {
-    setFieldValue('status', 0);
-  }
 
   setFieldValue('general_notes', haul.general_notes);
   setFieldValue('load_volume', haul.load?.volume);
@@ -3597,6 +3615,209 @@ function applyTemplateToForm(haul, options = {}) {
     syncUnloadToCompany(unloadToId, title);
   } else {
     syncUnloadToCompany();
+  }
+}
+
+function updateFooterButtonsState() {
+  const isCreate = state.view === views.CREATE;
+  const disable = Boolean(state.saving);
+
+  if (elements.saveDraftButton) {
+    elements.saveDraftButton.hidden = !isCreate;
+    elements.saveDraftButton.disabled = disable || !isCreate;
+  }
+
+  if (elements.finalizeHaulButton) {
+    elements.finalizeHaulButton.hidden = !isCreate;
+    elements.finalizeHaulButton.disabled = disable || !isCreate;
+  }
+
+  if (elements.submitHaul) {
+    elements.submitHaul.hidden = isCreate;
+    elements.submitHaul.disabled = disable && !isCreate;
+  }
+
+  if (elements.cancelEditor) {
+    elements.cancelEditor.disabled = disable;
+  }
+}
+
+function renderEditorStatusTimeline() {
+  if (!elements.editorStatus) {
+    return;
+  }
+  const currentValue = typeof state.editorStatus === 'number'
+    ? state.editorStatus
+    : haulStatusValues.PREPARATION;
+  const isEditable = state.view === views.EDIT && Boolean(state.currentHaulId);
+
+  elements.editorStatus.innerHTML = '';
+  elements.editorStatus.classList.toggle('editor-status--readonly', !isEditable && state.view !== views.CREATE);
+
+  const list = document.createElement('ol');
+  list.className = 'editor-status__list';
+
+  statusTimelineSteps.forEach((step, index) => {
+    const item = document.createElement('li');
+    item.className = 'editor-status__item';
+    item.dataset.statusValue = String(step.value);
+    if (step.value < currentValue) {
+      item.classList.add('is-completed');
+    }
+    if (step.value === currentValue) {
+      item.classList.add('is-active');
+    }
+    const marker = document.createElement('span');
+    marker.className = 'editor-status__marker';
+    const label = document.createElement('span');
+    label.className = 'editor-status__label';
+    label.textContent = step.label;
+    item.appendChild(marker);
+    item.appendChild(label);
+    list.appendChild(item);
+
+    if (index === 0) {
+      item.classList.add('is-first');
+    } else if (index === statusTimelineSteps.length - 1) {
+      item.classList.add('is-last');
+    }
+  });
+
+  elements.editorStatus.appendChild(list);
+}
+
+function handleCreateSubmit(mode) {
+  if (state.view !== views.CREATE) {
+    return;
+  }
+  if (mode === 'draft') {
+    void submitHaulRequest(elements.saveDraftButton, {
+      statusOverride: haulStatusValues.PREPARATION,
+      requireAll: false,
+    });
+    return;
+  }
+
+  void submitHaulRequest(elements.finalizeHaulButton, {
+    statusOverride: haulStatusValues.IN_PROGRESS,
+    requireAll: true,
+  });
+}
+
+function handleEditorStatusClick(event) {
+  const target = event.target.closest('[data-status-value]');
+  if (!target) {
+    return;
+  }
+  const value = Number(target.dataset.statusValue);
+  if (!Number.isFinite(value)) {
+    return;
+  }
+
+  if (state.saving) {
+    return;
+  }
+
+  if (state.view === views.CREATE) {
+    if (state.editorStatus === value) {
+      return;
+    }
+    state.editorStatus = value;
+    renderEditorStatusTimeline();
+    return;
+  }
+
+  if (!state.currentHaulId || state.editorStatus === value) {
+    return;
+  }
+
+  void changeEditorStatus(value);
+}
+
+function handleEditorStatusKeydown(event) {
+  if (event.key !== 'Enter' && event.key !== ' ') {
+    return;
+  }
+  event.preventDefault();
+  handleEditorStatusClick(event);
+}
+
+async function changeEditorStatus(value) {
+  if (!state.currentHaulId) {
+    return;
+  }
+
+  setEditorStatusLoading(true);
+  try {
+    const response = await request(`/api/hauls/${state.currentHaulId}/status`, {
+      method: 'POST',
+      body: { status: value },
+    });
+    if (response?.data) {
+      state.editorStatus = getStatusValue(response.data.status) ?? value;
+      upsertHaul(response.data);
+      renderEditorStatusTimeline();
+    }
+  } catch (error) {
+    handleApiError(error, { message: 'Не удалось изменить статус рейса' });
+  } finally {
+    setEditorStatusLoading(false);
+  }
+}
+
+function setEditorStatusLoading(loading) {
+  if (!elements.editorStatus) {
+    return;
+  }
+  elements.editorStatus.classList.toggle('editor-status--loading', Boolean(loading));
+}
+
+async function submitHaulRequest(triggerButton, options = {}) {
+  if (!elements.haulForm || state.saving) {
+    return;
+  }
+
+  clearFormError();
+
+  const payload = collectFormPayload({
+    statusOverride: typeof options.statusOverride === 'number' ? options.statusOverride : null,
+  });
+
+  const requireAll = options.requireAll !== false;
+  const errors = validatePayload(payload, { requireAll });
+  if (errors.length) {
+    showFormError(errors.join(' • '));
+    return;
+  }
+
+  state.saving = true;
+  updateFooterButtonsState();
+  setButtonLoading(triggerButton, true);
+
+  try {
+    const isEdit = state.view === views.EDIT && state.currentHaulId;
+    const url = isEdit
+      ? `/api/hauls/${state.currentHaulId}`
+      : `/api/deals/${state.dealId}/hauls`;
+    const method = isEdit ? 'PATCH' : 'POST';
+
+    const response = await request(url, { method, body: payload });
+    const saved = response?.data;
+
+    if (!saved) {
+      throw new Error('Ошибка обработки ответа сервера');
+    }
+
+    upsertHaul(saved);
+    updateDealMeta();
+    navigateTo(views.LIST);
+  } catch (error) {
+    console.error('Ошибка сохранения рейса', error);
+    showFormError(error.message || 'Не удалось сохранить рейс, попробуйте ещё раз');
+  } finally {
+    state.saving = false;
+    updateFooterButtonsState();
+    setButtonLoading(triggerButton, false);
   }
 }
 
@@ -3627,54 +3848,14 @@ function setSelectValue(select, value) {
 
 async function onSubmitForm(event) {
   event.preventDefault();
-  if (!elements.haulForm || state.saving) return;
-
-  clearFormError();
-
-  const payload = collectFormPayload();
-  const errors = validatePayload(payload);
-  if (errors.length) {
-    showFormError(errors.join(' • '));
+  if (state.view === views.CREATE) {
+    handleCreateSubmit('finalize');
     return;
   }
-
-  state.saving = true;
-  const originalText = elements.submitHaul?.textContent;
-  if (elements.submitHaul) {
-    elements.submitHaul.textContent = 'Сохраняем...';
-    elements.submitHaul.disabled = true;
-  }
-
-  try {
-    const isEdit = state.view === views.EDIT && state.currentHaulId;
-    const url = isEdit
-      ? `/api/hauls/${state.currentHaulId}`
-      : `/api/deals/${state.dealId}/hauls`;
-    const method = isEdit ? 'PATCH' : 'POST';
-
-    const response = await request(url, { method, body: payload });
-    const saved = response?.data;
-
-    if (!saved) {
-      throw new Error('Ошибка обработки ответа сервера');
-    }
-
-    upsertHaul(saved);
-    updateDealMeta();
-    navigateTo(views.LIST);
-  } catch (error) {
-    console.error('Ошибка сохранения рейса', error);
-    showFormError(error.message || 'Не удалось сохранить рейс, попробуйте ещё раз');
-  } finally {
-    state.saving = false;
-    if (elements.submitHaul) {
-      elements.submitHaul.disabled = false;
-      elements.submitHaul.textContent = originalText || 'Сохранить';
-    }
-  }
+  void submitHaulRequest(elements.submitHaul, { requireAll: true });
 }
 
-function collectFormPayload() {
+function collectFormPayload(options = {}) {
   const formData = new FormData(elements.haulForm);
   const data = Object.fromEntries(formData.entries());
 
@@ -3682,7 +3863,6 @@ function collectFormPayload() {
     responsible_id: toNullableNumber(data.responsible_id),
     truck_id: toNullableString(data.truck_id),
     material_id: toNullableString(data.material_id),
-    status: toNullableNumber(data.status) ?? 0,
     general_notes: toNullableString(data.general_notes),
     load_volume: toNullableNumber(data.load_volume),
     load_address_text: toNullableString(data.load_address_text, true),
@@ -3709,32 +3889,38 @@ function collectFormPayload() {
       ? [...state.currentHaulSnapshot.unload.documents]
       : [];
     payload.sequence = state.currentHaulSnapshot.sequence;
+  } else if (state.view === views.CREATE) {
+    payload.sequence = estimateNextSequence();
   }
 
-  if (payload.responsible_id === null) {
-    delete payload.responsible_id;
-  }
+  const statusValue = typeof options.statusOverride === 'number'
+    ? options.statusOverride
+    : (typeof state.editorStatus === 'number' ? state.editorStatus : haulStatusValues.PREPARATION);
+  payload.status = statusValue;
 
   return payload;
 }
 
-function validatePayload(payload) {
+function validatePayload(payload, options = {}) {
   const errors = [];
+  const requireAll = options.requireAll !== false;
 
-  if (!payload.responsible_id) {
-    errors.push('Выберите водителя');
-  }
-  if (!payload.truck_id) {
-    errors.push('Выберите самосвал');
-  }
-  if (!payload.material_id) {
-    errors.push('Выберите материал');
-  }
-  if (!payload.load_address_text) {
-    errors.push('Укажите адрес загрузки');
-  }
-  if (!payload.unload_address_text) {
-    errors.push('Укажите адрес выгрузки');
+  if (requireAll) {
+    if (!payload.responsible_id) {
+      errors.push('Выберите водителя');
+    }
+    if (!payload.truck_id) {
+      errors.push('Выберите самосвал');
+    }
+    if (!payload.material_id) {
+      errors.push('Выберите материал');
+    }
+    if (!payload.load_address_text) {
+      errors.push('Укажите адрес загрузки');
+    }
+    if (!payload.unload_address_text) {
+      errors.push('Укажите адрес выгрузки');
+    }
   }
 
   if (payload.unload_contact_phone) {
@@ -3771,6 +3957,13 @@ function upsertHaul(haul) {
     state.hauls.push(haul);
   }
   state.hauls.sort(compareHauls);
+
+  if (state.currentHaulId && haul.id === state.currentHaulId) {
+    state.currentHaulSnapshot = haul;
+    state.editorStatus = getStatusValue(haul.status) ?? state.editorStatus;
+    renderEditorStatusTimeline();
+  }
+
   renderList();
   scheduleFitWindow();
 }
@@ -3869,6 +4062,7 @@ function updatePanelsVisibility(view) {
   elements.mainSection?.setAttribute('hidden', '');
   elements.editorPanel?.removeAttribute('hidden');
   elements.editorPanel?.setAttribute('aria-hidden', 'false');
+  updateFooterButtonsState();
 }
 
 function lookupLabel(collection, id, field) {

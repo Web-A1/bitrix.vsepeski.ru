@@ -114,6 +114,7 @@
             <button type="button" class="button button--ghost" id="close-editor">Закрыть</button>
           </div>
         </header>
+        <div class="editor-status" id="editor-status" aria-label="Статус рейса"></div>
         <details class="directory-manager" id="directory-manager">
           <summary>Управление справочниками</summary>
           <p class="directory-manager__hint">Быстро добавляйте новые материалы и самосвалы прямо из формы рейса.</p>
@@ -200,16 +201,6 @@
                   inputmode="decimal"
                 />
               </label>
-              <label>
-                <span>Статус</span>
-                <select name="status" id="status-select">
-                  <option value="0">Формирование рейса</option>
-                  <option value="1">В работе</option>
-                  <option value="2">Загрузился</option>
-                  <option value="3">Выгрузился</option>
-                  <option value="4">Проверено</option>
-                </select>
-              </label>
             </div>
             <label>
               <span>Заметки по рейсу</span>
@@ -281,6 +272,12 @@
             <span class="form-error" id="form-error" role="alert"></span>
             <div class="editor__footer-actions">
               <button type="button" class="button button--ghost" id="cancel-editor">Отмена</button>
+              <button type="button" class="button button--ghost" id="save-draft-button">
+                Сохранить черновик
+              </button>
+              <button type="button" class="button button--primary" id="finalize-haul-button">
+                Рейс сформирован
+              </button>
               <button type="submit" class="button button--primary" id="submit-haul">
                 Сохранить
               </button>
