@@ -57,6 +57,10 @@ $logger->info('install.php request received', [
     'request_method' => $_SERVER['REQUEST_METHOD'] ?? null,
     'query' => $_GET,
 ]);
+$logger->info('install.php debug payload', [
+    'raw' => mb_substr($rawBody, 0, 500),
+    'request' => $_REQUEST,
+]);
 
 if ($rawBody !== '') {
     $logger->debug('install.php raw payload preview', ['raw' => mb_substr($rawBody, 0, 500)]);
