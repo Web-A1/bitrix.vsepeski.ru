@@ -50,7 +50,9 @@ function isSecureRequest(): bool
         return true;
     }
 
-    return false;
+    $appEnv = $_ENV['APP_ENV'] ?? 'production';
+
+    return strtolower($appEnv) !== 'local';
 }
 
 /** @var Application $app */
