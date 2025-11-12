@@ -68,7 +68,7 @@ final class HaulController
             return Response::json(['error' => $exception->getMessage()], 422);
         }
 
-        $actor = $this->resolveActor();
+        $actor = $this->resolveActor('manager', $request);
         if (!$this->canManageDeal($deal, $actor)) {
             $this->logAccessDenied('store', $actor, ['deal_id' => $dealId]);
             return Response::json(['error' => 'Недостаточно прав для создания рейсов.'], 403);
@@ -87,7 +87,7 @@ final class HaulController
             return Response::json(['error' => $validation], 422);
         }
 
-        $actor = $this->resolveActor();
+        $actor = $this->resolveActor('manager', $request);
 
         try {
             $existing = $this->service->get($haulId);
@@ -121,7 +121,7 @@ final class HaulController
         if (!isset($payload['status'])) {
             return Response::json(['error' => 'Поле status обязательно.'], 422);
         }
-        $contextActor = $actor ?? $this->resolveActor();
+        $contextActor = $actor ?? $this->resolveActor('manager', $request);
 
         if ($actor === null) {
             try {
@@ -158,7 +158,7 @@ final class HaulController
 
     public function destroy(string $haulId): Response
     {
-        $actor = $this->resolveActor();
+        $actor = $this->resolveActor('manager', $request);
 
         try {
             $existing = $this->service->get($haulId);
@@ -206,9 +206,34 @@ final class HaulController
         return null;
     }
 
-    private function resolveActor(string $defaultRole = 'manager'): ActorContext
+    private function resolveActor(string $defaultRole = 'manager', ?Request $request = null): ActorContext
     {
-        return $this->actorResolver->resolve($defaultRole);
+        $resolved = $this->actorResolver->resolve($defaultRole);
+
+        if ($request === null) {
+            return $resolved;
+        }
+
+        $hasSessionActor = $resolved->id !== null
+            || $resolved->name !== null
+            || $resolved->role !== $defaultRole;
+
+        if ($hasSessionActor) {
+            return $resolved;
+        }
+
+        $headerRole = $request->header('x-actor-role');
+        if (!$headerRole) {
+            return $resolved;
+        }
+
+        $role = strtolower(trim($headerRole));
+        $headerId = $request->header('x-actor-id');
+        $numericId = $headerId !== null ? filter_var($headerId, FILTER_VALIDATE_INT) : false;
+        $id = $numericId !== false ? (int) $numericId : null;
+        $name = $request->header('x-actor-name') ?? null;
+
+        return new ActorContext($id, $name, $role ?: $defaultRole);
     }
 
     private function isAdmin(ActorContext $actor): bool
