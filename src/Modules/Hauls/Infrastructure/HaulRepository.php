@@ -106,7 +106,7 @@ final class HaulRepository
     public function findByDeal(int $dealId): array
     {
         $statement = $this->connection->prepare(
-            'SELECT * FROM hauls WHERE deal_id = :deal_id AND deleted_at IS NULL ORDER BY sequence'
+            'SELECT * FROM hauls WHERE deal_id = :deal_id ORDER BY sequence'
         );
         $statement->execute(['deal_id' => $dealId]);
 
@@ -119,7 +119,7 @@ final class HaulRepository
     public function findByResponsible(int $responsibleId): array
     {
         $statement = $this->connection->prepare(
-            'SELECT * FROM hauls WHERE responsible_id = :responsible_id AND deleted_at IS NULL ORDER BY updated_at DESC, created_at DESC'
+            'SELECT * FROM hauls WHERE responsible_id = :responsible_id ORDER BY updated_at DESC, created_at DESC'
         );
         $statement->execute(['responsible_id' => $responsibleId]);
 
@@ -167,7 +167,6 @@ final class HaulRepository
                     unload_contact_phone = :unload_contact_phone,
                     unload_acceptance_time = :unload_acceptance_time,
                     unload_documents = :unload_documents,
-                    deleted_at = :deleted_at,
                     updated_at = NOW()
                 WHERE id = :id
             SQL
@@ -197,13 +196,12 @@ final class HaulRepository
             'unload_contact_phone' => $haul->unloadContactPhone(),
             'unload_acceptance_time' => $haul->unloadAcceptanceTime(),
             'unload_documents' => json_encode($haul->unloadDocuments(), JSON_THROW_ON_ERROR),
-            'deleted_at' => $haul->deletedAt()?->format('Y-m-d H:i:s'),
         ]);
     }
 
     public function delete(string $id): void
     {
-        $statement = $this->connection->prepare('UPDATE hauls SET deleted_at = NOW() WHERE id = :id AND deleted_at IS NULL');
+        $statement = $this->connection->prepare('DELETE FROM hauls WHERE id = :id');
         $statement->execute(['id' => $id]);
     }
 
@@ -232,12 +230,12 @@ final class HaulRepository
     }
 
     /**
-     * @return array<int,array{id:string,deal_id:int,sequence:int,deleted_at:?string}>
+     * @return array<int,array{id:string,deal_id:int,sequence:int}>
      */
     public function listUsageByMaterial(string $materialId, int $limit = 5): array
     {
         $statement = $this->connection->prepare(
-            'SELECT id, deal_id, sequence, deleted_at FROM hauls WHERE material_id = :material_id ORDER BY updated_at DESC LIMIT :limit'
+            'SELECT id, deal_id, sequence FROM hauls WHERE material_id = :material_id ORDER BY updated_at DESC LIMIT :limit'
         );
         $statement->bindValue(':material_id', $materialId);
         $statement->bindValue(':limit', $limit, PDO::PARAM_INT);
@@ -257,12 +255,12 @@ final class HaulRepository
     }
 
     /**
-     * @return array<int,array{id:string,deal_id:int,sequence:int,deleted_at:?string}>
+     * @return array<int,array{id:string,deal_id:int,sequence:int}>
      */
     public function listUsageByTruck(string $truckId, int $limit = 5): array
     {
         $statement = $this->connection->prepare(
-            'SELECT id, deal_id, sequence, deleted_at FROM hauls WHERE truck_id = :truck_id ORDER BY updated_at DESC LIMIT :limit'
+            'SELECT id, deal_id, sequence FROM hauls WHERE truck_id = :truck_id ORDER BY updated_at DESC LIMIT :limit'
         );
         $statement->bindValue(':truck_id', $truckId);
         $statement->bindValue(':limit', $limit, PDO::PARAM_INT);
@@ -303,7 +301,6 @@ final class HaulRepository
             $this->decodeJsonColumn($row['unload_documents']),
             new DateTimeImmutable($row['created_at']),
             new DateTimeImmutable($row['updated_at']),
-            $row['deleted_at'] !== null ? new DateTimeImmutable($row['deleted_at']) : null,
         );
     }
 

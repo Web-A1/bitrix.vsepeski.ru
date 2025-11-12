@@ -39,7 +39,6 @@ final class Haul
         private array $unloadDocuments,
         private DateTimeImmutable $createdAt,
         private DateTimeImmutable $updatedAt,
-        private ?DateTimeImmutable $deletedAt = null,
     ) {
     }
 
@@ -270,18 +269,4 @@ final class Haul
         $this->updatedAt = $timestamp;
     }
 
-    public function deletedAt(): ?DateTimeImmutable
-    {
-        return $this->deletedAt;
-    }
-
-    public function markDeleted(DateTimeImmutable $timestamp): void
-    {
-        $this->deletedAt = $timestamp;
-    }
-
-    public function restore(): void
-    {
-        $this->deletedAt = null;
-    }
 }

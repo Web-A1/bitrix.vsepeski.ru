@@ -2723,8 +2723,7 @@ function formatUsageSample(sample) {
   }
   const deal = sample.deal_id ? `Сделка #${sample.deal_id}` : 'Сделка';
   if (typeof sample.sequence === 'number') {
-    const archived = sample.deleted_at ? ' (архивный)' : '';
-    return `${deal} · рейс №${sample.sequence}${archived}`;
+    return `${deal} · рейс №${sample.sequence}`;
   }
   return deal;
 }

@@ -139,27 +139,11 @@ final class HaulService
         $this->repository->delete($existing->id());
     }
 
-    public function restore(string $id): array
-    {
-        $existing = $this->repository->find($id);
-
-        if ($existing === null) {
-            throw new RuntimeException('Haul not found.');
-        }
-
-        $existing->restore();
-        $existing->touch(new DateTimeImmutable());
-
-        $this->repository->save($existing);
-
-        return HaulResponse::fromEntity($existing, $this->historyRepository->listFor($existing->id()));
-    }
-
     public function get(string $id): array
     {
         $existing = $this->repository->find($id);
 
-        if ($existing === null || $existing->deletedAt() !== null) {
+        if ($existing === null) {
             throw new RuntimeException('Haul not found.');
         }
 
@@ -173,7 +157,7 @@ final class HaulService
     {
         $haul = $this->repository->find($haulId);
 
-        if ($haul === null || $haul->deletedAt() !== null) {
+        if ($haul === null) {
             throw new RuntimeException('Haul not found.');
         }
 

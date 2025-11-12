@@ -49,7 +49,6 @@ final class HaulResponse
             ],
             'created_at' => $haul->createdAt()->format('c'),
             'updated_at' => $haul->updatedAt()->format('c'),
-            'deleted_at' => $haul->deletedAt()?->format('c'),
             'status_history' => array_map(
                 static fn (array $event): array => [
                     'status' => [
