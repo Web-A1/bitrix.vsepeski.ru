@@ -111,10 +111,12 @@ final class HaulController
     public function destroy(string $haulId): Response
     {
         $actor = $this->resolveActor();
-        if (!$this->isAdmin($actor)) {
-            return Response::json(['error' => 'Недостаточно прав для удаления рейса.'], 403);
+
+        try {
+            $this->service->delete($haulId, $actor);
+        } catch (RuntimeException $exception) {
+            return Response::json(['error' => $exception->getMessage()], 403);
         }
-        $this->service->delete($haulId);
 
         return Response::noContent();
     }
