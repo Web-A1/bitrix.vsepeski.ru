@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace B24\Center\Modules\Hauls\Ui;
 
+use B24\Center\Infrastructure\Auth\ActorContextResolver;
 use B24\Center\Infrastructure\Http\Request;
 use B24\Center\Infrastructure\Http\Response;
 use B24\Center\Modules\Hauls\Application\DTO\ActorContext;
@@ -13,8 +14,10 @@ use RuntimeException;
 
 final class HaulController
 {
-    public function __construct(private readonly HaulService $service)
-    {
+    public function __construct(
+        private readonly HaulService $service,
+        private readonly ActorContextResolver $actorResolver,
+    ) {
     }
 
     public function index(int $dealId): Response
@@ -51,7 +54,10 @@ final class HaulController
             return Response::json(['error' => $validation], 422);
         }
 
-        $actor = $this->resolveActor($request);
+        $actor = $this->resolveActor();
+        if (!$this->isAdmin($actor)) {
+            return Response::json(['error' => 'Недостаточно прав для создания рейсов.'], 403);
+        }
         $created = $this->service->create($dealId, $payload, $actor);
 
         return Response::json(['data' => $created], 201);
@@ -66,7 +72,10 @@ final class HaulController
             return Response::json(['error' => $validation], 422);
         }
 
-        $actor = $this->resolveActor($request);
+        $actor = $this->resolveActor();
+        if (!$this->isAdmin($actor)) {
+            return Response::json(['error' => 'Недостаточно прав для изменения рейса.'], 403);
+        }
 
         try {
             $updated = $this->service->update($haulId, $payload, $actor);
@@ -83,7 +92,7 @@ final class HaulController
         if (!isset($payload['status'])) {
             return Response::json(['error' => 'Поле status обязательно.'], 422);
         }
-        $contextActor = $actor ?? $this->resolveActor($request);
+        $contextActor = $actor ?? $this->resolveActor();
 
         try {
             $updated = $this->service->transitionStatus(
@@ -101,6 +110,10 @@ final class HaulController
 
     public function destroy(string $haulId): Response
     {
+        $actor = $this->resolveActor();
+        if (!$this->isAdmin($actor)) {
+            return Response::json(['error' => 'Недостаточно прав для удаления рейса.'], 403);
+        }
         $this->service->delete($haulId);
 
         return Response::noContent();
@@ -129,23 +142,13 @@ final class HaulController
         return null;
     }
 
-    private function resolveActor(Request $request, string $defaultRole = 'manager'): ActorContext
+    private function resolveActor(string $defaultRole = 'manager'): ActorContext
     {
-        $idHeader = $request->header('x-actor-id');
-        $nameHeader = $request->header('x-actor-name');
-        $roleHeader = $request->header('x-actor-role') ?? $defaultRole;
+        return $this->actorResolver->resolve($defaultRole);
+    }
 
-        $id = null;
-        if ($idHeader !== null && $idHeader !== '') {
-            $numeric = filter_var($idHeader, FILTER_VALIDATE_INT);
-            if ($numeric !== false) {
-                $id = (int) $numeric;
-            }
-        }
-
-        $name = $nameHeader !== null && $nameHeader !== '' ? $nameHeader : null;
-        $role = $roleHeader !== '' ? $roleHeader : $defaultRole;
-
-        return new ActorContext($id, $name, $role);
+    private function isAdmin(ActorContext $actor): bool
+    {
+        return strtolower($actor->role) === 'admin';
     }
 }

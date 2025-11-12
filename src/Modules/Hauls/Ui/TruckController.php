@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace B24\Center\Modules\Hauls\Ui;
 
+use B24\Center\Infrastructure\Auth\ActorContextResolver;
 use B24\Center\Infrastructure\Http\Request;
 use B24\Center\Infrastructure\Http\Response;
+use B24\Center\Modules\Hauls\Application\DTO\ActorContext;
 use B24\Center\Modules\Hauls\Domain\Truck;
 use B24\Center\Modules\Hauls\Infrastructure\HaulRepository;
 use B24\Center\Modules\Hauls\Infrastructure\TruckRepository;
@@ -16,6 +18,7 @@ final class TruckController
     public function __construct(
         private readonly TruckRepository $repository,
         private readonly HaulRepository $hauls,
+        private readonly ActorContextResolver $actorResolver,
     ) {
     }
 
@@ -31,7 +34,8 @@ final class TruckController
 
     public function store(Request $request): Response
     {
-        if (!$this->isAdmin($request)) {
+        $actor = $this->resolveActor();
+        if (!$this->isAdmin($actor)) {
             return Response::json(['error' => 'Недостаточно прав для изменения справочника самосвалов.'], 403);
         }
 
@@ -61,7 +65,8 @@ final class TruckController
 
     public function update(string $truckId, Request $request): Response
     {
-        if (!$this->isAdmin($request)) {
+        $actor = $this->resolveActor();
+        if (!$this->isAdmin($actor)) {
             return Response::json(['error' => 'Недостаточно прав для изменения справочника самосвалов.'], 403);
         }
 
@@ -110,7 +115,8 @@ final class TruckController
 
     public function destroy(string $truckId, Request $request): Response
     {
-        if (!$this->isAdmin($request)) {
+        $actor = $this->resolveActor();
+        if (!$this->isAdmin($actor)) {
             return Response::json(['error' => 'Недостаточно прав для изменения справочника самосвалов.'], 403);
         }
 
@@ -172,11 +178,14 @@ final class TruckController
         ];
     }
 
-    private function isAdmin(Request $request): bool
+    private function resolveActor(): ActorContext
     {
-        $role = strtolower($request->header('x-actor-role') ?? '');
+        return $this->actorResolver->resolve('manager');
+    }
 
-        return $role === 'admin';
+    private function isAdmin(ActorContext $actor): bool
+    {
+        return strtolower($actor->role) === 'admin';
     }
 
     private function nullableString(mixed $value): ?string

@@ -40,6 +40,37 @@ final class Request
     }
 
     /**
+     * Helper factory for tests to avoid relying on superglobals.
+     *
+     * @param array<string,string> $headers
+     * @param array<string,mixed> $body
+     * @param array<string,mixed> $query
+     * @param array<string,mixed> $server
+     */
+    public static function fake(
+        string $method = 'GET',
+        string $path = '/',
+        array $body = [],
+        array $headers = [],
+        array $query = [],
+        array $server = [],
+    ): self {
+        $normalizedHeaders = [];
+        foreach ($headers as $name => $value) {
+            $normalizedHeaders[strtolower($name)] = $value;
+        }
+
+        return new self(
+            strtoupper($method),
+            $path,
+            $query,
+            $normalizedHeaders,
+            $body,
+            $server
+        );
+    }
+
+    /**
      * @param array<string,mixed> $fallback
      * @return array<string,mixed>
      */
@@ -124,4 +155,3 @@ final class Request
         return $this->rawServer;
     }
 }
-

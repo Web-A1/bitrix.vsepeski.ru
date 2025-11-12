@@ -9,7 +9,15 @@ final class SessionAuthManager
     private const SESSION_KEY = 'auth_user';
 
     /**
-     * @param array{id:int,name:string,login:string,first_name?:string,last_name?:string,email?:string|null} $user
+     * @param array{
+     *     id:int,
+     *     name:string,
+     *     login:string,
+     *     first_name?:string,
+     *     last_name?:string,
+     *     email?:string|null,
+     *     role?:string
+     * } $user
      */
     public function login(array $user): void
     {
@@ -29,7 +37,15 @@ final class SessionAuthManager
     }
 
     /**
-     * @return array{id:int,name:string,login:string,first_name?:string,last_name?:string,email?:string|null}|null
+     * @return array{
+     *     id:int,
+     *     name:string,
+     *     login:string,
+     *     first_name?:string,
+     *     last_name?:string,
+     *     email?:string|null,
+     *     role?:string
+     * }|null
      */
     public function user(): ?array
     {

@@ -35,6 +35,7 @@ final class LocalDriverAuthenticator
             'name' => $account->name(),
             'login' => $account->login(),
             'email' => $account->email(),
+            'role' => 'driver',
         ];
     }
 }

@@ -7,6 +7,7 @@ namespace B24\Center\Infrastructure\Http;
 use B24\Center\Core\Application;
 use B24\Center\Infrastructure\Http\Request;
 use B24\Center\Infrastructure\Http\Response;
+use B24\Center\Infrastructure\Auth\ActorContextResolver;
 use B24\Center\Infrastructure\Auth\SessionAuthManager;
 use B24\Center\Infrastructure\Auth\LocalDriverAuthenticator;
 use B24\Center\Modules\Hauls\Application\Services\HaulService;
@@ -55,6 +56,8 @@ class Kernel
         $path = rtrim($request->path(), '/') ?: '/';
         /** @var SessionAuthManager $authManager */
         $authManager = $this->container->get(SessionAuthManager::class);
+        /** @var ActorContextResolver $actorResolver */
+        $actorResolver = $this->container->get(ActorContextResolver::class);
 
         if ($path === '/') {
             return Response::json([
@@ -151,18 +154,23 @@ class Kernel
             return Response::noContent();
         }
 
-        $haulController = new HaulController($this->container->get(HaulService::class));
+        $haulController = new HaulController(
+            $this->container->get(HaulService::class),
+            $actorResolver
+        );
 
         /** @var HaulRepository $haulRepository */
         $haulRepository = $this->container->get(HaulRepository::class);
 
         $truckController = new TruckController(
             $this->container->get(TruckRepository::class),
-            $haulRepository
+            $haulRepository,
+            $actorResolver
         );
         $materialController = new MaterialController(
             $this->container->get(MaterialRepository::class),
-            $haulRepository
+            $haulRepository,
+            $actorResolver
         );
         $driverController = new DriverController($this->container->get(DriverLookupService::class));
         $companyController = new CompanyDirectoryController($this->container->get(CompanyDirectoryService::class));

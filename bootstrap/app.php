@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use B24\Center\Core\Application;
+use B24\Center\Infrastructure\Auth\ActorContextResolver;
 use B24\Center\Infrastructure\Auth\LocalDriverAuthenticator;
 use B24\Center\Infrastructure\Auth\SessionAuthManager;
 use B24\Center\Infrastructure\Http\Kernel;
@@ -28,6 +29,9 @@ $app = new Application();
 
 $app->singleton(Application::class, static fn (Application $container) => $container);
 $app->singleton(SessionAuthManager::class, static fn (): SessionAuthManager => new SessionAuthManager());
+$app->singleton(ActorContextResolver::class, static function (Application $container): ActorContextResolver {
+    return new ActorContextResolver($container->get(SessionAuthManager::class));
+});
 $app->singleton(LocalDriverAuthenticator::class, static function (Application $container): LocalDriverAuthenticator {
     /** @var DriverAccountRepository $repository */
     $repository = $container->get(DriverAccountRepository::class);

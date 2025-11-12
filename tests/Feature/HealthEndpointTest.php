@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace B24\Center\Tests\Feature;
 
 use B24\Center\Core\Application;
+use B24\Center\Infrastructure\Auth\ActorContextResolver;
 use B24\Center\Infrastructure\Auth\SessionAuthManager;
 use B24\Center\Infrastructure\Http\Kernel;
 use PHPUnit\Framework\TestCase;
@@ -23,6 +24,10 @@ final class HealthEndpointTest extends TestCase
 
         $this->app = new Application();
         $this->app->singleton(SessionAuthManager::class, static fn () => new SessionAuthManager());
+        $this->app->singleton(
+            ActorContextResolver::class,
+            static fn (Application $container) => new ActorContextResolver($container->get(SessionAuthManager::class))
+        );
         $this->bindPdoStub();
 
         $projectRoot = dirname(__DIR__, 2);
