@@ -47,7 +47,11 @@ final class InstallRequestHandler
         $eventName = $this->extractEventName($payload);
         $isInstallEvent = $this->isInstallEvent($eventName);
 
-        if ($isPlacementLaunch && !$isInstallEvent && !$isTokenDelivery) {
+        $shouldRenderGet = !$isTokenDelivery
+            && strtoupper($requestMethod) === 'GET'
+            && ($payload !== [] || $query !== [] || $request !== []);
+
+        if (($isPlacementLaunch || $shouldRenderGet) && !$isInstallEvent) {
             return $this->renderPlacement($payload, $query, $post, $request);
         }
 
