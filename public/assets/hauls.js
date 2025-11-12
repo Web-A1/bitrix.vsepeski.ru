@@ -4171,8 +4171,31 @@ function scheduleFitWindow(delay = 120) {
 }
 
 function fitWindow() {
-  if (state.embedded && window.BX24 && typeof window.BX24.fitWindow === 'function') {
-    window.BX24.fitWindow();
+  if (!state.embedded || !window.BX24) {
+    return;
+  }
+
+  if (typeof window.BX24.fitWindow === 'function') {
+    try {
+      window.BX24.fitWindow();
+      return;
+    } catch (error) {
+      console.warn('BX24.fitWindow failed', error);
+    }
+  }
+
+  if (typeof window.BX24.resizeWindow === 'function') {
+    const width = document.documentElement?.clientWidth || window.innerWidth || 1024;
+    const height = Math.max(
+      document.body?.scrollHeight || 0,
+      document.documentElement?.scrollHeight || 0,
+      window.innerHeight || 0,
+    );
+    try {
+      window.BX24.resizeWindow(width, height);
+    } catch (error) {
+      console.warn('BX24.resizeWindow failed', error);
+    }
   }
 }
 
