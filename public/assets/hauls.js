@@ -53,6 +53,25 @@ const state = {
   pendingFitOptions: null,
 };
 
+const finalizeFieldLabels = {
+  responsible_id: 'Водитель',
+  truck_id: 'Самосвал',
+  material_id: 'Материал',
+  load_volume: 'Объём',
+  leg_distance_km: 'Плечо',
+  load_address_text: 'Адрес загрузки',
+  load_address_url: 'Ссылка на карту загрузки',
+  load_from_company_id: 'От кого (поставщик)',
+  load_to_company_id: 'Кому (перевозчик)',
+  unload_address_text: 'Адрес выгрузки',
+  unload_address_url: 'Ссылка на карту выгрузки',
+  unload_from_company_id: 'От кого на выгрузке',
+  unload_to_company_id: 'Кому на выгрузке',
+  unload_contact_name: 'Контактное лицо выгрузки',
+  unload_contact_phone: 'Телефон выгрузки',
+  unload_acceptance_time: 'Время приёмки',
+};
+
 function detectDefaultRole(isEmbedded) {
   return isEmbedded ? 'manager' : 'driver';
 }
@@ -3854,6 +3873,7 @@ function handlePreparationSubmit(mode) {
   void submitHaulRequest(trigger, {
     statusOverride: isDraft ? haulStatusValues.PREPARATION : haulStatusValues.IN_PROGRESS,
     requireAll: !isDraft,
+    strict: !isDraft,
   });
 }
 
@@ -3938,7 +3958,7 @@ async function submitHaulRequest(triggerButton, options = {}) {
   });
 
   const requireAll = options.requireAll !== false;
-  const errors = validatePayload(payload, { requireAll });
+  const errors = validatePayload(payload, { requireAll, strict: options.strict });
   if (errors.length) {
     showFormError(errors.join(' • '));
     return;
@@ -4058,6 +4078,7 @@ function collectFormPayload(options = {}) {
 function validatePayload(payload, options = {}) {
   const errors = [];
   const requireAll = options.requireAll !== false;
+  const strict = Boolean(options.strict);
 
   if (requireAll) {
     if (!payload.responsible_id) {
@@ -4077,6 +4098,36 @@ function validatePayload(payload, options = {}) {
     }
   }
 
+  if (strict && elements.haulForm) {
+    const missing = new Set();
+    const controls = Array.from(elements.haulForm.elements || []);
+    controls.forEach((control) => {
+      const isInput = control instanceof HTMLInputElement
+        || control instanceof HTMLSelectElement
+        || control instanceof HTMLTextAreaElement;
+      if (!isInput) {
+        return;
+      }
+      if (!control.name || control.disabled) {
+        return;
+      }
+      if (control.type === 'button' || control.type === 'submit' || control.type === 'hidden') {
+        return;
+      }
+      if (control.dataset.optional === 'true') {
+        return;
+      }
+      const value = payload[control.name];
+      if (value === null || value === undefined || value === '') {
+        missing.add(getFieldLabel(control.name));
+      }
+    });
+
+    if (missing.size) {
+      errors.push(`Заполните поля: ${Array.from(missing).join(', ')}`);
+    }
+  }
+
   if (payload.unload_contact_phone) {
     const phonePattern = /^[\d\s()+-]{6,}$/;
     if (!phonePattern.test(payload.unload_contact_phone)) {
@@ -4089,6 +4140,10 @@ function validatePayload(payload, options = {}) {
   }
 
   return errors;
+}
+
+function getFieldLabel(name) {
+  return finalizeFieldLabels[name] || name;
 }
 
 function showFormError(message) {
