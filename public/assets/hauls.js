@@ -1842,6 +1842,7 @@ async function applyView(view, haulId, options = {}) {
   updatePanelsVisibility(view);
 
   if (view === views.LIST) {
+    resetScrollPosition();
     renderList();
     scheduleFitWindow();
     return;
@@ -4051,6 +4052,7 @@ function closeEditor() {
   state.currentHaulSnapshot = null;
   elements.haulForm?.reset();
   clearFormError();
+  resetScrollPosition();
   scheduleFitWindow();
 }
 
@@ -4172,6 +4174,23 @@ function fitWindow() {
   if (state.embedded && window.BX24 && typeof window.BX24.fitWindow === 'function') {
     window.BX24.fitWindow();
   }
+}
+
+function resetScrollPosition() {
+  try {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  } catch (error) {
+    window.scrollTo(0, 0);
+  }
+
+  if (document.documentElement) {
+    document.documentElement.scrollTop = 0;
+  }
+  if (document.body) {
+    document.body.scrollTop = 0;
+  }
+  elements.app?.scrollTo?.(0, 0);
+  elements.mainSection?.scrollTo?.(0, 0);
 }
 
 function updateEditorHeader(metaText) {
