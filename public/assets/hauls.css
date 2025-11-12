@@ -11,6 +11,8 @@
   --border-strong: #d1d5db;
   --danger: #dc2626;
   --shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+  --panel-radius: 16px;
+  --panel-padding: 18px;
   --font-size-base: 0.875rem;
   --font-size-label: 0.75rem;
   --font-weight-regular: 400;
@@ -710,8 +712,8 @@ body.mobile-driver .mobile-app {
 
 .haul-card {
   background: var(--surface);
-  border-radius: 16px;
-  padding: 18px;
+  border-radius: var(--panel-radius);
+  padding: var(--panel-padding);
   box-shadow: var(--shadow);
   border: 1px solid var(--border);
   font-size: var(--font-size-base);
@@ -989,8 +991,8 @@ body.mobile-driver .mobile-app {
 .directory-manager {
   margin: 16px;
   border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 16px;
+  border-radius: var(--panel-radius);
+  padding: var(--panel-padding);
   background: var(--surface);
 }
 
@@ -998,6 +1000,7 @@ body.mobile-driver .mobile-app {
   cursor: pointer;
   font-weight: var(--font-weight-semibold);
   margin-bottom: 8px;
+  font-size: calc(var(--font-size-base) * 1.05);
 }
 
 .directory-manager__hint {
@@ -1014,8 +1017,8 @@ body.mobile-driver .mobile-app {
 
 .directory-card {
   border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 16px;
+  border-radius: var(--panel-radius);
+  padding: var(--panel-padding);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -1035,7 +1038,7 @@ body.mobile-driver .mobile-app {
 
 .directory-card__header h4 {
   margin: 0;
-  font-size: 1rem;
+  font-size: calc(var(--font-size-base) * 1.15);
   font-weight: var(--font-weight-semibold);
 }
 
@@ -1206,13 +1209,14 @@ body.mobile-driver .mobile-app {
   color: var(--on-surface);
   width: 100%;
   margin: 0 0 32px;
-  border-radius: 24px;
+  border-radius: var(--panel-radius);
   box-shadow: var(--shadow);
   border: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   gap: 16px;
   padding-bottom: 32px;
+  font-size: var(--font-size-base);
 }
 
 @media (max-width: 640px) {
@@ -1278,6 +1282,7 @@ body.mobile-driver .mobile-app {
   padding: 12px clamp(24px, 5vw, 48px) 20px;
   border-bottom: 1px solid var(--border);
   background: var(--surface);
+  font-size: var(--font-size-base);
 }
 
 .editor-status__list {
@@ -1297,20 +1302,23 @@ body.mobile-driver .mobile-app {
   position: relative;
   text-align: center;
   color: var(--muted);
-  font-size: 0.85rem;
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-medium);
   cursor: pointer;
-  padding-top: 12px;
+  padding-top: calc(var(--status-marker-size) / 2 + 6px);
+  gap: 8px;
 }
 
 .editor-status__item::before {
   content: '';
   position: absolute;
-  top: 20px;
+  top: calc(var(--status-marker-size) / 2 + 6px);
   left: 0;
   right: 0;
-  height: 4px;
+  height: 2px;
   background: var(--border);
   z-index: 0;
+  transform: translateY(-50%);
 }
 
 .editor-status__item.is-first::before {
@@ -1322,18 +1330,18 @@ body.mobile-driver .mobile-app {
 }
 
 .editor-status__marker {
-  width: 18px;
-  height: 18px;
+  width: var(--status-marker-size);
+  height: var(--status-marker-size);
   border-radius: 50%;
   background: var(--border);
   position: relative;
   z-index: 1;
-  margin-bottom: 6px;
+  margin-bottom: 0;
 }
 
 .editor-status__label {
-  font-size: 0.85rem;
-  line-height: 1.2;
+  font-size: var(--font-size-label);
+  line-height: 1.3;
 }
 
 .editor-status__item.is-completed {
@@ -1378,8 +1386,8 @@ body.mobile-driver .mobile-app {
 
 .editor__deal-meta {
   margin: 0;
-  font-size: 1.05rem;
-  font-weight: 600;
+  font-size: calc(var(--font-size-base) * 1.2);
+  font-weight: var(--font-weight-semibold);
   color: var(--on-surface);
 }
 
@@ -1428,11 +1436,11 @@ form#haul-form::after {
   display: grid;
   gap: 16px;
   grid-template-rows: min-content 1fr;
-  padding: 18px;
-  border-radius: 18px;
+  padding: var(--panel-padding);
+  border-radius: var(--panel-radius);
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.8);
-  box-shadow: 0 5px 20px rgba(15, 23, 42, 0.08);
+  background: var(--surface);
+  box-shadow: var(--shadow);
   margin-bottom: 18px;
   width: 100%;
   box-sizing: border-box;
@@ -1440,7 +1448,9 @@ form#haul-form::after {
 
 .form-group h3 {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: calc(var(--font-size-base) * 1.15);
+  font-weight: var(--font-weight-semibold);
+  color: var(--on-surface);
 }
 
 .field-grid {
@@ -1456,13 +1466,22 @@ form#haul-form::after {
 label {
   display: grid;
   gap: 6px;
-  font-size: 0.92rem;
+  font-size: var(--font-size-base);
   width: 100%;
+  color: var(--on-surface);
+}
+
+label > span:first-child {
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-medium);
+  color: var(--muted);
+  letter-spacing: 0.01em;
 }
 
 label span small {
-  color: var(--muted);
-  font-weight: 400;
+  color: inherit;
+  font-weight: var(--font-weight-regular);
+  font-size: inherit;
 }
 
 .form-group label select,
@@ -1508,7 +1527,7 @@ textarea:focus {
 }
 
 .hint {
-  font-size: 0.78rem;
+  font-size: var(--font-size-label);
   color: var(--muted);
 }
 
@@ -1523,7 +1542,8 @@ textarea:focus {
 
 .form-error {
   color: var(--danger);
-  font-size: 0.9rem;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
   min-height: 1em;
 }
 
