@@ -118,15 +118,17 @@ class BitrixUserResolver
      */
     private function performRequest(string $method, string $query): array
     {
-        $endpoint = sprintf('%s/rest/%s.json?%s', $this->baseUrl, $method, $query);
+        $endpoint = sprintf('%s/rest/%s.json', $this->baseUrl, $method);
         $context = stream_context_create([
             'http' => [
-                'method' => 'GET',
+                'method' => 'POST',
                 'header' => [
                     'Accept: application/json',
+                    'Content-Type: application/x-www-form-urlencoded',
                 ],
                 'ignore_errors' => true,
                 'timeout' => 10,
+                'content' => $query,
             ],
         ]);
 
