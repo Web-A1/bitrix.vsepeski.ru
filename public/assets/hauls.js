@@ -367,7 +367,6 @@ const elements = {
   unloadFromInput: document.getElementById('unload-from-input'),
   unloadToDisplay: document.getElementById('unload-to-display'),
   unloadToInput: document.getElementById('unload-to-input'),
-  editorDealTitle: document.getElementById('editor-deal-title'),
   editorDealMeta: document.getElementById('editor-deal-meta'),
   formError: document.getElementById('form-error'),
   globalError: document.getElementById('app-error'),
@@ -3982,12 +3981,6 @@ function fitWindow() {
 }
 
 function updateEditorHeader(metaText) {
-  if (elements.editorDealTitle) {
-    const title = state.dealMeta?.title
-      ?? (state.dealId ? `Сделка #${state.dealId}` : 'Сделка');
-    elements.editorDealTitle.textContent = title;
-  }
-
   if (elements.editorDealMeta) {
     elements.editorDealMeta.textContent = metaText ?? '';
   }
