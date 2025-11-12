@@ -7,7 +7,9 @@ namespace B24\Center\Tests\Feature;
 use B24\Center\Infrastructure\Auth\ActorContextResolver;
 use B24\Center\Infrastructure\Auth\SessionAuthManager;
 use B24\Center\Infrastructure\Http\Request;
+use B24\Center\Infrastructure\Bitrix\BitrixRestClient;
 use B24\Center\Modules\Hauls\Application\Services\HaulService;
+use B24\Center\Modules\Hauls\Application\Services\DealInfoService;
 use B24\Center\Modules\Hauls\Infrastructure\HaulChangeHistoryRepository;
 use B24\Center\Modules\Hauls\Infrastructure\HaulRepository;
 use B24\Center\Modules\Hauls\Infrastructure\HaulStatusHistoryRepository;
@@ -26,6 +28,7 @@ final class AdminAuthorizationTest extends TestCase
     private SessionAuthManager $authManager;
     private ActorContextResolver $resolver;
     private PDO $pdo;
+    private DealInfoService $dealService;
 
     protected function setUp(): void
     {
@@ -38,6 +41,7 @@ final class AdminAuthorizationTest extends TestCase
         $_SESSION = [];
         $this->authManager = new SessionAuthManager();
         $this->resolver = new ActorContextResolver($this->authManager);
+        $this->dealService = new DealInfoService(new BitrixRestClient('https://example.com/rest'));
         $this->pdo = new class extends PDO {
             public function __construct()
             {
@@ -111,7 +115,8 @@ final class AdminAuthorizationTest extends TestCase
                 new HaulStatusHistoryRepository($this->pdo),
                 new HaulChangeHistoryRepository($this->pdo)
             ),
-            $this->resolver
+            $this->resolver,
+            $this->dealService
         );
 
         $request = Request::fake(

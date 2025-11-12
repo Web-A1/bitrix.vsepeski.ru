@@ -643,6 +643,15 @@ class Kernel
         return str_contains(mb_strtolower($value, 'UTF-8'), 'водител');
     }
 
+    private function containsDispatcherKeyword(mixed $value): bool
+    {
+        if (!is_string($value)) {
+            return false;
+        }
+
+        return str_contains(mb_strtolower($value, 'UTF-8'), 'диспетчер');
+    }
+
     private function isTruthyFlag(mixed $value): bool
     {
         if (is_bool($value)) {
@@ -662,11 +671,3 @@ class Kernel
         return false;
     }
 }
-    private function containsDispatcherKeyword(mixed $value): bool
-    {
-        if (!is_string($value)) {
-            return false;
-        }
-
-        return str_contains(mb_strtolower($value), 'диспетчер');
-    }
