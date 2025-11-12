@@ -17,6 +17,7 @@ let referenceDataPromise = null;
 let bx24DealLookupPromise = null;
 let portalBaseUrlCache = '';
 let serverSessionSynced = false;
+let serverSessionSyncPromise = null;
 
 const state = {
   dealId: initialDealContext.id,
@@ -266,13 +267,101 @@ async function ensureServerSessionFromBitrixAuth(force = false) {
   if (!state.embedded) {
     return;
   }
+
   if (serverSessionSynced && !force) {
     return;
   }
 
+  if (serverSessionSyncPromise) {
+    return serverSessionSyncPromise;
+  }
+
+  serverSessionSyncPromise = (async () => {
+    const bootstrapAuth = extractAuthFromBootstrap();
+    if (bootstrapAuth) {
+      const synced = await syncServerSession(bootstrapAuth);
+      if (synced) {
+        return;
+      }
+    }
+
+    const bxAuth = await extractAuthFromBx24();
+    if (bxAuth) {
+      await syncServerSession(bxAuth);
+    }
+  })().finally(() => {
+    serverSessionSyncPromise = null;
+  });
+
+  return serverSessionSyncPromise;
+}
+
+async function syncServerSession(authPayload) {
+  const body = {
+    auth_id: authPayload.authId,
+    member_id: authPayload.memberId,
+  };
+
+  if (authPayload.domain) {
+    body.domain = authPayload.domain;
+  }
+
+  try {
+    await request('/api/auth/bitrix', {
+      method: 'POST',
+      body,
+      skipSessionSync: true,
+    });
+    serverSessionSynced = true;
+    return true;
+  } catch (error) {
+    serverSessionSynced = false;
+    console.warn('Не удалось синхронизировать серверную сессию', error);
+    return false;
+  }
+}
+
+function extractAuthFromBootstrap() {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const bootstrap = window.B24_INSTALL_PAYLOAD || null;
+  if (!bootstrap) {
+    return null;
+  }
+
+  const sources = [
+    bootstrap.payload,
+    bootstrap.request,
+    bootstrap.post,
+    bootstrap.get,
+    bootstrap.query,
+  ];
+
+  for (const source of sources) {
+    const authId = extractBxAuthField(source, [
+      'auth_id',
+      'AUTH_ID',
+      'access_token',
+      'ACCESS_TOKEN',
+      'auth',
+      'AUTH',
+    ]);
+    const memberId = extractBxAuthField(source, ['member_id', 'MEMBER_ID']);
+    if (authId && memberId) {
+      const domain = extractBxAuthField(source, ['domain', 'DOMAIN']);
+      return { authId, memberId, domain };
+    }
+  }
+
+  return null;
+}
+
+async function extractAuthFromBx24() {
   const bx24 = await waitForBx24();
   if (!bx24 || typeof bx24.getAuth !== 'function') {
-    return;
+    return null;
   }
 
   let auth = null;
@@ -280,43 +369,32 @@ async function ensureServerSessionFromBitrixAuth(force = false) {
     auth = bx24.getAuth();
   } catch (error) {
     console.warn('BX24.getAuth недоступен', error);
-    return;
+    return null;
   }
 
   const authId = extractBxAuthField(auth, ['auth_id', 'AUTH_ID', 'access_token', 'ACCESS_TOKEN', 'auth', 'AUTH']);
   const memberId = extractBxAuthField(auth, ['member_id', 'MEMBER_ID']);
 
   if (!authId || !memberId) {
-    return;
+    return null;
   }
 
   const domain = extractBxAuthField(auth, ['domain', 'DOMAIN']);
 
-  try {
-    await request('/api/auth/bitrix', {
-      method: 'POST',
-      body: {
-        auth_id: authId,
-        member_id: memberId,
-        domain: domain || undefined,
-      },
-    });
-    serverSessionSynced = true;
-  } catch (error) {
-    serverSessionSynced = false;
-    console.warn('Не удалось синхронизировать серверную сессию', error);
-  }
+  return { authId, memberId, domain };
 }
 
-function extractBxAuthField(auth, candidates) {
-  if (!auth || typeof auth !== 'object') {
+function extractBxAuthField(source, candidates) {
+  if (!source || typeof source !== 'object') {
     return '';
   }
+
   for (const key of candidates) {
-    if (key in auth && auth[key]) {
-      return String(auth[key]).trim();
+    if (key in source && source[key]) {
+      return String(source[key]).trim();
     }
   }
+
   return '';
 }
 
@@ -4677,7 +4755,11 @@ async function callBx24Method(method, params = {}) {
 }
 
 async function request(path, options = {}) {
-  const { method = 'GET', body, headers = {} } = options;
+  const { method = 'GET', body, headers = {}, skipSessionSync = false } = options;
+
+  if (state.embedded && !skipSessionSync && path !== '/api/auth/bitrix') {
+    await ensureServerSessionFromBitrixAuth();
+  }
 
   const init = {
     method,
