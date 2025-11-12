@@ -1860,8 +1860,8 @@ function attachEventHandlers() {
   });
 
   elements.haulForm?.addEventListener('submit', onSubmitForm);
-  elements.saveDraftButton?.addEventListener('click', () => handleCreateSubmit('draft'));
-  elements.finalizeHaulButton?.addEventListener('click', () => handleCreateSubmit('finalize'));
+  elements.saveDraftButton?.addEventListener('click', () => handlePreparationSubmit('draft'));
+  elements.finalizeHaulButton?.addEventListener('click', () => handlePreparationSubmit('finalize'));
   elements.editorStatus?.addEventListener('click', handleEditorStatusClick);
   elements.editorStatus?.addEventListener('keydown', handleEditorStatusKeydown);
 
@@ -3717,7 +3717,7 @@ function prepareEditForm(haul) {
   applyTemplateToForm(haul, { includeStatus: true });
 
   state.editorStatus = getStatusValue(haul.status) ?? haulStatusValues.PREPARATION;
-  elements.submitHaul.textContent = 'Обновить';
+  elements.submitHaul.textContent = 'Сохранить';
   renderEditorStatusTimeline();
   updateFooterButtonsState();
 }
@@ -3758,23 +3758,33 @@ function applyTemplateToForm(haul, options = {}) {
   }
 }
 
+function isPreparationStageActive() {
+  if (state.view === views.CREATE) {
+    return true;
+  }
+  const value = typeof state.editorStatus === 'number'
+    ? state.editorStatus
+    : getStatusValue(state.editorStatus);
+  return value === haulStatusValues.PREPARATION;
+}
+
 function updateFooterButtonsState() {
-  const isCreate = state.view === views.CREATE;
   const disable = Boolean(state.saving);
+  const showPreparationActions = isPreparationStageActive();
 
   if (elements.saveDraftButton) {
-    elements.saveDraftButton.hidden = !isCreate;
-    elements.saveDraftButton.disabled = disable || !isCreate;
+    elements.saveDraftButton.hidden = !showPreparationActions;
+    elements.saveDraftButton.disabled = disable || !showPreparationActions;
   }
 
   if (elements.finalizeHaulButton) {
-    elements.finalizeHaulButton.hidden = !isCreate;
-    elements.finalizeHaulButton.disabled = disable || !isCreate;
+    elements.finalizeHaulButton.hidden = !showPreparationActions;
+    elements.finalizeHaulButton.disabled = disable || !showPreparationActions;
   }
 
   if (elements.submitHaul) {
-    elements.submitHaul.hidden = isCreate;
-    elements.submitHaul.disabled = disable && !isCreate;
+    elements.submitHaul.hidden = showPreparationActions;
+    elements.submitHaul.disabled = disable || showPreparationActions;
   }
 
   if (elements.cancelEditor) {
@@ -3826,21 +3836,16 @@ function renderEditorStatusTimeline() {
   elements.editorStatus.appendChild(list);
 }
 
-function handleCreateSubmit(mode) {
-  if (state.view !== views.CREATE) {
+function handlePreparationSubmit(mode) {
+  if (!isPreparationStageActive()) {
     return;
   }
-  if (mode === 'draft') {
-    void submitHaulRequest(elements.saveDraftButton, {
-      statusOverride: haulStatusValues.PREPARATION,
-      requireAll: false,
-    });
-    return;
-  }
+  const isDraft = mode === 'draft';
+  const trigger = isDraft ? elements.saveDraftButton : elements.finalizeHaulButton;
 
-  void submitHaulRequest(elements.finalizeHaulButton, {
-    statusOverride: haulStatusValues.IN_PROGRESS,
-    requireAll: true,
+  void submitHaulRequest(trigger, {
+    statusOverride: isDraft ? haulStatusValues.PREPARATION : haulStatusValues.IN_PROGRESS,
+    requireAll: !isDraft,
   });
 }
 
@@ -3897,6 +3902,7 @@ async function changeEditorStatus(value) {
       state.editorStatus = getStatusValue(response.data.status) ?? value;
       upsertHaul(response.data);
       renderEditorStatusTimeline();
+      updateFooterButtonsState();
     }
   } catch (error) {
     handleApiError(error, { message: 'Не удалось изменить статус рейса' });
@@ -3988,8 +3994,8 @@ function setSelectValue(select, value) {
 
 async function onSubmitForm(event) {
   event.preventDefault();
-  if (state.view === views.CREATE) {
-    handleCreateSubmit('finalize');
+  if (isPreparationStageActive()) {
+    handlePreparationSubmit('finalize');
     return;
   }
   void submitHaulRequest(elements.submitHaul, { requireAll: true });
