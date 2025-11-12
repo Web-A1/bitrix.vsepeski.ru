@@ -40,6 +40,16 @@ function isSecureRequest(): bool
         return true;
     }
 
+    $origin = $_SERVER['HTTP_ORIGIN'] ?? null;
+    if (is_string($origin) && str_starts_with(strtolower($origin), 'https://')) {
+        return true;
+    }
+
+    $referer = $_SERVER['HTTP_REFERER'] ?? null;
+    if (is_string($referer) && str_starts_with(strtolower($referer), 'https://')) {
+        return true;
+    }
+
     return false;
 }
 
