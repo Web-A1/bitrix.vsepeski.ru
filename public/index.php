@@ -10,7 +10,7 @@ use Throwable;
 require dirname(__DIR__) . '/vendor/autoload.php';
 
 if (session_status() === PHP_SESSION_NONE) {
-    $isSecure = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
+    $isSecure = isSecureRequest();
     session_set_cookie_params([
         'lifetime' => 0,
         'path' => '/',
@@ -19,6 +19,28 @@ if (session_status() === PHP_SESSION_NONE) {
         'samesite' => $isSecure ? 'None' : 'Lax',
     ]);
     session_start();
+}
+
+function isSecureRequest(): bool
+{
+    if (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
+        return true;
+    }
+
+    $forwardedProto = $_SERVER['HTTP_X_FORWARDED_PROTO'] ?? $_SERVER['HTTP_CF_VISITOR'] ?? null;
+    if (is_string($forwardedProto) && stripos($forwardedProto, 'https') !== false) {
+        return true;
+    }
+
+    if (isset($_SERVER['HTTP_X_FORWARDED_SSL']) && $_SERVER['HTTP_X_FORWARDED_SSL'] === 'on') {
+        return true;
+    }
+
+    if (isset($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443) {
+        return true;
+    }
+
+    return false;
 }
 
 /** @var Application $app */
