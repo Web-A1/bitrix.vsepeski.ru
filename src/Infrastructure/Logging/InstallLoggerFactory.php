@@ -64,7 +64,7 @@ final class InstallLoggerFactory
         return $logger;
     }
 
-    private static function boolEnv(string $key, bool $default): bool
+    public static function boolEnv(string $key, bool $default): bool
     {
         $value = $_ENV[$key] ?? $default;
 
