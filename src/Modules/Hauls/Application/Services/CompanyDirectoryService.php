@@ -49,8 +49,8 @@ final class CompanyDirectoryService
         while (count($items) < $this->maxItems) {
             $response = $this->client->call('crm.company.list', [
                 'order' => ['TITLE' => 'ASC'],
-                'filter' => ['TYPE_ID' => $typeId],
-                'select' => ['ID', 'TITLE', 'TYPE_ID', 'PHONE'],
+                'filter' => ['COMPANY_TYPE' => $typeId],
+                'select' => ['ID', 'TITLE', 'COMPANY_TYPE', 'PHONE'],
                 'start' => $start,
             ]);
 
@@ -59,7 +59,7 @@ final class CompanyDirectoryService
                 $items[] = [
                     'id' => isset($entry['ID']) ? (int) $entry['ID'] : 0,
                     'title' => (string) ($entry['TITLE'] ?? ''),
-                    'type_id' => (string) ($entry['TYPE_ID'] ?? $typeId),
+                    'type_id' => (string) ($entry['COMPANY_TYPE'] ?? $typeId),
                     'phone' => $this->extractPhone($entry),
                 ];
 
