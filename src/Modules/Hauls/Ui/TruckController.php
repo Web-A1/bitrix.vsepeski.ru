@@ -54,9 +54,19 @@ final class TruckController
         }
 
         $makeModel = isset($payload['make_model']) ? $this->nullableString($payload['make_model']) : null;
+        $invalidBodyVolume = false;
+        $bodyVolume = array_key_exists('body_volume', $payload)
+            ? $this->nullableFloat($payload['body_volume'], $invalidBodyVolume)
+            : null;
+        if ($invalidBodyVolume) {
+            return Response::json(['error' => 'Field "body_volume" must be numeric.'], 422);
+        }
+        if ($bodyVolume !== null && $bodyVolume <= 0) {
+            return Response::json(['error' => 'Field "body_volume" must be greater than zero.'], 422);
+        }
         $notes = isset($payload['notes']) ? $this->nullableString($payload['notes']) : null;
 
-        $truck = $this->repository->create($licensePlate, $makeModel, $notes);
+        $truck = $this->repository->create($licensePlate, $makeModel, $bodyVolume, $notes);
 
         return Response::json([
             'data' => $this->serializeTruck($truck),
@@ -81,8 +91,9 @@ final class TruckController
         $plateProvided = array_key_exists('license_plate', $payload);
         $makeProvided = array_key_exists('make_model', $payload);
         $notesProvided = array_key_exists('notes', $payload);
+        $bodyProvided = array_key_exists('body_volume', $payload);
 
-        if (!$plateProvided && !$makeProvided && !$notesProvided) {
+        if (!$plateProvided && !$makeProvided && !$notesProvided && !$bodyProvided) {
             return Response::json(['data' => $this->serializeTruck($truck)]);
         }
 
@@ -106,6 +117,18 @@ final class TruckController
 
         if ($notesProvided) {
             $truck->updateNotes($this->nullableString($payload['notes']));
+        }
+
+        if ($bodyProvided) {
+            $invalidBodyVolume = false;
+            $volume = $this->nullableFloat($payload['body_volume'], $invalidBodyVolume);
+            if ($invalidBodyVolume) {
+                return Response::json(['error' => 'Field "body_volume" must be numeric.'], 422);
+            }
+            if ($volume !== null && $volume <= 0) {
+                return Response::json(['error' => 'Field "body_volume" must be greater than zero.'], 422);
+            }
+            $truck->updateBodyVolume($volume);
         }
 
         $this->repository->save($truck);
@@ -150,6 +173,7 @@ final class TruckController
             'id' => $truck->id(),
             'license_plate' => $truck->licensePlate(),
             'make_model' => $truck->makeModel(),
+            'body_volume' => $truck->bodyVolume(),
             'notes' => $truck->notes(),
             'usage' => $this->truckUsagePayload($truck->id()),
         ];
@@ -197,6 +221,29 @@ final class TruckController
         $string = trim((string) $value);
 
         return $string === '' ? null : $string;
+    }
+
+    private function nullableFloat(mixed $value, bool &$invalid = false): ?float
+    {
+        $invalid = false;
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (is_string($value)) {
+            $normalized = str_replace(',', '.', trim($value));
+            if ($normalized === '') {
+                return null;
+            }
+            $value = $normalized;
+        }
+
+        if (!is_numeric($value)) {
+            $invalid = true;
+            return null;
+        }
+
+        return (float) $value;
     }
 
     private function normalizeLicensePlate(string $value): string

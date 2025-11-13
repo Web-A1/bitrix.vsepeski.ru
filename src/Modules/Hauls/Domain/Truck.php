@@ -11,6 +11,7 @@ final class Truck
         private string $licensePlate,
         private ?string $makeModel = null,
         private ?string $notes = null,
+        private ?float $bodyVolume = null,
     ) {
     }
 
@@ -48,5 +49,14 @@ final class Truck
     {
         $this->notes = $notes;
     }
-}
 
+    public function bodyVolume(): ?float
+    {
+        return $this->bodyVolume;
+    }
+
+    public function updateBodyVolume(?float $bodyVolume): void
+    {
+        $this->bodyVolume = $bodyVolume;
+    }
+}

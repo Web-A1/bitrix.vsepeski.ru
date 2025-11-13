@@ -2489,7 +2489,13 @@ function renderReferenceSelects() {
   renderSelect(elements.truckSelect, state.trucks, {
     placeholder: 'Не выбрано',
     allowEmpty: false,
-    getLabel: (truck) => truck.license_plate || truck.name || truck.id,
+    getLabel: (truck) => {
+      const parts = [];
+      if (truck.license_plate) parts.push(truck.license_plate);
+      if (truck.make_model) parts.push(truck.make_model);
+      if (truck.body_volume) parts.push(`${Number(truck.body_volume)} м³`);
+      return parts.join(' · ') || truck.id;
+    },
   });
 
   renderSelect(elements.materialSelect, state.materials, {
@@ -2644,7 +2650,7 @@ function renderDirectoryLists() {
     subtitle: (item) => {
       const parts = [];
       if (item.make_model) parts.push(item.make_model);
-      if (item.notes) parts.push(item.notes);
+      if (item.body_volume) parts.push(`${Number(item.body_volume)} м³`);
       return parts.join(' · ');
     },
     fields: [
@@ -2656,13 +2662,16 @@ function renderDirectoryLists() {
       },
       {
         name: 'make_model',
-        placeholder: 'Марка / модель (опционально)',
+        placeholder: 'Марка (без модели)',
         value: (item) => item.make_model ?? '',
       },
       {
-        name: 'notes',
-        placeholder: 'Заметки (опционально)',
-        value: (item) => item.notes ?? '',
+        name: 'body_volume',
+        placeholder: 'Объём кузова, м³',
+        type: 'number',
+        min: '0',
+        step: '0.1',
+        value: (item) => (item.body_volume ?? '').toString(),
       },
     ],
   });
@@ -2797,6 +2806,15 @@ function buildDirectoryEditForm(type, item, fields) {
     input.name = field.name;
     input.placeholder = field.placeholder || '';
     input.required = Boolean(field.required);
+    if (field.step) {
+      input.step = field.step;
+    }
+    if (field.min) {
+      input.min = field.min;
+    }
+    if (field.max) {
+      input.max = field.max;
+    }
     const value = typeof field.value === 'function' ? field.value(item) : item[field.name];
     input.value = value ?? '';
     fieldsWrapper.appendChild(input);
@@ -3038,10 +3056,15 @@ async function handleTruckSubmit(event) {
   }
   const plateInput = form.elements.namedItem('license_plate');
   const makeInput = form.elements.namedItem('make_model');
-  const notesInput = form.elements.namedItem('notes');
+  const volumeInput = form.elements.namedItem('body_volume');
   const plate = typeof plateInput?.value === 'string' ? plateInput.value.trim() : '';
   const make = typeof makeInput?.value === 'string' ? makeInput.value.trim() : '';
-  const notes = typeof notesInput?.value === 'string' ? notesInput.value.trim() : '';
+  const volumeRaw = typeof volumeInput?.value === 'string' ? volumeInput.value.trim() : '';
+  const volume = volumeRaw ? Number(volumeRaw.replace(',', '.')) : null;
+  if (volumeRaw && Number.isNaN(volume)) {
+    volumeInput?.focus();
+    return;
+  }
 
   if (!plate) {
     plateInput?.focus();
@@ -3056,7 +3079,7 @@ async function handleTruckSubmit(event) {
       body: {
         license_plate: plate,
         make_model: make || undefined,
-        notes: notes || undefined,
+        body_volume: volume ?? undefined,
       },
     });
     if (response?.data) {
@@ -3112,10 +3135,15 @@ async function updateMaterialById(id, form) {
 async function updateTruckById(id, form) {
   const plateInput = form.elements.namedItem('license_plate');
   const makeInput = form.elements.namedItem('make_model');
-  const notesInput = form.elements.namedItem('notes');
+  const volumeInput = form.elements.namedItem('body_volume');
   const plate = typeof plateInput?.value === 'string' ? plateInput.value.trim() : '';
   const make = typeof makeInput?.value === 'string' ? makeInput.value.trim() : '';
-  const notes = typeof notesInput?.value === 'string' ? notesInput.value.trim() : '';
+  const volumeRaw = typeof volumeInput?.value === 'string' ? volumeInput.value.trim() : '';
+  const volume = volumeRaw ? Number(volumeRaw.replace(',', '.')) : null;
+  if (volumeRaw && Number.isNaN(volume)) {
+    volumeInput?.focus();
+    return;
+  }
 
   if (!plate) {
     plateInput?.focus();
@@ -3130,7 +3158,7 @@ async function updateTruckById(id, form) {
       body: {
         license_plate: plate,
         make_model: make || null,
-        notes: notes || null,
+        body_volume: volume ?? null,
       },
     });
     if (response?.data) {
