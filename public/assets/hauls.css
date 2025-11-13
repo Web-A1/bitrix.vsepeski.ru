@@ -1217,6 +1217,7 @@ body.mobile-driver .mobile-app {
   gap: 16px;
   padding-bottom: 32px;
   font-size: var(--font-size-base);
+  overflow: hidden;
 }
 
 @media (max-width: 640px) {
@@ -1264,24 +1265,33 @@ body.mobile-driver .mobile-app {
 
 
 .editor__header {
-  padding: 24px 24px 20px;
+  padding: 24px 24px 16px;
   border-bottom: 1px solid var(--border-strong);
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
   gap: 16px;
-  align-items: center;
   margin-bottom: 24px;
   background: var(--surface);
   position: sticky;
   top: 0;
   z-index: 15;
   box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+  border-top-left-radius: var(--panel-radius);
+  border-top-right-radius: var(--panel-radius);
+}
+
+.editor__header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
 }
 
 .editor-status {
-  padding: 12px clamp(24px, 5vw, 48px) 20px;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
+  padding: 0;
+  background: transparent;
+  font-size: var(--font-size-base);
+  margin-top: 4px;
 }
 
 .editor-status__list {

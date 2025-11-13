@@ -2022,6 +2022,7 @@ async function applyView(view, haulId, options = {}) {
     const meta = buildEditorMeta({
       mode: 'create',
       sequence: estimateNextSequence(),
+      company: state.dealMeta?.company?.title,
     });
     openEditor(meta);
     return;
@@ -2041,6 +2042,7 @@ async function applyView(view, haulId, options = {}) {
     const meta = buildEditorMeta({
       mode: 'edit',
       sequence: formatSequence(haul),
+      company: state.dealMeta?.company?.title,
     });
     openEditor(meta);
   }
@@ -4435,18 +4437,21 @@ function updateEditorHeader(metaText) {
 
 function buildEditorMeta(options) {
   const sequenceLabel = options.sequence && options.sequence !== '-' ? `Рейс №${options.sequence}` : null;
-
-  if (options.mode === 'edit') {
-    if (sequenceLabel) {
-      return `${sequenceLabel} · редактирование`;
-    }
-    return 'Редактирование рейса';
-  }
+  const companyLabel = typeof options.company === 'string' && options.company.trim()
+    ? options.company.trim()
+    : '';
+  const modeLabel = options.mode === 'edit' ? 'редактирование' : 'новый';
+  const parts = [];
 
   if (sequenceLabel) {
-    return `${sequenceLabel} · новый`;
+    parts.push(sequenceLabel);
   }
-  return 'Новый рейс';
+  parts.push(modeLabel);
+  if (companyLabel) {
+    parts.push(companyLabel);
+  }
+
+  return parts.join(' — ');
 }
 
 function estimateNextSequence() {
