@@ -107,15 +107,13 @@
       </button>
       <section class="editor" id="editor-panel" aria-labelledby="editor-title" aria-hidden="true" hidden>
         <header class="editor__header">
-          <div class="editor__header-row">
-            <div class="editor__header-info">
-              <p class="editor__deal-meta" id="editor-deal-meta"></p>
-            </div>
+          <div class="editor__header-bar">
+            <p class="editor__deal-meta" id="editor-deal-meta"></p>
+            <div class="editor-status" id="editor-status" aria-label="Статус рейса"></div>
             <div class="editor__header-actions">
               <button type="button" class="button button--ghost" id="close-editor">Закрыть</button>
             </div>
           </div>
-          <div class="editor-status" id="editor-status" aria-label="Статус рейса"></div>
         </header>
         <details class="directory-manager" id="directory-manager">
           <summary>Управление справочниками</summary>

@@ -2022,7 +2022,6 @@ async function applyView(view, haulId, options = {}) {
     const meta = buildEditorMeta({
       mode: 'create',
       sequence: estimateNextSequence(),
-      company: state.dealMeta?.company?.title,
     });
     openEditor(meta);
     return;
@@ -2042,7 +2041,6 @@ async function applyView(view, haulId, options = {}) {
     const meta = buildEditorMeta({
       mode: 'edit',
       sequence: formatSequence(haul),
-      company: state.dealMeta?.company?.title,
     });
     openEditor(meta);
   }
@@ -2093,9 +2091,7 @@ function updateDealMeta() {
 
   const count = state.hauls.length;
   if (elements.dealSubtitle) {
-    if (state.dealMeta?.company?.title) {
-      elements.dealSubtitle.textContent = `Клиент: ${state.dealMeta.company.title}`;
-    } else if (count > 0) {
+    if (count > 0) {
       elements.dealSubtitle.textContent = `Всего рейсов: ${count}`;
     } else {
       elements.dealSubtitle.textContent = '';
@@ -4437,21 +4433,12 @@ function updateEditorHeader(metaText) {
 
 function buildEditorMeta(options) {
   const sequenceLabel = options.sequence && options.sequence !== '-' ? `Рейс №${options.sequence}` : null;
-  const companyLabel = typeof options.company === 'string' && options.company.trim()
-    ? options.company.trim()
-    : '';
-  const modeLabel = options.mode === 'edit' ? 'редактирование' : 'новый';
-  const parts = [];
 
   if (sequenceLabel) {
-    parts.push(sequenceLabel);
-  }
-  parts.push(modeLabel);
-  if (companyLabel) {
-    parts.push(companyLabel);
+    return sequenceLabel;
   }
 
-  return parts.join(' — ');
+  return options.mode === 'edit' ? 'Рейс' : 'Новый рейс';
 }
 
 function estimateNextSequence() {

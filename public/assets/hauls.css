@@ -1265,11 +1265,10 @@ body.mobile-driver .mobile-app {
 
 
 .editor__header {
-  padding: 24px 24px 16px;
+  padding: 24px;
   border-bottom: 1px solid var(--border-strong);
   display: flex;
   flex-direction: column;
-  gap: 16px;
   margin-bottom: 24px;
   background: var(--surface);
   position: sticky;
@@ -1280,10 +1279,9 @@ body.mobile-driver .mobile-app {
   border-top-right-radius: var(--panel-radius);
 }
 
-.editor__header-row {
+.editor__header-bar {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   gap: 16px;
 }
 
@@ -1291,7 +1289,7 @@ body.mobile-driver .mobile-app {
   padding: 0;
   background: transparent;
   font-size: var(--font-size-base);
-  margin-top: 4px;
+  flex: 1;
 }
 
 .editor-status__list {
@@ -1392,14 +1390,17 @@ body.mobile-driver .mobile-app {
 
 .editor__deal-meta {
   margin: 0;
-  font-size: calc(var(--font-size-base) * 1.2);
+  font-size: calc(var(--font-size-base) * 1.25);
   font-weight: var(--font-weight-semibold);
   color: var(--on-surface);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .editor__header-actions {
   display: flex;
   gap: 12px;
+  flex-shrink: 0;
 }
 
 .app[data-view='list'] .editor {
