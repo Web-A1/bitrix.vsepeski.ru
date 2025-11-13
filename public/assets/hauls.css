@@ -1020,6 +1020,7 @@ body.mobile-driver .mobile-app {
   border: none;
   padding: 0;
   background: transparent;
+  max-width: 560px;
 }
 
 .directory-manager--inline summary {
@@ -1562,6 +1563,28 @@ textarea:focus {
   border-top: 1px solid rgba(15, 23, 42, 0.08);
 }
 
+.editor__footer-grid {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.editor__footer-column--directories {
+  flex: 1;
+}
+
+.editor__footer-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+  flex: 0 0 auto;
+}
+
+.editor__footer-actions .button {
+  min-width: 140px;
+}
+
 .form-error {
   color: var(--danger);
   font-size: var(--font-size-base);
@@ -1571,17 +1594,6 @@ textarea:focus {
 
 .editor__footer .form-error {
   min-height: 1.2em;
-}
-
-.editor__footer-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.editor__footer-actions .button {
-  min-width: 140px;
 }
 
 @media (min-width: 641px) {

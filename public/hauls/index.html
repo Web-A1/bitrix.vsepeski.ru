@@ -238,8 +238,9 @@
 
           <footer class="editor__footer">
             <span class="form-error" id="form-error" role="alert"></span>
-            <div class="editor__footer-actions">
-              <details class="directory-manager directory-manager--inline" id="directory-manager">
+            <div class="editor__footer-grid">
+              <div class="editor__footer-column editor__footer-column--directories">
+                <details class="directory-manager directory-manager--inline" id="directory-manager">
                 <summary>Управление справочниками</summary>
                 <p class="directory-manager__hint">Быстро добавляйте новые материалы и самосвалы прямо из формы рейса.</p>
                 <div class="directory-manager__content">
@@ -276,6 +277,8 @@
                   </article>
                 </div>
               </details>
+              </div>
+              <div class="editor__footer-actions">
               <button type="button" class="button button--ghost" id="cancel-editor">Отмена</button>
               <button type="button" class="button button--ghost" id="save-draft-button">
                 Сохранить черновик
@@ -286,6 +289,7 @@
               <button type="submit" class="button button--primary" id="submit-haul">
                 Сохранить
               </button>
+            </div>
             </div>
           </footer>
         </form>
