@@ -2662,7 +2662,7 @@ function renderDirectoryLists() {
       },
       {
         name: 'make_model',
-        placeholder: 'Марка (без модели)',
+        placeholder: 'Марка',
         value: (item) => item.make_model ?? '',
       },
       {
