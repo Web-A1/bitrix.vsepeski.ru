@@ -1020,7 +1020,6 @@ body.mobile-driver .mobile-app {
   border: none;
   padding: 0;
   background: transparent;
-  max-width: 560px;
 }
 
 .directory-manager--inline summary {
