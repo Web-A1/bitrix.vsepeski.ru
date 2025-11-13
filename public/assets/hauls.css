@@ -1016,7 +1016,7 @@ body.mobile-driver .mobile-app {
 }
 
 .directory-manager--inline {
-  margin: 0;
+  margin: 0 0 10px 0;
   border: none;
   padding: 0;
   background: transparent;
