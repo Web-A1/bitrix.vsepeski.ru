@@ -57,6 +57,20 @@ final class DealInfoService
         }
 
         $companyId = isset($deal['COMPANY_ID']) ? (int) $deal['COMPANY_ID'] : null;
+        $company = null;
+        if ($companyId && $companyId > 0) {
+            $company = [
+                'id' => $companyId,
+                'title' => (string) ($deal['COMPANY_TITLE'] ?? ''),
+            ];
+
+            if ($company['title'] === '') {
+                $companyDetails = $this->fetchCompany($companyId);
+                if ($companyDetails !== null) {
+                    $company['title'] = $companyDetails['title'];
+                }
+            }
+        }
         $contactId = isset($deal['CONTACT_ID']) ? (int) $deal['CONTACT_ID'] : null;
 
         return [
@@ -64,12 +78,7 @@ final class DealInfoService
             'title' => (string) ($deal['TITLE'] ?? ''),
             'stage' => $deal['STAGE_ID'] ?? null,
             'category_id' => isset($deal['CATEGORY_ID']) ? (int) $deal['CATEGORY_ID'] : null,
-            'company' => $companyId
-                ? [
-                    'id' => $companyId,
-                    'title' => (string) ($deal['COMPANY_TITLE'] ?? ''),
-                ]
-                : null,
+            'company' => $company,
             'contact' => $contactId
                 ? [
                     'id' => $contactId,
@@ -138,5 +147,23 @@ final class DealInfoService
         return $name !== ''
             ? ['id' => $id, 'name' => $name]
             : ['id' => $id];
+    }
+
+    private function fetchCompany(int $companyId): ?array
+    {
+        try {
+            $response = $this->client->call('crm.company.get', ['id' => $companyId]);
+        } catch (RuntimeException) {
+            return null;
+        }
+
+        if (!isset($response['result']) || !is_array($response['result'])) {
+            return null;
+        }
+
+        return [
+            'id' => $companyId,
+            'title' => (string) ($response['result']['TITLE'] ?? ''),
+        ];
     }
 }
