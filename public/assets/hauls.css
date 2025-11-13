@@ -1340,7 +1340,7 @@ body.mobile-driver .mobile-app {
   background: var(--border);
   position: relative;
   z-index: 1;
-  margin-bottom: 6px;
+  margin-bottom: 16px;
 }
 
 .editor-status__label {
