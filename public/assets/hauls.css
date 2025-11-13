@@ -1015,6 +1015,21 @@ body.mobile-driver .mobile-app {
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
 
+.directory-manager--inline {
+  margin: 0;
+  border: none;
+  padding: 0;
+  background: transparent;
+}
+
+.directory-manager--inline summary {
+  font-size: var(--font-size-base);
+}
+
+.directory-manager--inline .directory-manager__content {
+  margin-top: 16px;
+}
+
 .directory-card {
   border: 1px solid var(--border);
   border-radius: var(--panel-radius);
