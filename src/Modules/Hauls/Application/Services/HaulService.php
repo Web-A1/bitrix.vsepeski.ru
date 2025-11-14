@@ -144,6 +144,10 @@ final class HaulService
             return;
         }
 
+        if (!$this->canDeleteHaul($existing, $actor)) {
+            throw new RuntimeException('Недостаточно прав для удаления рейса.');
+        }
+
         $this->repository->delete($existing->id());
     }
 
@@ -342,6 +346,21 @@ final class HaulService
                 sprintf('Для выбранного статуса заполните поля: %s.', implode(', ', $missing))
             );
         }
+    }
+
+    private function canDeleteHaul(Haul $haul, ActorContext $actor): bool
+    {
+        $role = strtolower($actor->role);
+        if (in_array($role, ['admin', 'dispatcher'], true)) {
+            return true;
+        }
+
+        $responsibleId = $haul->responsibleId();
+        if ($responsibleId !== null && $actor->id !== null && $responsibleId === $actor->id) {
+            return true;
+        }
+
+        return false;
     }
 
     /**

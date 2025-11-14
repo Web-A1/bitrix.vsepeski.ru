@@ -13,4 +13,5 @@ return [
         'supplier' => $_ENV['BITRIX_COMPANY_SUPPLIER_TYPE'] ?? 'SUPPLIER',
         'carrier' => $_ENV['BITRIX_COMPANY_CARRIER_TYPE'] ?? 'CARRIER',
     ],
+    'deal_material_field' => $_ENV['BITRIX_DEAL_MATERIAL_FIELD'] ?? '',
 ];

@@ -518,6 +518,7 @@ const elements = {
   driverSelect: document.getElementById('driver-select'),
   truckSelect: document.getElementById('truck-select'),
   materialSelect: document.getElementById('material-select'),
+  materialSelectHint: document.getElementById('material-select-hint'),
   supplierSelect: document.getElementById('supplier-select'),
   carrierSelect: document.getElementById('carrier-select'),
   legDistanceInput: document.getElementById('leg-distance-input'),
@@ -2119,6 +2120,7 @@ async function refreshDealMeta() {
 
   updateDealMeta();
   syncUnloadToCompany();
+  renderReferenceSelects();
 }
 
 async function detectDealId() {
@@ -2498,14 +2500,122 @@ function renderReferenceSelects() {
     },
   });
 
-  renderSelect(elements.materialSelect, state.materials, {
+  const availability = getMaterialAvailability();
+  const previousMaterialValue = elements.materialSelect?.value ?? '';
+  renderSelect(elements.materialSelect, availability.items, {
     placeholder: 'Не выбрано',
     allowEmpty: false,
     getLabel: (material) => material.name || material.id,
+    emptyLabel: availability.limited
+      ? 'Нет материалов, выбранных в сделке'
+      : 'данные недоступны',
   });
+  restoreSelectValue(elements.materialSelect, previousMaterialValue, { allowInjection: true });
+  updateMaterialSelectHint(availability);
 
   renderCompanySelect(elements.supplierSelect, state.suppliers, 'Выберите поставщика');
   renderCompanySelect(elements.carrierSelect, state.carriers, 'Выберите перевозчика');
+}
+
+function getMaterialAvailability() {
+  const materials = Array.isArray(state.materials) ? state.materials : [];
+  const dealLabels = extractDealMaterialLabels();
+  if (!dealLabels.length) {
+    return {
+      items: materials,
+      limited: false,
+      requiredLabels: [],
+      missingLabels: [],
+    };
+  }
+
+  const normalized = [];
+  const seen = new Set();
+  dealLabels.forEach((label) => {
+    const normalizedLabel = label.toLowerCase();
+    if (!normalizedLabel || seen.has(normalizedLabel)) {
+      return;
+    }
+    seen.add(normalizedLabel);
+    normalized.push({ original: label, normalized: normalizedLabel });
+  });
+
+  if (!normalized.length) {
+    return {
+      items: materials,
+      limited: false,
+      requiredLabels: [],
+      missingLabels: [],
+    };
+  }
+
+  const allowedSet = new Set(normalized.map((item) => item.normalized));
+  const filtered = materials.filter((material) => {
+    const name = typeof material.name === 'string' ? material.name.trim().toLowerCase() : '';
+    return name && allowedSet.has(name);
+  });
+
+  const matched = new Set(filtered.map((material) => {
+    if (typeof material.name !== 'string') {
+      return '';
+    }
+    return material.name.trim().toLowerCase();
+  }));
+
+  const missingLabels = materials.length === 0
+    ? []
+    : normalized
+        .filter((item) => !matched.has(item.normalized))
+        .map((item) => item.original);
+
+  return {
+    items: filtered,
+    limited: true,
+    requiredLabels: dealLabels,
+    missingLabels,
+  };
+}
+
+function extractDealMaterialLabels() {
+  const meta = state.dealMeta?.materials;
+  if (!meta) {
+    return [];
+  }
+  const source = Array.isArray(meta.labels) && meta.labels.length
+    ? meta.labels
+    : (
+      Array.isArray(meta.selected_labels) && meta.selected_labels.length
+        ? meta.selected_labels
+        : (
+          Array.isArray(meta.selected) && meta.selected.length
+            ? meta.selected
+            : (Array.isArray(meta.selected_ids) ? meta.selected_ids : [])
+        )
+    );
+  return source
+    .map((label) => (typeof label === 'string' ? label.trim() : ''))
+    .filter(Boolean);
+}
+
+function updateMaterialSelectHint(availability) {
+  const hint = elements.materialSelectHint;
+  if (!hint) {
+    return;
+  }
+
+  if (!availability.limited) {
+    hint.textContent = '';
+    hint.hidden = true;
+    return;
+  }
+
+  if (availability.items.length === 0 && availability.missingLabels.length > 0 && state.materials.length > 0) {
+    const missing = availability.missingLabels.join(', ');
+    hint.textContent = `В сделке выбраны материалы (${missing}), добавьте их в справочник, чтобы выбрать.`;
+  } else {
+    hint.textContent = 'Список ограничен материалами, выбранными в сделке.';
+  }
+  hint.hidden = false;
 }
 
 function setupDirectoryManager() {
@@ -3379,13 +3489,18 @@ function syncUnloadToCompany(idOverride = null, titleOverride = null) {
 function renderSelect(select, items, options) {
   if (!select) return;
 
-  const { placeholder, allowEmpty, getLabel } = options;
+  const {
+    placeholder,
+    allowEmpty,
+    getLabel,
+    emptyLabel = 'данные недоступны',
+  } = options;
   select.innerHTML = '';
 
   if (!items.length) {
     const option = document.createElement('option');
     option.value = '';
-    option.textContent = 'данные недоступны';
+    option.textContent = emptyLabel;
     option.disabled = true;
     select.appendChild(option);
     select.disabled = true;
@@ -4043,6 +4158,25 @@ function setSelectValue(select, value) {
     option.textContent = strValue;
     select.appendChild(option);
     select.value = strValue;
+  }
+}
+
+function restoreSelectValue(select, value, options = {}) {
+  if (!select) {
+    return;
+  }
+  if (value === undefined || value === null || value === '') {
+    return;
+  }
+  const strValue = String(value);
+  const hasOption = Array.from(select.options || []).some((option) => option.value === strValue);
+  if (hasOption) {
+    select.value = strValue;
+    return;
+  }
+
+  if (options.allowInjection) {
+    setSelectValue(select, strValue);
   }
 }
 

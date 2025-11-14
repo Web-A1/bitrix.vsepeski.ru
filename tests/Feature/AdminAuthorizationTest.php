@@ -41,7 +41,27 @@ final class AdminAuthorizationTest extends TestCase
         $_SESSION = [];
         $this->authManager = new SessionAuthManager();
         $this->resolver = new ActorContextResolver($this->authManager);
-        $this->dealService = new DealInfoService(new BitrixRestClient('https://example.com/rest'));
+        $transport = static function (string $method, array $payload): array {
+            if ($method === 'crm.deal.get') {
+                return [
+                    'result' => [
+                        'ID' => $payload['id'] ?? 1,
+                        'TITLE' => 'Test deal',
+                        'STAGE_ID' => 'NEW',
+                        'CATEGORY_ID' => 0,
+                        'COMPANY_ID' => null,
+                        'CONTACT_ID' => null,
+                        'ASSIGNED_BY_ID' => 1,
+                        'ASSIGNED_BY_NAME' => 'Test',
+                        'ASSIGNED_BY_LAST_NAME' => 'User',
+                    ],
+                ];
+            }
+
+            return ['result' => []];
+        };
+
+        $this->dealService = new DealInfoService(new BitrixRestClient('https://example.com/rest', $transport));
         $this->pdo = new class extends PDO {
             public function __construct()
             {

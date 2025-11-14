@@ -9,8 +9,15 @@ use RuntimeException;
 
 final class DealInfoService
 {
-    public function __construct(private readonly BitrixRestClient $client)
-    {
+    private ?array $materialFieldOptions = null;
+    private ?string $materialsField;
+
+    public function __construct(
+        private readonly BitrixRestClient $client,
+        ?string $materialsField = null,
+    ) {
+        $normalized = $materialsField !== null ? trim($materialsField) : '';
+        $this->materialsField = $normalized !== '' ? $normalized : null;
     }
 
     /**
@@ -30,9 +37,7 @@ final class DealInfoService
             throw new RuntimeException('Некорректный ID сделки.');
         }
 
-        $response = $this->client->call('crm.deal.get', [
-            'id' => $dealId,
-            'select' => [
+        $select = [
                 'ID',
                 'TITLE',
                 'STAGE_ID',
@@ -48,7 +53,15 @@ final class DealInfoService
                 'ASSIGNED_BY_NAME',
                 'ASSIGNED_BY_LAST_NAME',
                 'ASSIGNED_BY_SECOND_NAME',
-            ],
+        ];
+
+        if ($this->materialsField !== null && $this->materialsField !== '') {
+            $select[] = $this->materialsField;
+        }
+
+        $response = $this->client->call('crm.deal.get', [
+            'id' => $dealId,
+            'select' => $select,
         ]);
         $deal = $response['result'] ?? $response['deal'] ?? null;
 
@@ -87,7 +100,138 @@ final class DealInfoService
                 ]
                 : null,
             'responsible' => $this->extractResponsible($deal),
+            'materials' => $this->extractDealMaterials($deal),
         ];
+    }
+
+    private function extractDealMaterials(array $deal): ?array
+    {
+        if ($this->materialsField === null || $this->materialsField === '') {
+            return null;
+        }
+
+        if (!array_key_exists($this->materialsField, $deal)) {
+            return null;
+        }
+
+        $raw = $deal[$this->materialsField];
+        $selected = $this->normalizeSelectedMaterials($raw);
+
+        if ($selected === []) {
+            return null;
+        }
+
+        $labels = $this->resolveMaterialLabels($selected);
+        if ($labels === []) {
+            $labels = $selected;
+        }
+
+        return [
+            'field' => $this->materialsField,
+            'selected_ids' => $selected,
+            'labels' => $labels,
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function normalizeSelectedMaterials(mixed $raw): array
+    {
+        if ($raw === null) {
+            return [];
+        }
+
+        if (!is_array($raw)) {
+            $raw = [$raw];
+        }
+
+        $normalized = [];
+        foreach ($raw as $value) {
+            if ($value === null || $value === '') {
+                continue;
+            }
+            $normalized[] = (string) $value;
+        }
+
+        return array_values(array_unique($normalized));
+    }
+
+    /**
+     * @param list<string> $selected
+     * @return list<string>
+     */
+    private function resolveMaterialLabels(array $selected): array
+    {
+        if ($selected === []) {
+            return [];
+        }
+
+        $options = $this->loadMaterialFieldOptions();
+        if ($options === []) {
+            return [];
+        }
+
+        $labels = [];
+        foreach ($selected as $value) {
+            if (isset($options[$value])) {
+                $labels[] = $options[$value];
+            }
+        }
+
+        return $labels;
+    }
+
+    /**
+     * @return array<string,string>
+     */
+    private function loadMaterialFieldOptions(): array
+    {
+        if ($this->materialsField === null || $this->materialsField === '') {
+            return [];
+        }
+
+        if ($this->materialFieldOptions !== null) {
+            return $this->materialFieldOptions;
+        }
+
+        try {
+            $response = $this->client->call('crm.deal.userfield.list', [
+                'filter' => [
+                    'FIELD_NAME' => $this->materialsField,
+                ],
+            ]);
+        } catch (RuntimeException) {
+            $this->materialFieldOptions = [];
+            return $this->materialFieldOptions;
+        }
+
+        $items = $response['result'] ?? null;
+        if (!is_array($items)) {
+            $this->materialFieldOptions = [];
+            return $this->materialFieldOptions;
+        }
+
+        foreach ($items as $item) {
+            if (!is_array($item) || ($item['FIELD_NAME'] ?? null) !== $this->materialsField) {
+                continue;
+            }
+            if (!isset($item['LIST']) || !is_array($item['LIST'])) {
+                continue;
+            }
+            $options = [];
+            foreach ($item['LIST'] as $option) {
+                if (!isset($option['ID'], $option['VALUE'])) {
+                    continue;
+                }
+                $options[(string) $option['ID']] = (string) $option['VALUE'];
+            }
+            $this->materialFieldOptions = $options;
+            return $this->materialFieldOptions;
+        }
+
+        $this->materialFieldOptions = [];
+        return $this->materialFieldOptions;
     }
 
     private function formatContactName(array $deal): string

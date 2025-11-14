@@ -208,32 +208,9 @@ final class HaulController
 
     private function resolveActor(string $defaultRole = 'manager', ?Request $request = null): ActorContext
     {
-        $resolved = $this->actorResolver->resolve($defaultRole);
+        unset($request);
 
-        if ($request === null) {
-            return $resolved;
-        }
-
-        $hasSessionActor = $resolved->id !== null
-            || $resolved->name !== null
-            || $resolved->role !== $defaultRole;
-
-        if ($hasSessionActor) {
-            return $resolved;
-        }
-
-        $headerRole = $request->header('x-actor-role');
-        if (!$headerRole) {
-            return $resolved;
-        }
-
-        $role = strtolower(trim($headerRole));
-        $headerId = $request->header('x-actor-id');
-        $numericId = $headerId !== null ? filter_var($headerId, FILTER_VALIDATE_INT) : false;
-        $id = $numericId !== false ? (int) $numericId : null;
-        $name = $request->header('x-actor-name') ?? null;
-
-        return new ActorContext($id, $name, $role ?: $defaultRole);
+        return $this->actorResolver->resolve($defaultRole);
     }
 
     private function isAdmin(ActorContext $actor): bool

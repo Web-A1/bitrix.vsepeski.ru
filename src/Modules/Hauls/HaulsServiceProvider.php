@@ -103,7 +103,13 @@ class HaulsServiceProvider
         });
 
         $app->singleton(DealInfoService::class, static function (Application $container): DealInfoService {
-            return new DealInfoService($container->get(BitrixRestClient::class));
+            $config = require dirname(__DIR__, 3) . '/config/bitrix.php';
+            $field = $config['deal_material_field'] ?? '';
+
+            return new DealInfoService(
+                $container->get(BitrixRestClient::class),
+                is_string($field) ? $field : ''
+            );
         });
 
         $app->singleton(HaulService::class, static function (Application $container): HaulService {

@@ -8,11 +8,23 @@ use RuntimeException;
 
 final class BitrixRestClient
 {
-    public function __construct(private readonly string $webhookBaseUrl)
-    {
+    /**
+     * @var callable|null
+     */
+    private $transport;
+
+    /**
+     * @param callable|null $transport
+     */
+    public function __construct(
+        private readonly string $webhookBaseUrl,
+        ?callable $transport = null,
+    ) {
         if ($this->webhookBaseUrl === '') {
             throw new RuntimeException('Bitrix webhook URL is not configured.');
         }
+
+        $this->transport = $transport;
     }
 
     /**
@@ -21,6 +33,15 @@ final class BitrixRestClient
      */
     public function call(string $method, array $payload = []): array
     {
+        if ($this->transport !== null) {
+            $response = ($this->transport)($method, $payload);
+            if (!is_array($response)) {
+                throw new RuntimeException('Bitrix transport callback must return array.');
+            }
+
+            return $response;
+        }
+
         $url = sprintf('%s/%s', $this->webhookBaseUrl, $method);
 
         $context = stream_context_create([
