@@ -2490,13 +2490,7 @@ function renderReferenceSelects() {
   renderSelect(elements.truckSelect, state.trucks, {
     placeholder: 'Не выбрано',
     allowEmpty: false,
-    getLabel: (truck) => {
-      const parts = [];
-      if (truck.license_plate) parts.push(truck.license_plate);
-      if (truck.make_model) parts.push(truck.make_model);
-      if (truck.body_volume) parts.push(`${Number(truck.body_volume)} м³`);
-      return parts.join(' · ') || truck.id;
-    },
+    getLabel: (truck = {}) => formatTruckLabel(truck, truck.license_plate || truck.id || ''),
   });
 
   const availability = getMaterialAvailability();
@@ -2658,13 +2652,8 @@ function renderDirectoryLists() {
   renderDirectoryList(elements.trucksList, state.trucks, {
     emptyMessage: 'Самосвалы не заданы',
     type: 'truck',
-    title: (item) => item.license_plate || item.name || item.id,
-    subtitle: (item) => {
-      const parts = [];
-      if (item.make_model) parts.push(item.make_model);
-      if (item.body_volume) parts.push(`${Number(item.body_volume)} м³`);
-      return parts.join(' · ');
-    },
+    title: (item) => formatTruckLabel(item, item.license_plate || item.name || item.id),
+    subtitle: () => '',
     fields: [
       {
         name: 'license_plate',
@@ -2688,6 +2677,50 @@ function renderDirectoryLists() {
     ],
   });
   renderDirectoryAlert('truck');
+}
+
+function formatTruckLabel(truck, fallback = '') {
+  if (!truck || typeof truck !== 'object') {
+    return fallback;
+  }
+  const parts = [];
+  if (truck.license_plate) {
+    parts.push(String(truck.license_plate).trim());
+  }
+  if (truck.make_model) {
+    parts.push(String(truck.make_model).trim());
+  }
+  const volume = formatTruckVolume(truck.body_volume);
+  if (volume) {
+    parts.push(volume);
+  }
+  const label = parts.filter(Boolean).join(' ').trim();
+  if (label) {
+    return label;
+  }
+  if (truck.name) {
+    return String(truck.name).trim();
+  }
+  if (truck.id) {
+    return String(truck.id);
+  }
+  return fallback;
+}
+
+function formatTruckVolume(volume) {
+  if (volume === undefined || volume === null || volume === '') {
+    return '';
+  }
+  const parsed = Number(volume);
+  const normalized = Number.isFinite(parsed) ? parsed.toString() : String(volume).trim();
+  return normalized ? `${normalized}м3` : '';
+}
+
+function findTruckById(id) {
+  if (id === undefined || id === null || !Array.isArray(state.trucks)) {
+    return null;
+  }
+  return state.trucks.find((truck) => String(truck.id) === String(id)) || null;
 }
 
 function renderDirectoryList(listElement, items, options = {}) {
@@ -3538,7 +3571,8 @@ function createHeadingSection(haul) {
   headingRow.appendChild(title);
 
   const driverName = lookupDriver(haul.responsible_id) || 'Не назначен';
-  const truckLabel = lookupLabel(state.trucks, haul.truck_id, 'license_plate');
+  const truck = findTruckById(haul.truck_id);
+  const truckLabel = formatTruckLabel(truck, haul.truck_id ? String(haul.truck_id) : '—');
   const headingDetails = [
     { text: driverName, href: buildDriverProfileUrl(haul.responsible_id) },
     { text: truckLabel },

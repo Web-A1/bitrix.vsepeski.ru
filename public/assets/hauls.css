@@ -1029,6 +1029,9 @@ body.mobile-driver .mobile-app {
 
 .directory-manager--inline .directory-manager__content {
   margin-top: 16px;
+  grid-template-columns: minmax(320px, 460px);
+  justify-content: flex-start;
+  justify-items: start;
 }
 
 .directory-card {
@@ -1037,8 +1040,10 @@ body.mobile-driver .mobile-app {
   padding: var(--panel-padding);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
   background: var(--surface);
+  max-width: 460px;
+  width: 100%;
 }
 
 .directory-card--highlight {
@@ -1050,6 +1055,8 @@ body.mobile-driver .mobile-app {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
 }
 
 .directory-card__header h4 {
@@ -1140,7 +1147,7 @@ body.mobile-driver .mobile-app {
 
 .directory-card__actions {
   display: flex;
-  gap: 8px;
+  gap: 16px;
   flex-wrap: wrap;
 }
 
