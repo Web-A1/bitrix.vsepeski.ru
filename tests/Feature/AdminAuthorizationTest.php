@@ -13,10 +13,8 @@ use B24\Center\Modules\Hauls\Application\Services\DealInfoService;
 use B24\Center\Modules\Hauls\Infrastructure\HaulChangeHistoryRepository;
 use B24\Center\Modules\Hauls\Infrastructure\HaulRepository;
 use B24\Center\Modules\Hauls\Infrastructure\HaulStatusHistoryRepository;
-use B24\Center\Modules\Hauls\Infrastructure\MaterialRepository;
 use B24\Center\Modules\Hauls\Infrastructure\TruckRepository;
 use B24\Center\Modules\Hauls\Ui\HaulController;
-use B24\Center\Modules\Hauls\Ui\MaterialController;
 use B24\Center\Modules\Hauls\Ui\TruckController;
 use PDO;
 use PDOStatement;
@@ -54,6 +52,19 @@ final class AdminAuthorizationTest extends TestCase
                         'ASSIGNED_BY_ID' => 1,
                         'ASSIGNED_BY_NAME' => 'Test',
                         'ASSIGNED_BY_LAST_NAME' => 'User',
+                        'UF_TEST_FIELD' => ['material-1'],
+                    ],
+                ];
+            }
+            if ($method === 'crm.deal.userfield.list') {
+                return [
+                    'result' => [
+                        [
+                            'FIELD_NAME' => 'UF_TEST_FIELD',
+                            'LIST' => [
+                                ['ID' => 'material-1', 'VALUE' => 'Материал из сделки'],
+                            ],
+                        ],
                     ],
                 ];
             }
@@ -61,7 +72,7 @@ final class AdminAuthorizationTest extends TestCase
             return ['result' => []];
         };
 
-        $this->dealService = new DealInfoService(new BitrixRestClient('https://example.com/rest', $transport));
+        $this->dealService = new DealInfoService(new BitrixRestClient('https://example.com/rest', $transport), 'UF_TEST_FIELD');
         $this->pdo = new class extends PDO {
             public function __construct()
             {
@@ -85,26 +96,6 @@ final class AdminAuthorizationTest extends TestCase
                 throw new RuntimeException('Database access is not expected during authorization checks.');
             }
         };
-    }
-
-    public function testMaterialsStoreRequiresAdminSession(): void
-    {
-        $controller = new MaterialController(
-            new MaterialRepository($this->pdo),
-            new HaulRepository($this->pdo),
-            $this->resolver
-        );
-
-        $request = Request::fake(
-            method: 'POST',
-            path: '/api/materials',
-            body: ['name' => 'Щебень'],
-            headers: ['X-Actor-Role' => 'admin']
-        );
-
-        $response = $controller->store($request);
-
-        self::assertSame(403, $response->status());
     }
 
     public function testTrucksUpdateRequiresAdminSession(): void

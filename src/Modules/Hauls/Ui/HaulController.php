@@ -68,6 +68,11 @@ final class HaulController
             return Response::json(['error' => $exception->getMessage()], 422);
         }
 
+        $materialCheck = $this->validateMaterialSelection($payload['material_id'] ?? null, $deal, true);
+        if ($materialCheck !== null) {
+            return Response::json(['error' => $materialCheck], 422);
+        }
+
         $actor = $this->resolveActor('manager', $request);
         if (!$this->canManageDeal($deal, $actor)) {
             $this->logAccessDenied('store', $actor, ['deal_id' => $dealId]);
@@ -99,6 +104,13 @@ final class HaulController
             $deal = $this->loadDeal((int) $existing['deal_id']);
         } catch (RuntimeException $exception) {
             return Response::json(['error' => $exception->getMessage()], 422);
+        }
+
+        if (array_key_exists('material_id', $payload)) {
+            $materialCheck = $this->validateMaterialSelection($payload['material_id'], $deal, true);
+            if ($materialCheck !== null) {
+                return Response::json(['error' => $materialCheck], 422);
+            }
         }
 
         if (!$this->canManageDeal($deal, $actor)) {
@@ -257,6 +269,57 @@ final class HaulController
         $this->dealCache[$dealId] = $deal;
 
         return $deal;
+    }
+
+    private function validateMaterialSelection(mixed $value, array $deal, bool $required): ?string
+    {
+        $materialId = $value === null ? '' : trim((string) $value);
+
+        if ($materialId === '') {
+            return $required ? 'Field "material_id" is required.' : null;
+        }
+
+        $allowed = $this->allowedMaterialIds($deal);
+
+        if ($allowed === []) {
+            return 'В сделке не выбраны материалы. Укажите материалы в сделке и попробуйте снова.';
+        }
+
+        if (!in_array($materialId, $allowed, true)) {
+            return 'Материал должен быть выбран в сделке.';
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<string,mixed> $deal
+     * @return list<string>
+     */
+    private function allowedMaterialIds(array $deal): array
+    {
+        $materials = $deal['materials'] ?? null;
+        if (!is_array($materials)) {
+            return [];
+        }
+
+        $selected = $materials['selected_ids']
+            ?? $materials['selected']
+            ?? null;
+
+        if (!is_array($selected)) {
+            return [];
+        }
+
+        $normalized = [];
+        foreach ($selected as $item) {
+            if ($item === null || $item === '') {
+                continue;
+            }
+            $normalized[] = (string) $item;
+        }
+
+        return array_values(array_unique($normalized));
     }
 
     private function logAccessDenied(string $action, ActorContext $actor, array $context = []): void

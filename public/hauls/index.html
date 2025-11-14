@@ -139,14 +139,6 @@
               <label>
                 <span>Материал <small>(обязательно)</small></span>
                 <select name="material_id" id="material-select" required></select>
-                <button
-                  type="button"
-                  class="link-button"
-                  data-manage-target="materials"
-                  title="Управлять списком материалов"
-                >
-                  Управлять списком
-                </button>
                 <span class="hint" id="material-select-hint" hidden></span>
               </label>
               <label>
@@ -245,21 +237,6 @@
                 <summary>Управление справочниками</summary>
                 <p class="directory-manager__hint">Быстро добавляйте новые материалы и самосвалы прямо из формы рейса.</p>
                 <div class="directory-manager__content">
-                  <article class="directory-card" data-directory="materials">
-                    <div class="directory-card__header">
-                      <h4>Материалы</h4>
-                      <button type="button" class="link-button" data-manage-refresh="materials">Обновить</button>
-                    </div>
-                    <div class="directory-card__alert" data-directory-alert="materials" role="alert" aria-live="polite" hidden></div>
-                    <ul class="directory-card__list" id="materials-list"></ul>
-                    <form class="directory-card__form" id="materials-form">
-                      <div class="directory-card__fields">
-                        <input type="text" name="name" placeholder="Название материала" required />
-                        <input type="text" name="description" placeholder="Описание (опционально)" />
-                      </div>
-                      <button type="submit" class="button button--ghost">Добавить материал</button>
-                    </form>
-                  </article>
                   <article class="directory-card" data-directory="trucks">
                     <div class="directory-card__header">
                       <h4>Самосвалы</h4>

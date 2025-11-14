@@ -28,7 +28,13 @@ final class DealInfoService
      *     category_id?:int|null,
      *     company?:array{id:int,title:string}|null,
      *     contact?:array{id:int,name:string,phone:?string}|null,
-     *     responsible?:array{id:int,name?:string}|null
+     *     responsible?:array{id:int,name?:string}|null,
+     *     materials?:array{
+     *         field:string,
+     *         selected_ids:list<string>,
+     *         labels:list<string>,
+     *         options:list<array{id:string,label:string}>
+     *     }|null
      * }
      */
     public function get(int $dealId): array
@@ -121,15 +127,15 @@ final class DealInfoService
             return null;
         }
 
-        $labels = $this->resolveMaterialLabels($selected);
-        if ($labels === []) {
-            $labels = $selected;
-        }
+        $labelsMap = $this->resolveMaterialLabelMap($selected);
+        $labels = $labelsMap === [] ? $selected : array_values($labelsMap);
+        $options = $this->buildMaterialOptions($selected, $labelsMap);
 
         return [
             'field' => $this->materialsField,
             'selected_ids' => $selected,
             'labels' => $labels,
+            'options' => $options,
         ];
     }
 
@@ -159,9 +165,9 @@ final class DealInfoService
 
     /**
      * @param list<string> $selected
-     * @return list<string>
+     * @return array<string,string>
      */
-    private function resolveMaterialLabels(array $selected): array
+    private function resolveMaterialLabelMap(array $selected): array
     {
         if ($selected === []) {
             return [];
@@ -175,11 +181,29 @@ final class DealInfoService
         $labels = [];
         foreach ($selected as $value) {
             if (isset($options[$value])) {
-                $labels[] = $options[$value];
+                $labels[$value] = $options[$value];
             }
         }
 
         return $labels;
+    }
+
+    /**
+     * @param list<string> $selected
+     * @param array<string,string> $labels
+     * @return list<array{id:string,label:string}>
+     */
+    private function buildMaterialOptions(array $selected, array $labels): array
+    {
+        $options = [];
+        foreach ($selected as $value) {
+            $options[] = [
+                'id' => $value,
+                'label' => $labels[$value] ?? $value,
+            ];
+        }
+
+        return $options;
     }
 
     /**

@@ -14,13 +14,11 @@ use B24\Center\Infrastructure\Bitrix\BitrixUserResolver;
 use B24\Center\Modules\Hauls\Application\Services\HaulService;
 use B24\Center\Modules\Hauls\Application\DTO\ActorContext;
 use B24\Center\Modules\Hauls\Infrastructure\HaulRepository;
-use B24\Center\Modules\Hauls\Infrastructure\MaterialRepository;
 use B24\Center\Modules\Hauls\Infrastructure\TruckRepository;
 use B24\Center\Modules\Hauls\Application\Services\DriverLookupService;
 use B24\Center\Modules\Hauls\Application\Services\CompanyDirectoryService;
 use B24\Center\Modules\Hauls\Application\Services\DealInfoService;
 use B24\Center\Modules\Hauls\Ui\HaulController;
-use B24\Center\Modules\Hauls\Ui\MaterialController;
 use B24\Center\Modules\Hauls\Ui\TruckController;
 use B24\Center\Modules\Hauls\Ui\DriverController;
 use B24\Center\Modules\Hauls\Ui\HaulPlacementPageRenderer;
@@ -227,11 +225,6 @@ class Kernel
             $haulRepository,
             $actorResolver
         );
-        $materialController = new MaterialController(
-            $this->container->get(MaterialRepository::class),
-            $haulRepository,
-            $actorResolver
-        );
         $driverController = new DriverController($this->container->get(DriverLookupService::class));
         $companyController = new CompanyDirectoryController($this->container->get(CompanyDirectoryService::class));
         $dealController = new DealInfoController($this->container->get(DealInfoService::class));
@@ -317,24 +310,6 @@ class Kernel
             return match ($method) {
                 'GET' => $companyController->index($request),
                 default => $this->methodNotAllowed(['GET']),
-            };
-        }
-
-        if ($path === '/api/materials') {
-            return match ($method) {
-                'GET' => $materialController->index(),
-                'POST' => $materialController->store($request),
-                default => $this->methodNotAllowed(['GET', 'POST']),
-            };
-        }
-
-        if (preg_match('#^/api/materials/([A-Za-z0-9\\-]+)$#', $path, $matches)) {
-            $materialId = $matches[1];
-
-            return match ($method) {
-                'PUT', 'PATCH' => $materialController->update($materialId, $request),
-                'DELETE' => $materialController->destroy($materialId, $request),
-                default => $this->methodNotAllowed(['PUT', 'PATCH', 'DELETE']),
             };
         }
 

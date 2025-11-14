@@ -10,7 +10,6 @@ use B24\Center\Modules\Hauls\Infrastructure\HaulRepository;
 use B24\Center\Modules\Hauls\Infrastructure\HaulChangeHistoryRepository;
 use B24\Center\Modules\Hauls\Infrastructure\HaulStatusHistoryRepository;
 use B24\Center\Modules\Hauls\Application\Services\HaulService;
-use B24\Center\Modules\Hauls\Infrastructure\MaterialRepository;
 use B24\Center\Modules\Hauls\Infrastructure\TruckRepository;
 use B24\Center\Infrastructure\Bitrix\BitrixRestClient;
 use B24\Center\Modules\Hauls\Application\Services\DriverLookupService;
@@ -50,13 +49,6 @@ class HaulsServiceProvider
             $connection = $container->get(PDO::class);
 
             return new DriverAccountRepository($connection);
-        });
-
-        $app->singleton(MaterialRepository::class, static function (Application $container): MaterialRepository {
-            /** @var PDO $connection */
-            $connection = $container->get(PDO::class);
-
-            return new MaterialRepository($connection);
         });
 
         $app->singleton(TruckRepository::class, static function (Application $container): TruckRepository {

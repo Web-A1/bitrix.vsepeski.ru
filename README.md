@@ -9,7 +9,7 @@
 - Haul (`hauls`): рейс сделки; включает load/unload блоки, sequence, ответственного водителя.
 - `hauls.leg_distance_km` хранит плечо (км) между точками, используется в предпросмотре и копировании рейса.
 - Truck (`trucks`): самосвал, уникальный `license_plate`.
-- Material (`materials`): тип груза.
+- Материал: берём варианты из пользовательского поля сделки в Bitrix24, локального справочника больше нет.
 - Drivers поступают из Bitrix отдела `BITRIX_DRIVERS_DEPARTMENT`.
 - Каждое изменение полей фиксируется в таблице `haul_change_events` (кто/что/когда), статусные переходы дополнительно пишутся в `haul_status_events`.
 
@@ -39,7 +39,6 @@
 - `GET/POST /api/deals/{dealId}/hauls` — список и создание рейсов.
 - `GET/PATCH/DELETE /api/hauls/{haulId}` — чтение/обновление/мягкое удаление.
 - `GET/POST /api/trucks`, `DELETE /api/trucks/{id}`.
-- `GET/POST /api/materials`, `DELETE /api/materials/{id}`.
 - `GET /api/drivers` — Bitrix REST прокси (ожидает webhook URL).
 - `GET /api/crm/companies?type=supplier|carrier` — справочники компаний Bitrix24 по типам.
 - `GET /api/deals/{dealId}` — заголовок сделки + данные клиента/контакта для автозаполнения формы.

@@ -42,11 +42,9 @@ const state = {
   loading: false,
   saving: false,
   directoryEditing: {
-    materials: null,
     trucks: null,
   },
   directoryAlerts: {
-    materials: null,
     trucks: null,
   },
   editorStatus: 0,
@@ -536,13 +534,10 @@ const elements = {
   finalizeHaulButton: document.getElementById('finalize-haul-button'),
   directoryManager: document.getElementById('directory-manager'),
   editorStatus: document.getElementById('editor-status'),
-  materialsList: document.getElementById('materials-list'),
-  materialsForm: document.getElementById('materials-form'),
   trucksList: document.getElementById('trucks-list'),
   trucksForm: document.getElementById('trucks-form'),
   manageTargetButtons: Array.from(document.querySelectorAll('[data-manage-target]')),
   manageRefreshButtons: Array.from(document.querySelectorAll('[data-manage-refresh]')),
-  materialsAlert: document.querySelector('[data-directory-alert="materials"]'),
   trucksAlert: document.querySelector('[data-directory-alert="trucks"]'),
 };
 
@@ -1151,7 +1146,8 @@ function buildMobileHaulCard(haul) {
   meta.className = 'mobile-haul__meta';
 
   if (haul?.material_id) {
-    meta.appendChild(createMetaBadge(`Материал: ${haul.material_id}`));
+    const label = lookupLabel(state.materials, haul.material_id, 'label');
+    meta.appendChild(createMetaBadge(`Материал: ${label}`));
   }
 
   const statusBadge = buildStatusBadge(haul.status);
@@ -2103,14 +2099,18 @@ function updateDealMeta() {
 async function refreshDealMeta() {
   if (!state.dealId) {
     state.dealMeta = null;
+    syncMaterialsFromDeal();
     updateDealMeta();
     syncUnloadToCompany();
+    renderReferenceSelects();
+    renderList();
     return;
   }
 
   try {
     const response = await request(`/api/deals/${state.dealId}`);
     state.dealMeta = response?.data ?? null;
+    syncMaterialsFromDeal();
     if (state.dealMeta?.title) {
       applyDealTitle(state.dealMeta.title, { force: true });
     }
@@ -2121,6 +2121,7 @@ async function refreshDealMeta() {
   updateDealMeta();
   syncUnloadToCompany();
   renderReferenceSelects();
+  renderList();
 }
 
 async function detectDealId() {
@@ -2258,9 +2259,8 @@ async function detectDealId() {
 
 async function loadReferenceData() {
   try {
-    const [trucks, materials, suppliers, carriers] = await Promise.all([
+    const [trucks, suppliers, carriers] = await Promise.all([
       request('/api/trucks'),
-      request('/api/materials'),
       loadCompanyDirectory('supplier'),
       loadCompanyDirectory('carrier'),
     ]);
@@ -2273,7 +2273,6 @@ async function loadReferenceData() {
     }
 
     state.trucks = Array.isArray(trucks?.data) ? trucks.data : [];
-    state.materials = Array.isArray(materials?.data) ? materials.data : [];
     state.suppliers = suppliers;
     state.carriers = carriers;
 
@@ -2505,10 +2504,10 @@ function renderReferenceSelects() {
   renderSelect(elements.materialSelect, availability.items, {
     placeholder: 'Не выбрано',
     allowEmpty: false,
-    getLabel: (material) => material.name || material.id,
+    getLabel: (material) => material.label || material.name || material.id,
     emptyLabel: availability.limited
-      ? 'Нет материалов, выбранных в сделке'
-      : 'данные недоступны',
+      ? 'Нет материалов из сделки'
+      : 'Выберите сделку',
   });
   restoreSelectValue(elements.materialSelect, previousMaterialValue, { allowInjection: true });
   updateMaterialSelectHint(availability);
@@ -2518,83 +2517,10 @@ function renderReferenceSelects() {
 }
 
 function getMaterialAvailability() {
-  const materials = Array.isArray(state.materials) ? state.materials : [];
-  const dealLabels = extractDealMaterialLabels();
-  if (!dealLabels.length) {
-    return {
-      items: materials,
-      limited: false,
-      requiredLabels: [],
-      missingLabels: [],
-    };
-  }
-
-  const normalized = [];
-  const seen = new Set();
-  dealLabels.forEach((label) => {
-    const normalizedLabel = label.toLowerCase();
-    if (!normalizedLabel || seen.has(normalizedLabel)) {
-      return;
-    }
-    seen.add(normalizedLabel);
-    normalized.push({ original: label, normalized: normalizedLabel });
-  });
-
-  if (!normalized.length) {
-    return {
-      items: materials,
-      limited: false,
-      requiredLabels: [],
-      missingLabels: [],
-    };
-  }
-
-  const allowedSet = new Set(normalized.map((item) => item.normalized));
-  const filtered = materials.filter((material) => {
-    const name = typeof material.name === 'string' ? material.name.trim().toLowerCase() : '';
-    return name && allowedSet.has(name);
-  });
-
-  const matched = new Set(filtered.map((material) => {
-    if (typeof material.name !== 'string') {
-      return '';
-    }
-    return material.name.trim().toLowerCase();
-  }));
-
-  const missingLabels = materials.length === 0
-    ? []
-    : normalized
-        .filter((item) => !matched.has(item.normalized))
-        .map((item) => item.original);
-
   return {
-    items: filtered,
-    limited: true,
-    requiredLabels: dealLabels,
-    missingLabels,
+    items: Array.isArray(state.materials) ? state.materials : [],
+    limited: Boolean(state.dealMeta?.materials),
   };
-}
-
-function extractDealMaterialLabels() {
-  const meta = state.dealMeta?.materials;
-  if (!meta) {
-    return [];
-  }
-  const source = Array.isArray(meta.labels) && meta.labels.length
-    ? meta.labels
-    : (
-      Array.isArray(meta.selected_labels) && meta.selected_labels.length
-        ? meta.selected_labels
-        : (
-          Array.isArray(meta.selected) && meta.selected.length
-            ? meta.selected
-            : (Array.isArray(meta.selected_ids) ? meta.selected_ids : [])
-        )
-    );
-  return source
-    .map((label) => (typeof label === 'string' ? label.trim() : ''))
-    .filter(Boolean);
 }
 
 function updateMaterialSelectHint(availability) {
@@ -2604,17 +2530,23 @@ function updateMaterialSelectHint(availability) {
   }
 
   if (!availability.limited) {
-    hint.textContent = '';
-    hint.hidden = true;
+    if (!state.dealId) {
+      hint.textContent = 'Укажите сделку, чтобы выбрать материал.';
+      hint.hidden = false;
+      return;
+    }
+    hint.textContent = 'Выберите материалы в сделке Bitrix24, чтобы использовать их здесь.';
+    hint.hidden = false;
     return;
   }
 
-  if (availability.items.length === 0 && availability.missingLabels.length > 0 && state.materials.length > 0) {
-    const missing = availability.missingLabels.join(', ');
-    hint.textContent = `В сделке выбраны материалы (${missing}), добавьте их в справочник, чтобы выбрать.`;
-  } else {
-    hint.textContent = 'Список ограничен материалами, выбранными в сделке.';
+  if (availability.items.length === 0) {
+    hint.textContent = 'В сделке пока не выбраны материалы. Добавьте их и обновите данные.';
+    hint.hidden = false;
+    return;
   }
+
+  hint.textContent = 'Список материалов формируется по выбранным значениям в сделке.';
   hint.hidden = false;
 }
 
@@ -2624,15 +2556,8 @@ function setupDirectoryManager() {
   }
   setupDirectoryManager.initialized = true;
 
-  elements.materialsForm?.addEventListener('submit', handleMaterialSubmit);
   elements.trucksForm?.addEventListener('submit', handleTruckSubmit);
 
-  elements.materialsList?.addEventListener('click', (event) => {
-    handleDirectoryListClick(event, 'material');
-  });
-  elements.materialsList?.addEventListener('submit', (event) => {
-    handleDirectoryEditSubmit(event, 'material');
-  });
   elements.trucksList?.addEventListener('click', (event) => {
     handleDirectoryListClick(event, 'truck');
   });
@@ -2650,9 +2575,7 @@ function setupDirectoryManager() {
   (elements.manageRefreshButtons || []).forEach((button) => {
     button?.addEventListener('click', () => {
       const target = button.getAttribute('data-manage-refresh');
-      if (target === 'materials') {
-        refreshMaterialsDirectory(button);
-      } else if (target === 'trucks') {
+      if (target === 'trucks') {
         refreshTrucksDirectory(button);
       }
     });
@@ -2732,27 +2655,6 @@ function updateDirectoryManagerVisibility() {
 }
 
 function renderDirectoryLists() {
-  renderDirectoryList(elements.materialsList, state.materials, {
-    emptyMessage: 'Материалы не заданы',
-    type: 'material',
-    title: (item) => item.name || item.id,
-    subtitle: (item) => item.description ?? '',
-    fields: [
-      {
-        name: 'name',
-        placeholder: 'Название материала',
-        required: true,
-        value: (item) => item.name ?? '',
-      },
-      {
-        name: 'description',
-        placeholder: 'Описание (опционально)',
-        value: (item) => item.description ?? '',
-      },
-    ],
-  });
-  renderDirectoryAlert('material');
-
   renderDirectoryList(elements.trucksList, state.trucks, {
     emptyMessage: 'Самосвалы не заданы',
     type: 'truck',
@@ -2794,7 +2696,7 @@ function renderDirectoryList(listElement, items, options = {}) {
   }
   const {
     emptyMessage = 'Список пуст',
-    type = 'material',
+    type = 'truck',
     title,
     subtitle,
     fields = [],
@@ -2848,7 +2750,7 @@ function renderDirectoryList(listElement, items, options = {}) {
         const editButton = document.createElement('button');
         editButton.type = 'button';
         editButton.className = 'directory-card__action';
-        editButton.dataset.action = type === 'truck' ? 'edit-truck' : 'edit-material';
+        editButton.dataset.action = 'edit-truck';
         editButton.dataset.id = item.id;
         editButton.textContent = 'Редактировать';
         actions.appendChild(editButton);
@@ -2856,7 +2758,7 @@ function renderDirectoryList(listElement, items, options = {}) {
         const deleteButton = document.createElement('button');
         deleteButton.type = 'button';
         deleteButton.className = 'directory-card__delete';
-        deleteButton.dataset.action = type === 'truck' ? 'delete-truck' : 'delete-material';
+        deleteButton.dataset.action = 'delete-truck';
         deleteButton.dataset.id = item.id;
         const inUse = Boolean(item?.usage?.count);
         deleteButton.disabled = inUse;
@@ -2904,7 +2806,7 @@ function renderDirectoryUsage(usage) {
 function buildDirectoryEditForm(type, item, fields) {
   const form = document.createElement('form');
   form.className = 'directory-card__edit';
-  form.dataset.action = type === 'truck' ? 'update-truck' : 'update-material';
+  form.dataset.action = 'update-truck';
   form.dataset.id = item.id;
 
   const fieldsWrapper = document.createElement('div');
@@ -2944,7 +2846,7 @@ function buildDirectoryEditForm(type, item, fields) {
   const cancelButton = document.createElement('button');
   cancelButton.type = 'button';
   cancelButton.className = 'button button--ghost';
-  cancelButton.dataset.action = type === 'truck' ? 'cancel-edit-truck' : 'cancel-edit-material';
+  cancelButton.dataset.action = 'cancel-edit-truck';
   cancelButton.dataset.id = item.id;
   cancelButton.textContent = 'Отмена';
   actions.appendChild(cancelButton);
@@ -2955,11 +2857,14 @@ function buildDirectoryEditForm(type, item, fields) {
 }
 
 function handleDirectoryEditSubmit(event, type) {
+  if (!isTruckDirectory(type)) {
+    return;
+  }
   const form = event.target;
   if (!(form instanceof HTMLFormElement)) {
     return;
   }
-  const expectedAction = type === 'truck' ? 'update-truck' : 'update-material';
+  const expectedAction = 'update-truck';
   if (form.dataset.action !== expectedAction) {
     return;
   }
@@ -2978,14 +2883,13 @@ function handleDirectoryEditSubmit(event, type) {
     return;
   }
 
-  if (type === 'truck') {
-    void updateTruckById(id, form);
-  } else {
-    void updateMaterialById(id, form);
-  }
+  void updateTruckById(id, form);
 }
 
 function startDirectoryEdit(type, id) {
+  if (!isTruckDirectory(type)) {
+    return;
+  }
   if (!canManageDirectories()) {
     setDirectoryAlert(type, {
       type: 'error',
@@ -3004,19 +2908,20 @@ function startDirectoryEdit(type, id) {
 }
 
 function cancelDirectoryEdit(type) {
+  if (!isTruckDirectory(type)) {
+    return;
+  }
   const key = directoryKeyFromType(type);
   state.directoryEditing[key] = null;
   renderDirectoryLists();
 }
 
 function directoryKeyFromType(type) {
-  return type === 'truck' || type === 'trucks' ? 'trucks' : 'materials';
+  return 'trucks';
 }
 
 function getDirectoryListElement(type) {
-  return type === 'truck' || type === 'trucks'
-    ? elements.trucksList
-    : elements.materialsList;
+  return isTruckDirectory(type) ? elements.trucksList : null;
 }
 
 function formatUsageSample(sample) {
@@ -3031,19 +2936,26 @@ function formatUsageSample(sample) {
 }
 
 function setDirectoryAlert(type, alert) {
+  if (!isTruckDirectory(type)) {
+    return;
+  }
   const key = directoryKeyFromType(type);
   state.directoryAlerts[key] = alert;
   renderDirectoryAlert(type);
 }
 
 function clearDirectoryAlert(type) {
+  if (!isTruckDirectory(type)) {
+    return;
+  }
   setDirectoryAlert(type, null);
 }
 
 function renderDirectoryAlert(type) {
-  const element = type === 'truck' || type === 'trucks'
-    ? elements.trucksAlert
-    : elements.materialsAlert;
+  if (!isTruckDirectory(type)) {
+    return;
+  }
+  const element = elements.trucksAlert;
   if (!element) {
     return;
   }
@@ -3076,6 +2988,10 @@ function renderDirectoryAlert(type) {
   }
 }
 
+function isTruckDirectory(type) {
+  return type === 'truck' || type === 'trucks';
+}
+
 function buildUsageAlertMessage(prefix, usage) {
   if (!usage || !usage.count) {
     return prefix;
@@ -3086,13 +3002,12 @@ function buildUsageAlertMessage(prefix, usage) {
 }
 
 function replaceDirectoryItem(key, payload) {
-  if (!payload || !payload.id) {
+  if (!payload || !payload.id || key !== 'trucks') {
     return;
   }
-  const listKey = key === 'trucks' ? 'trucks' : 'materials';
-  const source = Array.isArray(state[listKey]) ? state[listKey] : [];
+  const source = Array.isArray(state.trucks) ? state.trucks : [];
   const updated = source.map((item) => (item.id === payload.id ? payload : item));
-  state[listKey] = sortDirectoryCollection(updated, listKey);
+  state.trucks = sortDirectoryCollection(updated, 'trucks');
 }
 
 function sortDirectoryCollection(items, key) {
@@ -3104,51 +3019,6 @@ function sortDirectoryCollection(items, key) {
   };
 
   return [...items].sort((a, b) => labelFor(a).localeCompare(labelFor(b), 'ru', { sensitivity: 'base' }));
-}
-
-async function handleMaterialSubmit(event) {
-  event.preventDefault();
-  const form = event.currentTarget;
-  if (!(form instanceof HTMLFormElement)) {
-    return;
-  }
-  if (!canManageDirectories()) {
-    setDirectoryAlert('material', {
-      type: 'error',
-      message: 'Недостаточно прав для добавления материалов.',
-    });
-    return;
-  }
-  const nameInput = form.elements.namedItem('name');
-  const descriptionInput = form.elements.namedItem('description');
-  const name = typeof nameInput?.value === 'string' ? nameInput.value.trim() : '';
-  const description = typeof descriptionInput?.value === 'string' ? descriptionInput.value.trim() : '';
-
-  if (!name) {
-    nameInput?.focus();
-    return;
-  }
-
-  const submitButton = form.querySelector('button[type="submit"]');
-  setButtonLoading(submitButton, true);
-  try {
-    const response = await request('/api/materials', {
-      method: 'POST',
-      body: { name, description: description || undefined },
-    });
-    if (response?.data) {
-      state.materials.push(response.data);
-      state.materials = sortDirectoryCollection(state.materials, 'materials');
-      clearDirectoryAlert('material');
-      renderReferenceSelects();
-      renderDirectoryLists();
-      form.reset();
-    }
-  } catch (error) {
-    handleApiError(error, 'Не удалось добавить материал');
-  } finally {
-    setButtonLoading(submitButton, false);
-  }
 }
 
 async function handleTruckSubmit(event) {
@@ -3207,41 +3077,6 @@ async function handleTruckSubmit(event) {
   }
 }
 
-async function updateMaterialById(id, form) {
-  const nameInput = form.elements.namedItem('name');
-  const descriptionInput = form.elements.namedItem('description');
-  const name = typeof nameInput?.value === 'string' ? nameInput.value.trim() : '';
-  const description = typeof descriptionInput?.value === 'string' ? descriptionInput.value.trim() : '';
-
-  if (!name) {
-    nameInput?.focus();
-    return;
-  }
-
-  const submitButton = form.querySelector('button[type="submit"]');
-  setButtonLoading(submitButton, true);
-  try {
-    const response = await request(`/api/materials/${encodeURIComponent(id)}`, {
-      method: 'PATCH',
-      body: {
-        name,
-        description: description || null,
-      },
-    });
-    if (response?.data) {
-      replaceDirectoryItem('materials', response.data);
-      clearDirectoryAlert('material');
-      cancelDirectoryEdit('material');
-      renderReferenceSelects();
-      renderDirectoryLists();
-    }
-  } catch (error) {
-    handleApiError(error, 'Не удалось обновить материал');
-  } finally {
-    setButtonLoading(submitButton, false);
-  }
-}
-
 async function updateTruckById(id, form) {
   const plateInput = form.elements.namedItem('license_plate');
   const makeInput = form.elements.namedItem('make_model');
@@ -3293,6 +3128,9 @@ async function updateTruckById(id, form) {
 }
 
 function handleDirectoryListClick(event, type) {
+  if (!isTruckDirectory(type)) {
+    return;
+  }
   const target = event.target;
   if (!(target instanceof Element)) {
     return;
@@ -3307,34 +3145,16 @@ function handleDirectoryListClick(event, type) {
     return;
   }
 
-  if (action === 'edit-material' && type === 'material') {
-    startDirectoryEdit('material', id);
-    return;
-  }
-  if (action === 'edit-truck' && type === 'truck') {
+  if (action === 'edit-truck' && isTruckDirectory(type)) {
     startDirectoryEdit('truck', id);
     return;
   }
-  if (action === 'cancel-edit-material' && type === 'material') {
-    cancelDirectoryEdit('material');
-    return;
-  }
-  if (action === 'cancel-edit-truck' && type === 'truck') {
+  if (action === 'cancel-edit-truck' && isTruckDirectory(type)) {
     cancelDirectoryEdit('truck');
     return;
   }
 
-  if (action === 'delete-material' && type === 'material') {
-    if (!canManageDirectories()) {
-      setDirectoryAlert('material', {
-        type: 'error',
-        message: 'Недостаточно прав для удаления материалов.',
-      });
-      return;
-    }
-    void deleteMaterialById(id, button);
-  }
-  if (action === 'delete-truck' && type === 'truck') {
+  if (action === 'delete-truck' && isTruckDirectory(type)) {
     if (!canManageDirectories()) {
       setDirectoryAlert('truck', {
         type: 'error',
@@ -3343,32 +3163,6 @@ function handleDirectoryListClick(event, type) {
       return;
     }
     void deleteTruckById(id, button);
-  }
-}
-
-async function deleteMaterialById(id, trigger) {
-  setButtonLoading(trigger, true);
-  try {
-    await request(`/api/materials/${encodeURIComponent(id)}`, { method: 'DELETE' });
-    state.materials = state.materials.filter((item) => item.id !== id);
-    if (state.directoryEditing.materials === id) {
-      state.directoryEditing.materials = null;
-    }
-    clearDirectoryAlert('material');
-    renderReferenceSelects();
-    renderDirectoryLists();
-  } catch (error) {
-    if (error?.status === 409 && error.payload?.usage) {
-      setDirectoryAlert('material', {
-        type: 'error',
-        message: buildUsageAlertMessage('Материал используется в рейсах', error.payload.usage),
-        usage: error.payload.usage,
-      });
-    } else {
-      handleApiError(error, 'Не удалось удалить материал');
-    }
-  } finally {
-    setButtonLoading(trigger, false);
   }
 }
 
@@ -3408,23 +3202,6 @@ function focusDirectoryCard(target) {
     card.classList.add('directory-card--highlight');
     card.scrollIntoView({ behavior: 'smooth', block: 'center' });
     setTimeout(() => card.classList.remove('directory-card--highlight'), 1500);
-  }
-}
-
-async function refreshMaterialsDirectory(button) {
-  setButtonLoading(button, true);
-  try {
-    const response = await request('/api/materials');
-    const data = Array.isArray(response?.data) ? response.data : [];
-    state.materials = sortDirectoryCollection(data, 'materials');
-    state.directoryEditing.materials = null;
-    clearDirectoryAlert('material');
-    renderReferenceSelects();
-    renderDirectoryLists();
-  } catch (error) {
-    handleApiError(error, 'Не удалось обновить материалы');
-  } finally {
-    setButtonLoading(button, false);
   }
 }
 
@@ -3484,6 +3261,44 @@ function syncUnloadToCompany(idOverride = null, titleOverride = null) {
       elements.unloadToDisplay.value = companyTitle ?? state.dealMeta?.company?.title ?? `#${companyId}`;
     }
   }
+}
+
+function syncMaterialsFromDeal() {
+  state.materials = extractDealMaterialOptions();
+}
+
+function extractDealMaterialOptions() {
+  const materialsMeta = state.dealMeta?.materials;
+  if (!materialsMeta) {
+    return [];
+  }
+
+  if (Array.isArray(materialsMeta.options) && materialsMeta.options.length) {
+    return materialsMeta.options
+      .map((option) => {
+        const id = option.id ?? option.ID ?? option.value ?? option.VALUE ?? null;
+        const label = option.label ?? option.LABEL ?? option.name ?? option.value ?? option.VALUE ?? id;
+        if (!id || !label) {
+          return null;
+        }
+        return { id: String(id), label: String(label) };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.label.localeCompare(b.label, 'ru', { sensitivity: 'base' }));
+  }
+
+  const ids = Array.isArray(materialsMeta.selected_ids) ? materialsMeta.selected_ids : [];
+  const labels = Array.isArray(materialsMeta.labels) ? materialsMeta.labels : [];
+  const items = [];
+  ids.forEach((id, index) => {
+    if (id === null || id === '') {
+      return;
+    }
+    const value = labels[index] ?? id;
+    items.push({ id: String(id), label: String(value) });
+  });
+
+  return items.sort((a, b) => a.label.localeCompare(b.label, 'ru', { sensitivity: 'base' }));
 }
 
 function renderSelect(select, items, options) {
@@ -3650,7 +3465,7 @@ function createPrimaryInfoRow(haul) {
   const row = document.createElement('div');
   row.className = 'haul-card__row haul-card__row--primary';
 
-  const materialLabel = lookupLabel(state.materials, haul.material_id, 'name');
+  const materialLabel = lookupLabel(state.materials, haul.material_id, 'label');
 
   row.appendChild(createInfoItem('Материал', materialLabel));
   const distanceValue = formatDistance(haul.leg_distance_km);
