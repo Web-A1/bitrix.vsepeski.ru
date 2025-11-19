@@ -56,6 +56,7 @@
 - Привязки выполняются асинхронно, если `INSTALL_QUEUE_PLACEMENTS=true`: `QueuedPlacementBindingDispatcher` складывает задания в `storage/bitrix/placement-jobs`, а CLI `bin/process-placement-jobs` выполняет их (добавьте cron `* * * * * cd ~/bitrix.vsepeski.ru/app && php bin/process-placement-jobs`).
 - Если нужно синхронно (отладка), установите `INSTALL_QUEUE_PLACEMENTS=false` — тогда используется `SyncPlacementBindingDispatcher`.
 - В install hook проверяем `X-Bitrix-Signature` (HMAC SHA-256 по GET/POST) с `BITRIX_WEBHOOK_SECRET`; запросы с неверной подписью отклоняются.
+- Когда Bitrix не присылает `ONAPPINSTALL`, можно включить резервный режим `INSTALL_FALLBACK_ON_LAUNCH=true`: каждый запуск плейсмента с токенами будет сохранять OAuth и ставить задание на привязку (с троттлингом `INSTALL_FALLBACK_REBIND_TTL`, сек). Отключите флаг после того, как портал начнёт отправлять событие штатно.
 
 ## Tooling & commands
 - `composer install`, `.env` на базе `.env.example` (dotenv 5.6).

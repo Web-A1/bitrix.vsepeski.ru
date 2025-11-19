@@ -70,7 +70,16 @@ $shouldQueue = filter_var($_ENV['INSTALL_QUEUE_PLACEMENTS'] ?? 'true', FILTER_VA
 $bindingDispatcher = $shouldQueue
     ? new QueuedPlacementBindingDispatcher($projectRoot, $logger)
     : new SyncPlacementBindingDispatcher($logger);
-$handler = new InstallRequestHandler($projectRoot, $logger, $bindingDispatcher);
+$fallbackEnabled = filter_var($_ENV['INSTALL_FALLBACK_ON_LAUNCH'] ?? 'false', FILTER_VALIDATE_BOOL);
+$fallbackThrottle = (int) ($_ENV['INSTALL_FALLBACK_REBIND_TTL'] ?? 1800);
+$handler = new InstallRequestHandler(
+    $projectRoot,
+    $logger,
+    $bindingDispatcher,
+    'https://bitrix.vsepeski.ru/bitrix/install.php?placement=hauls',
+    $fallbackEnabled,
+    $fallbackThrottle
+);
 $result = $handler->handle(
     $payload,
     $_GET,

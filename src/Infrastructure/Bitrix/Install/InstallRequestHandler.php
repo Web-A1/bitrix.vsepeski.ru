@@ -18,11 +18,15 @@ final class InstallRequestHandler
 
     private readonly HaulPlacementPageRenderer $renderer;
 
+    private const FALLBACK_STATE_FILE = 'install-fallback.json';
+
     public function __construct(
         private readonly string $projectRoot,
         private readonly LoggerInterface $logger,
         private readonly PlacementBindingDispatcher $bindingDispatcher,
-        private readonly string $placementHandlerUri = 'https://bitrix.vsepeski.ru/bitrix/install.php?placement=hauls'
+        private readonly string $placementHandlerUri = 'https://bitrix.vsepeski.ru/bitrix/install.php?placement=hauls',
+        private readonly bool $fallbackEnabled = false,
+        private readonly int $fallbackThrottleSeconds = 1800
     ) {
         $this->renderer = new HaulPlacementPageRenderer($projectRoot);
     }
@@ -46,12 +50,17 @@ final class InstallRequestHandler
         $isTokenDelivery = strtoupper($requestMethod) === 'POST' && $hasTokens;
         $eventName = $this->extractEventName($payload);
         $isInstallEvent = $this->isInstallEvent($eventName);
+        $domain = $auth['domain'] ?? $payload['DOMAIN'] ?? null;
 
         $shouldRenderGet = !$isTokenDelivery
             && strtoupper($requestMethod) === 'GET'
             && ($payload !== [] || $query !== [] || $request !== []);
 
-        if (($isPlacementLaunch || $shouldRenderGet) && !$isInstallEvent) {
+        if (
+            !$isTokenDelivery
+            && ($isPlacementLaunch || $shouldRenderGet)
+            && !$isInstallEvent
+        ) {
             return $this->renderPlacement($payload, $query, $post, $request);
         }
 
@@ -79,11 +88,13 @@ final class InstallRequestHandler
             ], 500);
         }
 
+        if ($this->shouldTriggerFallback($isInstallEvent, $isPlacementLaunch, $auth, $domain)) {
+            $this->triggerFallbackBinding($domain, (string) $auth['access_token']);
+        }
+
         if ($isPlacementLaunch && !$isInstallEvent) {
             return $this->renderPlacement($payload, $query, $post, $request);
         }
-
-        $domain = $auth['domain'] ?? $payload['DOMAIN'] ?? null;
 
         $bindings = [];
 
@@ -307,4 +318,115 @@ final class InstallRequestHandler
         ];
     }
 
+    /**
+     * @param array<string,mixed> $auth
+     */
+    private function shouldTriggerFallback(
+        bool $isInstallEvent,
+        bool $isPlacementLaunch,
+        array $auth,
+        ?string $domain
+    ): bool {
+        if (!$this->fallbackEnabled) {
+            return false;
+        }
+
+        if ($isInstallEvent || !$isPlacementLaunch) {
+            return false;
+        }
+
+        if (!$this->hasTokens($auth)) {
+            return false;
+        }
+
+        return is_string($domain) && $domain !== '';
+    }
+
+    private function triggerFallbackBinding(string $domain, string $token): void
+    {
+        $stateFile = $this->projectRoot . '/storage/bitrix/' . self::FALLBACK_STATE_FILE;
+        $now = new \DateTimeImmutable();
+        $state = $this->readFallbackState($stateFile);
+
+        if (!$this->isFallbackAllowed($state, $now)) {
+            $this->logger->info('install.php fallback rebind skipped', [
+                'reason' => 'throttled',
+                'last_rebind_at' => $state['last_rebind_at'] ?? null,
+            ]);
+
+            return;
+        }
+
+        $bindings = $this->rebindPlacements($domain, $token);
+
+        $this->writeFallbackState($stateFile, [
+            'last_rebind_at' => $now->format(DATE_ATOM),
+        ]);
+
+        $this->logger->info('install.php fallback rebind dispatched', [
+            'bindings' => $bindings,
+        ]);
+    }
+
+    /**
+     * @return array<string,mixed>
+     */
+    private function readFallbackState(string $path): array
+    {
+        if (!is_file($path)) {
+            return [];
+        }
+
+        $contents = file_get_contents($path);
+        if ($contents === false) {
+            return [];
+        }
+
+        $decoded = json_decode($contents, true);
+
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    /**
+     * @param array<string,mixed> $state
+     */
+    private function isFallbackAllowed(array $state, \DateTimeImmutable $now): bool
+    {
+        $throttle = max(0, $this->fallbackThrottleSeconds);
+        if ($throttle === 0) {
+            return true;
+        }
+
+        $last = $state['last_rebind_at'] ?? null;
+        if (!is_string($last) || $last === '') {
+            return true;
+        }
+
+        try {
+            $lastTime = new \DateTimeImmutable($last);
+        } catch (\Exception) {
+            return true;
+        }
+
+        $elapsed = $now->getTimestamp() - $lastTime->getTimestamp();
+
+        return $elapsed >= $throttle;
+    }
+
+    /**
+     * @param array<string,mixed> $state
+     */
+    private function writeFallbackState(string $path, array $state): void
+    {
+        $directory = dirname($path);
+        if (!is_dir($directory)) {
+            @mkdir($directory, 0775, true);
+        }
+
+        $encoded = json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+        if (is_string($encoded)) {
+            file_put_contents($path, $encoded);
+        }
+    }
 }

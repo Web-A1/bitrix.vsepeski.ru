@@ -77,6 +77,68 @@ final class InstallRequestHandlerTest extends TestCase
         self::assertSame('refresh', $stored['refresh_token']);
     }
 
+    public function testFallbackRebindsPlacementsWhenEnabled(): void
+    {
+        $dispatcher = new RecordingDispatcher();
+        $handler = new InstallRequestHandler(
+            $this->projectRoot,
+            new NullLogger(),
+            $dispatcher,
+            'https://example.com/install.php?placement=hauls',
+            true,
+            0
+        );
+
+        $payload = [
+            'auth' => [
+                'access_token' => 'access-fallback',
+                'refresh_token' => 'refresh-fallback',
+                'expires_in' => 3600,
+                'domain' => 'fallback.example.com',
+            ],
+            'PLACEMENT' => 'DEFAULT',
+        ];
+
+        $handler->handle($payload, [], [], [], 'POST');
+
+        self::assertCount(1, $dispatcher->calls);
+        $call = $dispatcher->calls[0];
+        self::assertSame('fallback.example.com', $call['domain']);
+        self::assertSame('access-fallback', $call['token']);
+    }
+
+    public function testFallbackHonorsThrottle(): void
+    {
+        $statePath = $this->projectRoot . '/storage/bitrix/install-fallback.json';
+        file_put_contents($statePath, json_encode([
+            'last_rebind_at' => (new \DateTimeImmutable())->format(DATE_ATOM),
+        ], JSON_PRETTY_PRINT));
+
+        $dispatcher = new RecordingDispatcher();
+        $handler = new InstallRequestHandler(
+            $this->projectRoot,
+            new NullLogger(),
+            $dispatcher,
+            'https://example.com/install.php?placement=hauls',
+            true,
+            3600
+        );
+
+        $payload = [
+            'auth' => [
+                'access_token' => 'access-fallback',
+                'refresh_token' => 'refresh-fallback',
+                'expires_in' => 3600,
+                'domain' => 'fallback.example.com',
+            ],
+            'PLACEMENT' => 'DEFAULT',
+        ];
+
+        $handler->handle($payload, [], [], [], 'POST');
+
+        self::assertCount(0, $dispatcher->calls);
+    }
+
     private function removeDirectory(string $path): void
     {
         if (!is_dir($path)) {
