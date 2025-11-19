@@ -7,10 +7,20 @@ use B24\Center\Infrastructure\Bitrix\Install\QueuedPlacementBindingDispatcher;
 use B24\Center\Infrastructure\Bitrix\Install\SyncPlacementBindingDispatcher;
 use B24\Center\Infrastructure\Security\WebhookSignatureVerifier;
 use B24\Center\Infrastructure\Logging\InstallLoggerFactory;
+use Dotenv\Dotenv;
 
 require dirname(__DIR__, 2) . '/vendor/autoload.php';
 
 $projectRoot = dirname(__DIR__, 2);
+
+if (file_exists($projectRoot . '/.env')) {
+    Dotenv::createImmutable($projectRoot)->safeLoad();
+}
+
+if (file_exists($projectRoot . '/.env.local')) {
+    Dotenv::createImmutable($projectRoot, ['.env.local'])->safeLoad();
+}
+
 $logger = InstallLoggerFactory::create($projectRoot);
 
 set_exception_handler(static function (\Throwable $exception) use ($logger): void {
