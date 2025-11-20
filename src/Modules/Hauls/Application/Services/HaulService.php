@@ -350,17 +350,10 @@ final class HaulService
 
     private function canDeleteHaul(Haul $haul, ActorContext $actor): bool
     {
-        $role = strtolower($actor->role);
-        if (in_array($role, ['admin', 'dispatcher'], true)) {
-            return true;
-        }
+        unset($haul, $actor);
 
-        $responsibleId = $haul->responsibleId();
-        if ($responsibleId !== null && $actor->id !== null && $responsibleId === $actor->id) {
-            return true;
-        }
-
-        return false;
+        // Удаление сейчас разрешено всем авторизованным пользователям.
+        return true;
     }
 
     /**
