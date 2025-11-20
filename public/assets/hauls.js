@@ -7,6 +7,7 @@ const views = {
 };
 
 const knownPlacements = new Set(['CRM_DEAL_DETAIL_TAB', 'CRM_DEAL_LIST_MENU', 'HAULS']);
+const installPlacementHints = new Set(['DEFAULT', 'APPLICATION_INSTALL', 'REST_APP_INSTALL']);
 
 const initialDealContext = readInitialDealContext();
 
@@ -18,6 +19,7 @@ let bx24DealLookupPromise = null;
 let portalBaseUrlCache = '';
 let serverSessionSynced = false;
 let serverSessionSyncPromise = null;
+let installFinishAttempted = false;
 
 const state = {
   dealId: initialDealContext.id,
@@ -661,6 +663,138 @@ function detectEmbeddedMode() {
   return false;
 }
 
+function detectInstallWizard() {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const bootstrap = window.B24_INSTALL_PAYLOAD || null;
+  const sources = [
+    bootstrap?.payload,
+    bootstrap?.request,
+    bootstrap?.post,
+    bootstrap?.get,
+    bootstrap?.query,
+  ].filter(Boolean);
+
+  const searchParams = extractSearchParams(window.location?.search);
+  if (searchParams) {
+    sources.push(searchParams);
+  }
+
+  return sources.some((candidate) => hasInstallHint(candidate));
+}
+
+function extractSearchParams(search) {
+  if (typeof search !== 'string') {
+    return null;
+  }
+
+  const trimmed = search.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const normalized = trimmed.startsWith('?') ? trimmed.slice(1) : trimmed;
+  if (!normalized) {
+    return null;
+  }
+
+  try {
+    const params = new URLSearchParams(normalized);
+    if ([...params.keys()].length === 0) {
+      return null;
+    }
+    return params;
+  } catch (error) {
+    console.warn('Не удалось разобрать параметры установки', error);
+    return null;
+  }
+}
+
+function hasInstallHint(source) {
+  if (!source) {
+    return false;
+  }
+
+  if (Array.isArray(source)) {
+    return source.some((item) => hasInstallHint(item));
+  }
+
+  if (source instanceof URLSearchParams) {
+    const placement = source.get('PLACEMENT') || source.get('placement');
+    if (placement && isInstallPlacementValue(placement)) {
+      return true;
+    }
+
+    const options = source.get('PLACEMENT_OPTIONS') || source.get('placement_options');
+    if (options && hasInstallHint(options)) {
+      return true;
+    }
+
+    for (const key of ['INSTALL', 'install', 'IS_INSTALL', 'is_install', 'SETUP', 'setup', 'MODE', 'mode']) {
+      const value = source.get(key);
+      if (value && isTruthyFlag(value)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  if (typeof source === 'string') {
+    const trimmed = source.trim();
+    if (!trimmed) {
+      return false;
+    }
+
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (parsed && typeof parsed === 'object') {
+        return hasInstallHint(parsed);
+      }
+    } catch (error) {
+      // строка не является JSON — продолжаем проверки
+    }
+
+    try {
+      const params = new URLSearchParams(trimmed);
+      if ([...params.keys()].length > 0) {
+        return hasInstallHint(params);
+      }
+    } catch (error) {
+      // не получается разобрать как query string
+    }
+
+    return false;
+  }
+
+  if (typeof source !== 'object') {
+    return false;
+  }
+
+  const placement = readPlacementFromObject(source);
+  if (isInstallPlacementValue(placement)) {
+    return true;
+  }
+
+  for (const key of ['INSTALL', 'install', 'IS_INSTALL', 'is_install', 'SETUP', 'setup', 'MODE', 'mode']) {
+    if (key in source && isTruthyFlag(source[key])) {
+      return true;
+    }
+  }
+
+  const optionsRaw = extractPlacementOptionsRaw(source);
+  if (optionsRaw) {
+    const parsedOptions = parsePlacementOptions(optionsRaw);
+    if (parsedOptions && parsedOptions !== optionsRaw) {
+      return hasInstallHint(parsedOptions);
+    }
+  }
+
+  return false;
+}
+
 function hasKnownPlacement(candidate) {
   if (!candidate) {
     return false;
@@ -773,6 +907,19 @@ function isKnownPlacementValue(value) {
   return knownPlacements.has(normalized.toUpperCase());
 }
 
+function isInstallPlacementValue(value) {
+  if (typeof value !== 'string') {
+    return false;
+  }
+
+  const normalized = value.trim();
+  if (!normalized) {
+    return false;
+  }
+
+  return installPlacementHints.has(normalized.toUpperCase());
+}
+
 const mobileStorage = {
   getLogin() {
     try {
@@ -837,6 +984,7 @@ if (state.embedded) {
 async function initEmbedded() {
   detectDarkMode();
   configureEmbedding();
+  await finishBitrixInstallIfNeeded();
   attachEventHandlers();
   setupDirectoryManager();
   await ensureServerSessionFromBitrixAuth();
@@ -861,6 +1009,27 @@ async function initEmbedded() {
   }
   setAppReady(true);
   scheduleFitWindow(200, { waitForLayout: true });
+}
+
+async function finishBitrixInstallIfNeeded() {
+  if (!state.embedded || installFinishAttempted) {
+    return;
+  }
+
+  if (!detectInstallWizard()) {
+    return;
+  }
+
+  installFinishAttempted = true;
+
+  try {
+    const bx24 = await waitForBx24();
+    if (bx24 && typeof bx24.installFinish === 'function') {
+      bx24.installFinish();
+    }
+  } catch (error) {
+    console.warn('Не удалось завершить установку приложения в Bitrix24', error);
+  }
 }
 
 async function initMobile() {
