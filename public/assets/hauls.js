@@ -988,6 +988,7 @@ async function initEmbedded() {
   attachEventHandlers();
   setupDirectoryManager();
   await ensureServerSessionFromBitrixAuth();
+  void ensureBitrixInstallCompleted();
   const actorPromise = resolveActorFromBitrix();
   referenceDataPromise = loadReferenceData().catch((error) => {
     console.error('Не удалось загрузить справочники', error);
@@ -1012,7 +1013,7 @@ async function initEmbedded() {
 }
 
 async function finishBitrixInstallIfNeeded() {
-  if (!state.embedded || installFinishAttempted) {
+  if (!state.embedded) {
     return;
   }
 
@@ -1020,16 +1021,71 @@ async function finishBitrixInstallIfNeeded() {
     return;
   }
 
+  await requestBitrixInstallFinish();
+}
+
+async function ensureBitrixInstallCompleted() {
+  if (!state.embedded) {
+    return;
+  }
+
+  let info;
+  try {
+    info = await callBx24Method('app.info');
+  } catch (error) {
+    console.warn('Не удалось получить статус установки приложения', error);
+    return;
+  }
+
+  const installed = normalizeInstallFlag(info?.INSTALLED ?? info?.installed ?? null);
+  if (installed === true) {
+    return;
+  }
+
+  await requestBitrixInstallFinish();
+}
+
+async function requestBitrixInstallFinish() {
+  if (installFinishAttempted) {
+    return;
+  }
+
   installFinishAttempted = true;
 
   try {
     const bx24 = await waitForBx24();
-    if (bx24 && typeof bx24.installFinish === 'function') {
-      bx24.installFinish();
+    if (!bx24 || typeof bx24.installFinish !== 'function') {
+      console.warn('BX24.installFinish недоступен, завершите установку вручную в Маркете');
+      return;
     }
+
+    bx24.installFinish();
+    console.info('BX24.installFinish вызван — ожидаем подтверждения установки');
   } catch (error) {
     console.warn('Не удалось завершить установку приложения в Bitrix24', error);
   }
+}
+
+function normalizeInstallFlag(value) {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  if (typeof value === 'number') {
+    return value > 0;
+  }
+
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (['y', 'yes', 'true', '1'].includes(normalized)) {
+      return true;
+    }
+    if (['n', 'no', 'false', '0'].includes(normalized)) {
+      return false;
+    }
+  }
+
+  return null;
 }
 
 async function initMobile() {
