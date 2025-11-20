@@ -235,19 +235,10 @@ final class HaulController
      */
     private function canManageDeal(array $deal, ActorContext $actor): bool
     {
-        if ($this->isAdmin($actor) || $this->isDispatcher($actor)) {
-            return true;
-        }
+        unset($deal, $actor);
 
-        $responsible = $deal['responsible'] ?? null;
-        $responsibleId = is_array($responsible) && isset($responsible['id'])
-            ? (int) $responsible['id']
-            : null;
-        if ($responsibleId === null || $actor->id === null) {
-            return false;
-        }
-
-        return $responsibleId === $actor->id;
+        // На текущем этапе доступ к изменениям открыт для всех авторизованных пользователей.
+        return true;
     }
 
     private function isDispatcher(ActorContext $actor): bool
