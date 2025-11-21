@@ -4498,6 +4498,13 @@ function validatePayload(payload, options = {}) {
       if (control.dataset.optional === 'true') {
         return;
       }
+      if (control.closest('.directory-manager')) {
+        return;
+      }
+      if (control.offsetParent === null && control.type !== 'hidden') {
+        return;
+      }
+
       const value = payload[control.name];
       if (value === null || value === undefined || value === '') {
         missing.add(getFieldLabel(control.name));
@@ -4510,9 +4517,23 @@ function validatePayload(payload, options = {}) {
   }
 
   if (payload.unload_contact_phone) {
-    const phonePattern = /^[\d\s()+-]{6,}$/;
-    if (!phonePattern.test(payload.unload_contact_phone)) {
-      errors.push('Телефон введите в понятном формате (например +7 900 000-00-00)');
+    const rawPhone = String(payload.unload_contact_phone).trim();
+    const onlyAllowedChars = /^[\d+\s()-]+$/.test(rawPhone);
+    const digits = rawPhone.replace(/\D+/g, '');
+    const startsWithPlus7 = rawPhone.startsWith('+7');
+    const startsWith8 = rawPhone.startsWith('8');
+    const onlyDigitsAfterPlus = rawPhone.startsWith('+') ? rawPhone.slice(1).replace(/\d/g, '') === '' : true;
+
+    const valid =
+      onlyAllowedChars
+      && onlyDigitsAfterPlus
+      && (
+        (startsWithPlus7 && digits.length === 11)
+        || (startsWith8 && digits.length === 11)
+      );
+
+    if (!valid) {
+      errors.push('Введите телефон в формате 8XXXXXXXXXX или +7XXXXXXXXXX');
     }
   }
 

@@ -274,11 +274,11 @@ final class HaulController
 
     private function validateMaterialSelection(mixed $value, array $deal, bool $required): ?string
     {
-        $materialId = $value === null ? '' : trim((string) $value);
+            $materialId = $value === null ? '' : trim((string) $value);
 
-        if ($materialId === '') {
-            return $required ? 'Поле "Материал" обязательно для сохранения рейса.' : null;
-        }
+            if ($materialId === '') {
+                return $required ? 'Поле "Материал" обязательно для сохранения рейса.' : null;
+            }
 
         $allowed = $this->allowedMaterialIds($deal);
 
