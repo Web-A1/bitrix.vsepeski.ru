@@ -4483,12 +4483,14 @@ function getFieldLabel(name) {
 function showFormError(message) {
   if (elements.formError) {
     elements.formError.textContent = message;
+    elements.formError.hidden = !message;
   }
 }
 
 function clearFormError() {
   if (elements.formError) {
     elements.formError.textContent = '';
+    elements.formError.hidden = true;
   }
 }
 

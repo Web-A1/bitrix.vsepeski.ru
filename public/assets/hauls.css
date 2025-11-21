@@ -1615,11 +1615,10 @@ textarea:focus {
 }
 
 .form-error--top {
-  display: block;
+  display: none;
   margin: 0 0 8px;
 }
 
-@media (min-width: 641px) {
 form#haul-form {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
@@ -1648,11 +1647,15 @@ form#haul-form .form-error--top {
 }
 
 form#haul-form .form-error--top:empty {
-  min-height: 0;
+  display: none;
+  height: 0;
   margin: 0;
+  padding: 0;
+  border: 0;
 }
 
 form#haul-form .form-error--top:not(:empty) {
+  display: block;
   padding: 6px 10px;
   background: rgba(220, 38, 38, 0.06);
   border: 1px solid rgba(220, 38, 38, 0.25);
