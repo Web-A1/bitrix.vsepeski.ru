@@ -3664,11 +3664,11 @@ async function loadHauls() {
   renderList();
   try {
     const response = await request(`/api/deals/${state.dealId}/hauls`);
-    const data = Array.isArray(response?.data) ? response.data : [];
-    state.hauls = data.slice().sort(compareHauls);
-    clearGlobalError();
-  } catch (error) {
-    handleApiError(error, { message: 'Не удалось загрузить список рейсов' });
+      const data = Array.isArray(response?.data) ? response.data : [];
+      state.hauls = data.slice().sort(compareHauls);
+      clearGlobalError();
+    } catch (error) {
+      handleApiError(error, { message: 'Не удалось загрузить список рейсов' });
   } finally {
     state.loading = false;
     renderList();
@@ -3683,6 +3683,7 @@ function renderList() {
   const container = elements.haulsList;
   container.classList.remove('empty', 'loading');
   container.innerHTML = '';
+  updateHeaderCreateButtonVisibility();
 
   if (state.loading) {
     container.classList.add('loading');
@@ -3703,12 +3704,24 @@ function renderList() {
     container.querySelector('[data-action="open-create"]')?.addEventListener('click', () => {
       handleCreateRequest();
     });
+    updateHeaderCreateButtonVisibility();
     return;
   }
 
   state.hauls.forEach((haul) => {
     container.appendChild(createHaulCard(haul));
   });
+  updateHeaderCreateButtonVisibility();
+}
+
+function updateHeaderCreateButtonVisibility() {
+  const button = elements.headerCreateHaul;
+  if (!button) {
+    return;
+  }
+  const hasHauls = Array.isArray(state.hauls) && state.hauls.length > 0;
+  button.hidden = !hasHauls;
+  button.style.display = hasHauls ? '' : 'none';
 }
 
 function createHaulCard(haul) {
