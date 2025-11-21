@@ -1312,7 +1312,8 @@ body.mobile-driver .mobile-app {
 .editor__header-bar {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
+  flex-wrap: nowrap;
 }
 
 .editor-status {
@@ -1320,6 +1321,7 @@ body.mobile-driver .mobile-app {
   background: transparent;
   font-size: var(--font-size-base);
   flex: 1;
+  min-width: 0;
 }
 
 .editor-status__list {
@@ -1429,8 +1431,14 @@ body.mobile-driver .mobile-app {
 
 .editor__header-actions {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   flex-shrink: 0;
+  align-items: center;
+}
+
+.editor__header-actions .button {
+  white-space: nowrap;
+  min-width: 118px;
 }
 
 .app[data-view='list'] .editor {

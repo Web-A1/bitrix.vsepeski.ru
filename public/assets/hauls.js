@@ -530,10 +530,7 @@ const elements = {
   formError: document.getElementById('form-error'),
   globalError: document.getElementById('app-error'),
   closeEditor: document.getElementById('close-editor'),
-  cancelEditor: document.getElementById('cancel-editor'),
-  submitHaul: document.getElementById('submit-haul'),
-  saveDraftButton: document.getElementById('save-draft-button'),
-  finalizeHaulButton: document.getElementById('finalize-haul-button'),
+  primaryEditorButton: document.getElementById('primary-editor-button'),
   directoryManager: document.getElementById('directory-manager'),
   editorStatus: document.getElementById('editor-status'),
   trucksList: document.getElementById('trucks-list'),
@@ -2092,8 +2089,8 @@ function attachEventHandlers() {
 
   elements.floatingCreate?.addEventListener('click', handleCreateRequest);
 
+  elements.primaryEditorButton?.addEventListener('click', handlePrimaryHeaderAction);
   elements.closeEditor?.addEventListener('click', () => navigateTo(views.LIST));
-  elements.cancelEditor?.addEventListener('click', () => navigateTo(views.LIST));
 
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && state.view !== views.LIST) {
@@ -2102,15 +2099,13 @@ function attachEventHandlers() {
   });
 
   elements.haulForm?.addEventListener('submit', onSubmitForm);
-  elements.saveDraftButton?.addEventListener('click', () => handlePreparationSubmit('draft'));
-  elements.finalizeHaulButton?.addEventListener('click', () => handlePreparationSubmit('finalize'));
   elements.editorStatus?.addEventListener('click', handleEditorStatusClick);
   elements.editorStatus?.addEventListener('keydown', handleEditorStatusKeydown);
   elements.haulForm?.addEventListener('input', () => {
-    updateCloseButtonState();
+    updateHeaderActions();
   });
   elements.haulForm?.addEventListener('change', () => {
-    updateCloseButtonState();
+    updateHeaderActions();
   });
 
   elements.haulsList?.addEventListener('click', (event) => {
@@ -3958,13 +3953,12 @@ function prepareCreateForm() {
    setSelectValue(elements.carrierSelect, '');
   clearFormError();
   state.editorStatus = haulStatusValues.PREPARATION;
-  elements.submitHaul.textContent = 'Сохранить';
   syncUnloadFromCompany();
   syncUnloadToCompany();
   renderEditorStatusTimeline();
   updateFooterButtonsState();
   editorBaselinePayload = collectFormPayload();
-  updateCloseButtonState();
+  updateHeaderActions();
 }
 
 function prepareEditForm(haul) {
@@ -3974,11 +3968,10 @@ function prepareEditForm(haul) {
   applyTemplateToForm(haul, { includeStatus: true });
 
   state.editorStatus = getStatusValue(haul.status) ?? haulStatusValues.PREPARATION;
-  elements.submitHaul.textContent = 'Сохранить';
   renderEditorStatusTimeline();
   updateFooterButtonsState();
   editorBaselinePayload = collectFormPayload();
-  updateCloseButtonState();
+  updateHeaderActions();
 }
 
 function applyTemplateToForm(haul, options = {}) {
@@ -4071,9 +4064,10 @@ function isFormDirty(currentPayload) {
   return serializeForDiff(currentPayload) !== serializeForDiff(editorBaselinePayload);
 }
 
-function updateCloseButtonState() {
-  const button = elements.closeEditor;
-  if (!button || !elements.haulForm) {
+function updateHeaderActions() {
+  const primary = elements.primaryEditorButton;
+  const closeButton = elements.closeEditor;
+  if (!elements.haulForm) {
     return;
   }
 
@@ -4085,46 +4079,55 @@ function updateCloseButtonState() {
   const dirty = isFormDirty(payload);
   const isCreate = state.view === views.CREATE;
   const isInProgress = statusValue === haulStatusValues.IN_PROGRESS;
+  const saving = Boolean(state.saving);
 
-  let label = 'Закрыть';
-  let visible = true;
+  let primaryLabel = '';
+  let showPrimary = false;
 
   if (isCreate) {
-    label = requiredFilled ? 'Рейс сформирован' : 'Сохранить черновик';
-    visible = true;
-  } else if (isInProgress) {
-    label = 'Сохранить';
-    visible = dirty;
+    primaryLabel = requiredFilled ? 'Готово' : 'Черновик';
+    showPrimary = true;
+  } else if (isInProgress && dirty) {
+    primaryLabel = 'Сохранить';
+    showPrimary = true;
   }
 
-  button.textContent = label;
-  setButtonVisibility(button, visible);
+  setButtonVisibility(primary, showPrimary);
+  if (primary) {
+    primary.textContent = primaryLabel;
+    primary.disabled = saving;
+  }
+
+  if (closeButton) {
+    closeButton.textContent = 'Закрыть';
+    closeButton.disabled = saving;
+  }
+}
+
+function handlePrimaryHeaderAction() {
+  if (state.saving) {
+    return;
+  }
+
+  const statusValue = typeof state.editorStatus === 'number'
+    ? state.editorStatus
+    : getStatusValue(state.editorStatus);
+  const payload = collectFormPayload({ statusOverride: statusValue });
+  const requiredFilled = validatePayload(payload, { requireAll: true, strict: false }).length === 0;
+  const dirty = isFormDirty(payload);
+
+  if (state.view === views.CREATE) {
+    handlePreparationSubmit(requiredFilled ? 'finalize' : 'draft');
+    return;
+  }
+
+  if (statusValue === haulStatusValues.IN_PROGRESS && dirty) {
+    void submitHaulRequest(elements.primaryEditorButton, { requireAll: true, strict: false });
+  }
 }
 
 function updateFooterButtonsState() {
-  const disable = Boolean(state.saving);
-  const showPreparationActions = isPreparationStageActive();
-
-  setButtonVisibility(elements.saveDraftButton, showPreparationActions);
-  if (elements.saveDraftButton) {
-    elements.saveDraftButton.disabled = disable || !showPreparationActions;
-  }
-
-  setButtonVisibility(elements.finalizeHaulButton, showPreparationActions);
-  if (elements.finalizeHaulButton) {
-    elements.finalizeHaulButton.disabled = disable || !showPreparationActions;
-  }
-
-  setButtonVisibility(elements.submitHaul, !showPreparationActions);
-  if (elements.submitHaul) {
-    elements.submitHaul.disabled = disable || showPreparationActions;
-  }
-
-  if (elements.cancelEditor) {
-    elements.cancelEditor.disabled = disable;
-  }
-
-  updateCloseButtonState();
+  updateHeaderActions();
 }
 
 function renderEditorStatusTimeline() {
@@ -4169,7 +4172,7 @@ function renderEditorStatusTimeline() {
   });
 
   elements.editorStatus.appendChild(list);
-  updateCloseButtonState();
+  updateHeaderActions();
 }
 
 function handlePreparationSubmit(mode) {
@@ -4178,8 +4181,9 @@ function handlePreparationSubmit(mode) {
   }
   const isDraft = mode === 'draft';
   const trigger = isDraft ? elements.saveDraftButton : elements.finalizeHaulButton;
+  const actionButton = trigger || elements.primaryEditorButton;
 
-  void submitHaulRequest(trigger, {
+  void submitHaulRequest(actionButton, {
     statusOverride: isDraft ? haulStatusValues.PREPARATION : haulStatusValues.IN_PROGRESS,
     requireAll: !isDraft,
     strict: !isDraft,
@@ -4241,6 +4245,7 @@ async function changeEditorStatus(value) {
       renderEditorStatusTimeline();
       updateFooterButtonsState();
       editorBaselinePayload = collectFormPayload();
+      updateHeaderActions();
     }
   } catch (error) {
     handleApiError(error, { message: 'Не удалось изменить статус рейса' });
@@ -4355,7 +4360,7 @@ async function onSubmitForm(event) {
     handlePreparationSubmit('finalize');
     return;
   }
-  void submitHaulRequest(elements.submitHaul, { requireAll: true });
+  void submitHaulRequest(elements.primaryEditorButton, { requireAll: true });
 }
 
 function collectFormPayload(options = {}) {
@@ -4565,6 +4570,7 @@ function openEditor(metaText = '') {
   elements.editorPanel?.setAttribute('aria-hidden', 'false');
   elements.editorPanel?.removeAttribute('hidden');
   elements.mainSection?.setAttribute('hidden', '');
+  updateHeaderActions();
   scheduleFitWindow(200, { waitForLayout: true });
 }
 
@@ -4764,13 +4770,13 @@ function updateEditorHeader(metaText) {
 }
 
 function buildEditorMeta(options) {
-  const sequenceLabel = options.sequence && options.sequence !== '-' ? `Рейс №${options.sequence}` : null;
+  const sequenceLabel = options.sequence && options.sequence !== '-' ? `#${options.sequence}` : null;
 
   if (sequenceLabel) {
     return sequenceLabel;
   }
 
-  return options.mode === 'edit' ? 'Рейс' : 'Новый рейс';
+  return options.mode === 'edit' ? '#–' : 'Новый рейс';
 }
 
 function estimateNextSequence() {
