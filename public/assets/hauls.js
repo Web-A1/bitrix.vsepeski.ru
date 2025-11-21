@@ -4090,7 +4090,7 @@ function updateHeaderActions() {
     ? state.editorStatus
     : getStatusValue(state.editorStatus);
   const payload = collectFormPayload({ statusOverride: statusValue });
-  const requiredFilled = validatePayload(payload, { requireAll: true, strict: false }).length === 0;
+  const requiredFilled = validatePayload(payload, { requireAll: true, strict: true }).length === 0;
   const dirty = isFormDirty(payload);
   const isCreate = state.view === views.CREATE;
   const isDraftStage = statusValue <= haulStatusValues.PREPARATION;
@@ -4132,7 +4132,7 @@ function handlePrimaryHeaderAction() {
     ? state.editorStatus
     : getStatusValue(state.editorStatus);
   const payload = collectFormPayload({ statusOverride: statusValue });
-  const requiredFilled = validatePayload(payload, { requireAll: true, strict: false }).length === 0;
+  const requiredFilled = validatePayload(payload, { requireAll: true, strict: true }).length === 0;
   const dirty = isFormDirty(payload);
   const isDraftStage = statusValue <= haulStatusValues.PREPARATION;
 
