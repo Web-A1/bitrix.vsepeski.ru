@@ -68,7 +68,9 @@ final class HaulController
             return Response::json(['error' => $exception->getMessage()], 422);
         }
 
-        $materialCheck = $this->validateMaterialSelection($payload['material_id'] ?? null, $deal, true);
+        $status = $this->extractStatus($payload, HaulStatus::PREPARATION);
+        $materialRequired = $status > HaulStatus::PREPARATION;
+        $materialCheck = $this->validateMaterialSelection($payload['material_id'] ?? null, $deal, $materialRequired);
         if ($materialCheck !== null) {
             return Response::json(['error' => $materialCheck], 422);
         }
@@ -107,7 +109,9 @@ final class HaulController
         }
 
         if (array_key_exists('material_id', $payload)) {
-            $materialCheck = $this->validateMaterialSelection($payload['material_id'], $deal, true);
+            $status = $this->extractStatus($payload, (int) ($existing['status'] ?? HaulStatus::PREPARATION));
+            $materialRequired = $status > HaulStatus::PREPARATION;
+            $materialCheck = $this->validateMaterialSelection($payload['material_id'], $deal, $materialRequired);
             if ($materialCheck !== null) {
                 return Response::json(['error' => $materialCheck], 422);
             }
@@ -206,13 +210,19 @@ final class HaulController
         if ($shouldRequire) {
             foreach ($required as $field) {
                 if (!isset($payload[$field]) || $payload[$field] === '') {
-                    return sprintf('Field "%s" is required.', $field);
+                    return match ($field) {
+                        'truck_id' => 'Выберите самосвал.',
+                        'material_id' => 'Выберите материал.',
+                        'load_address_text' => 'Укажите адрес загрузки.',
+                        'unload_address_text' => 'Укажите адрес выгрузки.',
+                        default => 'Заполните обязательные поля.',
+                    };
                 }
             }
         }
 
         if (isset($payload['load_volume']) && $payload['load_volume'] !== null && !is_numeric($payload['load_volume'])) {
-            return 'Field "load_volume" must be numeric.';
+            return 'Поле "Объём" должно содержать число.';
         }
 
         return null;
@@ -267,7 +277,7 @@ final class HaulController
         $materialId = $value === null ? '' : trim((string) $value);
 
         if ($materialId === '') {
-            return $required ? 'Field "material_id" is required.' : null;
+            return $required ? 'Поле "Материал" обязательно для сохранения рейса.' : null;
         }
 
         $allowed = $this->allowedMaterialIds($deal);
@@ -311,6 +321,23 @@ final class HaulController
         }
 
         return array_values(array_unique($normalized));
+    }
+
+    /**
+     * @param array<string,mixed> $payload
+     */
+    private function extractStatus(array $payload, ?int $fallback = null): int
+    {
+        $raw = $payload['status'] ?? $payload['STATUS'] ?? null;
+        if (is_numeric($raw)) {
+            return HaulStatus::sanitize((int) $raw);
+        }
+
+        if ($fallback !== null) {
+            return HaulStatus::sanitize($fallback);
+        }
+
+        return HaulStatus::PREPARATION;
     }
 
     private function logAccessDenied(string $action, ActorContext $actor, array $context = []): void
