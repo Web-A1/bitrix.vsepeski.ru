@@ -1667,17 +1667,17 @@ form#haul-form > .form-error--top {
   scroll-padding-bottom: 48px;
 }
 form#haul-form::after {
-    height: 0;
-  }
-
-  .editor__footer {
-    padding-top: 16px;
-  }
-
-  .editor__footer-actions .button {
-    min-height: 40px;
-  }
+  height: 0;
 }
+
+.editor__footer {
+  padding-top: 16px;
+}
+
+.editor__footer-actions .button {
+  min-height: 40px;
+}
+
 .danger {
   color: var(--danger);
 }
