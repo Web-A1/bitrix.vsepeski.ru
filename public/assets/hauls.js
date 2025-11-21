@@ -509,6 +509,7 @@ const elements = {
   dealIdLabel: document.getElementById('deal-id-label'),
   dealSubtitle: document.getElementById('deal-subtitle'),
   loadButton: document.getElementById('load-hauls'),
+  headerCreateHaul: document.getElementById('header-create-haul'),
   floatingCreate: document.getElementById('floating-create'),
   haulsList: document.getElementById('hauls-list'),
   mainSection: document.querySelector('.app__main'),
@@ -2088,6 +2089,7 @@ function attachEventHandlers() {
   });
 
   elements.floatingCreate?.addEventListener('click', handleCreateRequest);
+  elements.headerCreateHaul?.addEventListener('click', handleCreateRequest);
 
   elements.primaryEditorButton?.addEventListener('click', handlePrimaryHeaderAction);
   elements.closeEditor?.addEventListener('click', () => navigateTo(views.LIST));

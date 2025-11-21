@@ -566,6 +566,11 @@ body.mobile-driver .mobile-app {
   align-items: flex-end;
   gap: 12px;
   flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.app__actions .button {
+  white-space: nowrap;
 }
 
 .app__error {
@@ -1695,10 +1700,6 @@ body.dark .button--ghost {
 
 body.embedded .deal-controls {
   display: none;
-}
-
-body.embedded .fab {
-  display: flex;
 }
 
 @media (max-width: 820px) {
