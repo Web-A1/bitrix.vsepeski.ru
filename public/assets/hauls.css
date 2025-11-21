@@ -718,6 +718,13 @@ body.mobile-driver .mobile-app {
   border: 1px solid var(--border);
   font-size: var(--font-size-base);
   font-weight: var(--font-weight-regular);
+  transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+}
+
+.haul-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.08);
+  border-color: rgba(47, 107, 255, 0.2);
 }
 
 .haul-card__heading {
