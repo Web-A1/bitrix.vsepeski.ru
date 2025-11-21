@@ -970,6 +970,7 @@ let fitTimer = null;
 let bx24Ready = null;
 let bx24InitPromise = null;
 let pendingHashSkips = 0;
+let editorBaselinePayload = null;
 
 if (state.embedded) {
   initEmbedded().catch((error) => {
@@ -2105,6 +2106,12 @@ function attachEventHandlers() {
   elements.finalizeHaulButton?.addEventListener('click', () => handlePreparationSubmit('finalize'));
   elements.editorStatus?.addEventListener('click', handleEditorStatusClick);
   elements.editorStatus?.addEventListener('keydown', handleEditorStatusKeydown);
+  elements.haulForm?.addEventListener('input', () => {
+    updateCloseButtonState();
+  });
+  elements.haulForm?.addEventListener('change', () => {
+    updateCloseButtonState();
+  });
 
   elements.haulsList?.addEventListener('click', (event) => {
     if (!(event.target instanceof Element)) {
@@ -3956,6 +3963,8 @@ function prepareCreateForm() {
   syncUnloadToCompany();
   renderEditorStatusTimeline();
   updateFooterButtonsState();
+  editorBaselinePayload = collectFormPayload();
+  updateCloseButtonState();
 }
 
 function prepareEditForm(haul) {
@@ -3968,6 +3977,8 @@ function prepareEditForm(haul) {
   elements.submitHaul.textContent = 'Сохранить';
   renderEditorStatusTimeline();
   updateFooterButtonsState();
+  editorBaselinePayload = collectFormPayload();
+  updateCloseButtonState();
 }
 
 function applyTemplateToForm(haul, options = {}) {
@@ -4024,6 +4035,72 @@ function setButtonVisibility(button, visible) {
   button.style.display = visible ? '' : 'none';
 }
 
+function normalizeForDiff(value) {
+  if (value === undefined) {
+    return null;
+  }
+  if (value === null || typeof value === 'number' || typeof value === 'string' || typeof value === 'boolean') {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeForDiff(item));
+  }
+  if (typeof value === 'object') {
+    const sorted = {};
+    Object.keys(value)
+      .sort()
+      .forEach((key) => {
+        sorted[key] = normalizeForDiff(value[key]);
+      });
+    return sorted;
+  }
+  return String(value);
+}
+
+function serializeForDiff(value) {
+  return JSON.stringify(normalizeForDiff(value));
+}
+
+function isFormDirty(currentPayload) {
+  if (!currentPayload) {
+    return false;
+  }
+  if (!editorBaselinePayload) {
+    return true;
+  }
+  return serializeForDiff(currentPayload) !== serializeForDiff(editorBaselinePayload);
+}
+
+function updateCloseButtonState() {
+  const button = elements.closeEditor;
+  if (!button || !elements.haulForm) {
+    return;
+  }
+
+  const statusValue = typeof state.editorStatus === 'number'
+    ? state.editorStatus
+    : getStatusValue(state.editorStatus);
+  const payload = collectFormPayload({ statusOverride: statusValue });
+  const requiredFilled = validatePayload(payload, { requireAll: true, strict: false }).length === 0;
+  const dirty = isFormDirty(payload);
+  const isCreate = state.view === views.CREATE;
+  const isInProgress = statusValue === haulStatusValues.IN_PROGRESS;
+
+  let label = 'Закрыть';
+  let visible = true;
+
+  if (isCreate) {
+    label = requiredFilled ? 'Рейс сформирован' : 'Сохранить черновик';
+    visible = true;
+  } else if (isInProgress) {
+    label = 'Сохранить';
+    visible = dirty;
+  }
+
+  button.textContent = label;
+  setButtonVisibility(button, visible);
+}
+
 function updateFooterButtonsState() {
   const disable = Boolean(state.saving);
   const showPreparationActions = isPreparationStageActive();
@@ -4046,6 +4123,8 @@ function updateFooterButtonsState() {
   if (elements.cancelEditor) {
     elements.cancelEditor.disabled = disable;
   }
+
+  updateCloseButtonState();
 }
 
 function renderEditorStatusTimeline() {
@@ -4090,6 +4169,7 @@ function renderEditorStatusTimeline() {
   });
 
   elements.editorStatus.appendChild(list);
+  updateCloseButtonState();
 }
 
 function handlePreparationSubmit(mode) {
@@ -4160,6 +4240,7 @@ async function changeEditorStatus(value) {
       upsertHaul(response.data);
       renderEditorStatusTimeline();
       updateFooterButtonsState();
+      editorBaselinePayload = collectFormPayload();
     }
   } catch (error) {
     handleApiError(error, { message: 'Не удалось изменить статус рейса' });
@@ -4492,6 +4573,7 @@ function closeEditor() {
   elements.editorPanel?.setAttribute('hidden', '');
   elements.mainSection?.removeAttribute('hidden');
   state.currentHaulSnapshot = null;
+  editorBaselinePayload = null;
   elements.haulForm?.reset();
   clearFormError();
   resetScrollPosition();
