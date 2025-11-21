@@ -2107,6 +2107,10 @@ function attachEventHandlers() {
   elements.editorStatus?.addEventListener('keydown', handleEditorStatusKeydown);
 
   elements.haulsList?.addEventListener('click', (event) => {
+    if (!(event.target instanceof Element)) {
+      return;
+    }
+
     const copyButton = event.target.closest('[data-action="copy"]');
     if (copyButton) {
       const haulId = copyButton.getAttribute('data-haul-id');
@@ -2130,6 +2134,16 @@ function attachEventHandlers() {
       const haulId = deleteButton.getAttribute('data-haul-id');
       if (haulId) {
         deleteHaul(haulId);
+      }
+      return;
+    }
+
+    const card = event.target.closest('.haul-card');
+    if (card) {
+      const haulId = card.getAttribute('data-haul-id') || card.dataset.haulId;
+      const linkClicked = event.target.closest('a');
+      if (haulId && !linkClicked) {
+        navigateTo(views.EDIT, haulId);
       }
     }
   });
