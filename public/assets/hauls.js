@@ -4043,6 +4043,34 @@ function setButtonVisibility(button, visible) {
   button.style.display = visible ? '' : 'none';
 }
 
+function hasValue(value) {
+  if (value === null || value === undefined) {
+    return false;
+  }
+  if (typeof value === 'number') {
+    return Number.isFinite(value);
+  }
+  if (typeof value === 'string') {
+    return value.trim() !== '';
+  }
+  return true;
+}
+
+function isReadyToFinalize(payload) {
+  const requiredFields = [
+    'responsible_id',
+    'truck_id',
+    'material_id',
+    'load_address_text',
+    'unload_address_text',
+    'unload_contact_name',
+    'unload_contact_phone',
+    'unload_acceptance_time',
+  ];
+
+  return requiredFields.every((field) => hasValue(payload[field]));
+}
+
 function normalizeForDiff(value) {
   if (value === undefined) {
     return null;
@@ -4090,7 +4118,7 @@ function updateHeaderActions() {
     ? state.editorStatus
     : getStatusValue(state.editorStatus);
   const payload = collectFormPayload({ statusOverride: statusValue });
-  const requiredFilled = validatePayload(payload, { requireAll: true, strict: true }).length === 0;
+  const requiredFilled = isReadyToFinalize(payload);
   const dirty = isFormDirty(payload);
   const isCreate = state.view === views.CREATE;
   const isDraftStage = statusValue <= haulStatusValues.PREPARATION;
@@ -4132,7 +4160,7 @@ function handlePrimaryHeaderAction() {
     ? state.editorStatus
     : getStatusValue(state.editorStatus);
   const payload = collectFormPayload({ statusOverride: statusValue });
-  const requiredFilled = validatePayload(payload, { requireAll: true, strict: true }).length === 0;
+  const requiredFilled = isReadyToFinalize(payload);
   const dirty = isFormDirty(payload);
   const isDraftStage = statusValue <= haulStatusValues.PREPARATION;
 
@@ -4205,7 +4233,7 @@ function handlePreparationSubmit(mode) {
   void submitHaulRequest(actionButton, {
     statusOverride: isDraft ? haulStatusValues.PREPARATION : haulStatusValues.IN_PROGRESS,
     requireAll: !isDraft,
-    strict: false,
+    strict: !isDraft,
   });
 }
 
