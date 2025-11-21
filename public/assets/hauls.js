@@ -4080,6 +4080,7 @@ function updateHeaderActions() {
   const requiredFilled = validatePayload(payload, { requireAll: true, strict: false }).length === 0;
   const dirty = isFormDirty(payload);
   const isCreate = state.view === views.CREATE;
+  const isDraftStage = statusValue <= haulStatusValues.PREPARATION;
   const isInProgressOrLater = statusValue >= haulStatusValues.IN_PROGRESS;
   const saving = Boolean(state.saving);
 
@@ -4088,6 +4089,9 @@ function updateHeaderActions() {
 
   if (isCreate) {
     primaryLabel = requiredFilled ? 'Готово' : 'Черновик';
+    showPrimary = true;
+  } else if (isDraftStage) {
+    primaryLabel = requiredFilled ? 'Готово' : 'Сохранить';
     showPrimary = true;
   } else if (isInProgressOrLater) {
     primaryLabel = 'Сохранить';
@@ -4117,13 +4121,14 @@ function handlePrimaryHeaderAction() {
   const payload = collectFormPayload({ statusOverride: statusValue });
   const requiredFilled = validatePayload(payload, { requireAll: true, strict: false }).length === 0;
   const dirty = isFormDirty(payload);
+  const isDraftStage = statusValue <= haulStatusValues.PREPARATION;
 
-  if (state.view === views.CREATE) {
+  if (state.view === views.CREATE || isDraftStage) {
     handlePreparationSubmit(requiredFilled ? 'finalize' : 'draft');
     return;
   }
 
-  if (statusValue === haulStatusValues.IN_PROGRESS && dirty) {
+  if (statusValue >= haulStatusValues.IN_PROGRESS && dirty) {
     void submitHaulRequest(elements.primaryEditorButton, { requireAll: true, strict: false });
   }
 }
@@ -4182,8 +4187,7 @@ function handlePreparationSubmit(mode) {
     return;
   }
   const isDraft = mode === 'draft';
-  const trigger = isDraft ? elements.saveDraftButton : elements.finalizeHaulButton;
-  const actionButton = trigger || elements.primaryEditorButton;
+  const actionButton = elements.primaryEditorButton;
 
   void submitHaulRequest(actionButton, {
     statusOverride: isDraft ? haulStatusValues.PREPARATION : haulStatusValues.IN_PROGRESS,
