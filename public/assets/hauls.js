@@ -4087,9 +4087,9 @@ function updateHeaderActions() {
   if (isCreate) {
     primaryLabel = requiredFilled ? 'Готово' : 'Черновик';
     showPrimary = true;
-  } else if (isInProgress && dirty) {
+  } else if (isInProgress) {
     primaryLabel = 'Сохранить';
-    showPrimary = true;
+    showPrimary = dirty;
   }
 
   setButtonVisibility(primary, showPrimary);
