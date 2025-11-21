@@ -1614,8 +1614,9 @@ textarea:focus {
   min-height: 1em;
 }
 
-.editor__footer .form-error {
-  min-height: 1.2em;
+.form-error--top {
+  display: block;
+  margin: 0 0 8px;
 }
 
 @media (min-width: 641px) {

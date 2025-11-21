@@ -4078,7 +4078,7 @@ function updateHeaderActions() {
   const requiredFilled = validatePayload(payload, { requireAll: true, strict: false }).length === 0;
   const dirty = isFormDirty(payload);
   const isCreate = state.view === views.CREATE;
-  const isInProgress = statusValue === haulStatusValues.IN_PROGRESS;
+  const isInProgressOrLater = statusValue >= haulStatusValues.IN_PROGRESS;
   const saving = Boolean(state.saving);
 
   let primaryLabel = '';
@@ -4087,7 +4087,7 @@ function updateHeaderActions() {
   if (isCreate) {
     primaryLabel = requiredFilled ? 'Готово' : 'Черновик';
     showPrimary = true;
-  } else if (isInProgress) {
+  } else if (isInProgressOrLater) {
     primaryLabel = 'Сохранить';
     showPrimary = dirty;
   }
