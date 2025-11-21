@@ -1620,11 +1620,50 @@ textarea:focus {
 }
 
 @media (min-width: 641px) {
+form#haul-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 24px;
+  align-items: start;
+}
+
+form#haul-form .form-group,
+form#haul-form .form-error--top {
+  grid-column: 1 / -1;
+}
+
+@media (min-width: 992px) {
   form#haul-form {
-    padding-bottom: 48px;
-    scroll-padding-bottom: 48px;
+    grid-template-columns: repeat(3, minmax(320px, 1fr));
   }
-  form#haul-form::after {
+
+  form#haul-form .form-group {
+    grid-column: auto;
+  }
+}
+
+form#haul-form .form-error--top {
+  grid-column: 1 / -1;
+  margin: 0 0 8px;
+}
+
+form#haul-form .form-error--top:empty {
+  min-height: 0;
+  margin: 0;
+}
+
+form#haul-form .form-error--top:not(:empty) {
+  padding: 6px 10px;
+  background: rgba(220, 38, 38, 0.06);
+  border: 1px solid rgba(220, 38, 38, 0.25);
+  border-radius: 10px;
+}
+
+form#haul-form > .form-error--top {
+  padding-bottom: 48px;
+  scroll-padding-bottom: 48px;
+}
+form#haul-form::after {
     height: 0;
   }
 
