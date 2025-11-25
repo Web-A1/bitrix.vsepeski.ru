@@ -3320,6 +3320,8 @@ function sortDirectoryCollection(items, key) {
 
 async function handleTruckSubmit(event) {
   event.preventDefault();
+  event.stopPropagation();
+  event.stopImmediatePropagation();
   const form = event.currentTarget;
   if (!(form instanceof HTMLFormElement)) {
     return;
