@@ -1032,7 +1032,8 @@ body.mobile-driver .mobile-app {
   border: none;
   padding: 0;
   background: transparent;
-  max-width: 900px;
+  width: 100%;
+  max-width: 1080px;
 }
 
 .directory-manager--inline summary {
@@ -1041,9 +1042,9 @@ body.mobile-driver .mobile-app {
 
 .directory-manager--inline .directory-manager__content {
   margin-top: 16px;
-  grid-template-columns: minmax(320px, 460px);
+  grid-template-columns: minmax(320px, 1fr);
   justify-content: flex-start;
-  justify-items: start;
+  justify-items: stretch;
 }
 
 .directory-card {
@@ -1056,6 +1057,10 @@ body.mobile-driver .mobile-app {
   background: var(--surface);
   max-width: 460px;
   width: 100%;
+}
+
+.directory-manager--inline .directory-card {
+  max-width: none;
 }
 
 .directory-card--highlight {
@@ -1195,9 +1200,9 @@ body.mobile-driver .mobile-app {
 }
 
 .directory-card__edit-fields {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
 }
 
 .directory-card__edit-fields input {
@@ -1221,8 +1226,8 @@ body.mobile-driver .mobile-app {
 }
 
 .directory-card__fields {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 8px;
 }
 
