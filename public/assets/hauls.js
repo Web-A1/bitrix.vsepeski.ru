@@ -4426,6 +4426,10 @@ function restoreSelectValue(select, value, options = {}) {
 
 async function onSubmitForm(event) {
   event.preventDefault();
+  const submitter = event.submitter;
+  if (submitter instanceof HTMLElement && submitter.closest('.directory-manager')) {
+    return;
+  }
   if (isPreparationStageActive()) {
     handlePreparationSubmit('finalize');
     return;

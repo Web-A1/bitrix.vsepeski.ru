@@ -245,17 +245,18 @@
                     <ul class="directory-card__list" id="trucks-list"></ul>
                     <form class="directory-card__form" id="trucks-form">
                       <div class="directory-card__fields">
-                        <input type="text" name="license_plate" placeholder="Госномер (A123BC77)" required />
-                        <input type="text" name="make_model" placeholder="Марка" />
+                        <input type="text" name="license_plate" form="trucks-form" placeholder="Госномер (A123BC77)" required />
+                        <input type="text" name="make_model" form="trucks-form" placeholder="Марка" />
                         <input
                           type="number"
                           name="body_volume"
+                          form="trucks-form"
                           placeholder="Объём кузова, м³"
                           step="0.1"
                           min="0"
                         />
                       </div>
-                      <button type="submit" class="button button--ghost">Добавить самосвал</button>
+                      <button type="submit" form="trucks-form" class="button button--ghost">Добавить самосвал</button>
                     </form>
                   </article>
                 </div>
