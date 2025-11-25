@@ -3370,6 +3370,10 @@ async function handleTruckSubmit(event) {
       form.reset();
     }
   } catch (error) {
+    setDirectoryAlert('truck', {
+      type: 'error',
+      message: error?.message || 'Не удалось добавить самосвал',
+    });
     handleApiError(error, 'Не удалось добавить самосвал');
   } finally {
     setButtonLoading(submitButton, false);
