@@ -2956,7 +2956,7 @@ function formatTruckVolume(volume) {
   }
   const parsed = Number(volume);
   const normalized = Number.isFinite(parsed) ? parsed.toString() : String(volume).trim();
-  return normalized ? `${normalized}м3` : '';
+  return normalized ? `${normalized}м³` : '';
 }
 
 function findTruckById(id) {
