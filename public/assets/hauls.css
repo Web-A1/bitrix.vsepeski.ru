@@ -1115,7 +1115,11 @@ body.mobile-driver .mobile-app {
 
 .directory-card__alert-list {
   margin: 4px 0 0 0;
-  padding-left: 16px;
+  padding-left: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .directory-card__item {
@@ -1159,7 +1163,11 @@ body.mobile-driver .mobile-app {
 
 .directory-card__usage-list {
   margin: 0;
-  padding-left: 16px;
+  padding-left: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .directory-card__actions {

@@ -3204,11 +3204,32 @@ function formatUsageSample(sample) {
   if (!sample) {
     return '';
   }
-  const deal = sample.deal_id ? `Сделка #${sample.deal_id}` : 'Сделка';
+  const dealTitle = deriveDealTitle(sample);
   if (typeof sample.sequence === 'number') {
-    return `${deal} · рейс №${sample.sequence}`;
+    return `${dealTitle} · #${sample.sequence}`;
   }
-  return deal;
+  return dealTitle;
+}
+
+function deriveDealTitle(sample) {
+  const dealId = sample?.deal_id;
+  const currentDealId = state.dealId ? Number(state.dealId) || state.dealId : null;
+  if (dealId && (dealId === currentDealId || String(dealId) === String(currentDealId)) && state.dealMeta?.title) {
+    const trimmed = state.dealMeta.title.trim();
+    if (trimmed) {
+      return trimmed;
+    }
+  }
+  if (sample?.deal_title) {
+    const trimmed = String(sample.deal_title).trim();
+    if (trimmed) {
+      return trimmed;
+    }
+  }
+  if (dealId) {
+    return `Сделка #${dealId}`;
+  }
+  return 'Сделка';
 }
 
 function setDirectoryAlert(type, alert) {
