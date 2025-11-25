@@ -3304,7 +3304,7 @@ function replaceDirectoryItem(key, payload) {
   }
   const source = Array.isArray(state.trucks) ? state.trucks : [];
   const updated = source.map((item) => (item.id === payload.id ? payload : item));
-  state.trucks = sortDirectoryCollection(updated, 'trucks');
+  state.trucks = updated;
 }
 
 function sortDirectoryCollection(items, key) {
@@ -3363,7 +3363,6 @@ async function handleTruckSubmit(event) {
     });
     if (response?.data) {
       state.trucks.push(response.data);
-      state.trucks = sortDirectoryCollection(state.trucks, 'trucks');
       clearDirectoryAlert('truck');
       renderReferenceSelects();
       renderDirectoryLists();
@@ -3513,7 +3512,7 @@ async function refreshTrucksDirectory(button) {
   try {
     const response = await request('/api/trucks');
     const data = Array.isArray(response?.data) ? response.data : [];
-    state.trucks = sortDirectoryCollection(data, 'trucks');
+    state.trucks = data;
     state.directoryEditing.trucks = null;
     clearDirectoryAlert('truck');
     renderReferenceSelects();
