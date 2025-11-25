@@ -1603,7 +1603,7 @@ textarea:focus {
   flex-direction: column;
   gap: 12px;
   margin-top: 8px;
-  padding: 12px clamp(8px, 2vw, 16px) 0;
+  padding: 12px 24px 0;
   border-top: 1px solid rgba(15, 23, 42, 0.08);
 }
 
@@ -1611,8 +1611,6 @@ textarea:focus {
   display: flex;
   gap: 16px;
   align-items: flex-start;
-  max-width: 1080px;
-  margin: 0 auto;
   width: 100%;
 }
 
