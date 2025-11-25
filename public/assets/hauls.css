@@ -1033,7 +1033,7 @@ body.mobile-driver .mobile-app {
   padding: 0;
   background: transparent;
   width: 100%;
-  max-width: 1080px;
+  max-width: 1000px;
 }
 
 .directory-manager--inline summary {
