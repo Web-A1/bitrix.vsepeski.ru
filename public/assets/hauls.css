@@ -1489,8 +1489,8 @@ form#haul-form {
   gap: 24px;
   flex: 1;
   min-height: 0;
-  padding-bottom: calc(96px + env(safe-area-inset-bottom, 32px));
-  scroll-padding-bottom: calc(96px + env(safe-area-inset-bottom, 32px));
+  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  scroll-padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
 }
 
 form#haul-form::after {
@@ -1662,6 +1662,11 @@ form#haul-form .form-error--top {
   form#haul-form .form-group {
     grid-column: auto;
   }
+}
+
+form#haul-form {
+  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  scroll-padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
 }
 
 form#haul-form .form-error--top {
